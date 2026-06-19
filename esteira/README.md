@@ -1,10 +1,18 @@
-# Garimpo · Esteira (Fase 2)
+# Garimpo · Esteira (Fases 2 e 3)
 
-Cascata de enriquecimento em Python. Lê leads `bruto`, processa por fontes
-gratuitas e escreve `enriquecido`, gravando **proveniência por campo** e
-**match rate**. Roda de graça no cron do GitHub Actions — sem máquina ligada.
+Cascata em Python que leva o lead do `bruto` até o `rascunho_pronto`, sozinha:
 
-A esteira nunca contata ninguém (humano no loop).
+```
+bruto ──enrich──▶ enriquecido ──score──▶ qualificado ──draft──▶ rascunho_pronto
+                                     └──▶ descartado
+```
+
+- **enrich** (Fase 2): fontes gratuitas preenchem campos + proveniência + match rate.
+- **score** (Fase 3): regras puras do ICP → score explicável + qualifica/descarta.
+- **draft** (Fase 3): IA escreve as 2 mensagens (mock offline ou Gemini).
+
+Roda de graça no cron do GitHub Actions. A esteira **nunca contata ninguém**
+(humano no loop): só deixa o rascunho pronto pro humano aprovar e enviar.
 
 ## Rodar offline (sem banco)
 
@@ -13,14 +21,15 @@ cd esteira
 python3 -m venv .venv && . .venv/bin/activate
 pip install -e ".[dev]"
 
-# popular alguns leads bruto e enriquecer com fixtures (deterministico)
+# pipeline inteiro com fixtures + copy mock (deterministico)
 python -m garimpo_esteira.run seed-demo --sink jsonfile --json /tmp/g.json
-python -m garimpo_esteira.run enrich    --sink jsonfile --json /tmp/g.json --sources fixture --delay 0
+python -m garimpo_esteira.run pipeline  --sink jsonfile --json /tmp/g.json --sources fixture --llm mock --delay 0
 ```
 
-Saída mostra campos preenchidos, match rate e % com telefone (meta ≥80%).
+Estágios também rodam soltos: `enrich`, `score`, `draft`. Saída mostra campos
+preenchidos, % com telefone (meta ≥80%), score/decisão e os rascunhos.
 
-Testes: `python -m pytest` (30 testes, offline).
+Testes: `python -m pytest` (45 testes, offline).
 
 ## Fontes da cascata
 
@@ -33,6 +42,20 @@ Testes: `python -m pytest` (30 testes, offline).
 
 Maps (descoberta) tem o `grid.py` (contorna o teto de ~120 resultados via
 subdivisão adaptativa) — lógica pura, usada pela captação.
+
+## Score (Fase 3) — regras puras do ICP
+
+Sem LLM: determinístico, explicável (`score_reason` guarda cada critério e
+seus pontos), de graça. Corte em 50/100. Critérios: nota (4,3+), volume de
+avaliações (80–800), descuido digital (sem site/IG = ouro), "já anuncia?", e
+contato (sem telefone = descarte automático — não dá pra falar no WhatsApp).
+
+## Rascunho (Fase 3) — copy das 2 mensagens
+
+Provider trocável por `GARIMPO_LLM`: `mock` (template offline, R$0) ou
+`gemini` (free tier Flash, ~1.500 req/dia). Fluxo de 2 mensagens (abertura →
+pitch), personalizado pelos sinais. **Nunca envia.** Respeita opt-out (LGPD):
+lead opt-out não recebe rascunho de contato.
 
 ## Ligar no Supabase
 
@@ -64,8 +87,12 @@ src/garimpo_esteira/
   grid.py          grade do Maps (teto 120, subdivisao adaptativa)
   validation.py    valida conteudo, nao status HTTP
   match_rate.py    fracao de campos-alvo preenchidos
+  scoring.py       regras ICP puras -> score + score_reason explicavel
   sources/         cnpj, website, instagram, ad_library (+ base)
+  draft/           mock | gemini (+ prompt, base)
   sink/            jsonfile (offline) | supabase (REST service_role)
-  cascade.py       orquestrador (lotes, delays, idempotente)
-  run.py           CLI (seed-demo / enrich / counts)
+  cascade.py       enrich   (bruto -> enriquecido)
+  score_stage.py   score    (enriquecido -> qualificado/descartado)
+  draft_stage.py   draft    (qualificado -> rascunho_pronto)
+  run.py           CLI (seed-demo / enrich / score / draft / pipeline / counts)
 ```

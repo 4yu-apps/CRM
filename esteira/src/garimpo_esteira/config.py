@@ -11,6 +11,8 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from .draft.base import DraftProvider
+from .draft.mock import MockDraftProvider
 from .sink.base import LeadSink
 from .sink.jsonfile import JsonFileSink
 from .sources import AdLibrarySource, CnpjSource, InstagramSource, Source, WebsiteSource
@@ -29,6 +31,9 @@ class Config:
     batch: int = 20
     delay: float = 1.0
     ad_token: str | None = None
+    llm: str = "mock"                 # mock | gemini
+    gemini_key: str | None = None
+    gemini_model: str = "gemini-flash-latest"
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -42,6 +47,9 @@ class Config:
             batch=int(os.getenv("GARIMPO_BATCH", "20")),
             delay=float(os.getenv("GARIMPO_DELAY", "1.0")),
             ad_token=os.getenv("META_AD_LIBRARY_TOKEN"),
+            llm=os.getenv("GARIMPO_LLM", "mock"),
+            gemini_key=os.getenv("GEMINI_API_KEY"),
+            gemini_model=os.getenv("GEMINI_MODEL", "gemini-flash-latest"),
         )
 
 
@@ -81,3 +89,13 @@ def build_sources(cfg: Config) -> list[Source]:
         WebsiteSource(),
         AdLibrarySource(),
     ]
+
+
+def build_provider(cfg: Config) -> DraftProvider:
+    if cfg.llm == "gemini":
+        if not cfg.gemini_key:
+            raise SystemExit("GARIMPO_LLM=gemini exige GEMINI_API_KEY")
+        from .draft.gemini import GeminiDraftProvider
+
+        return GeminiDraftProvider(cfg.gemini_key, cfg.gemini_model)
+    return MockDraftProvider()

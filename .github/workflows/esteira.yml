@@ -29,7 +29,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -e .
-      - name: Enriquecer (bruto -> enriquecido)
+      - name: Pipeline (enrich -> score -> draft)
         env:
           GARIMPO_SINK: supabase
           GARIMPO_SOURCES: real
@@ -38,4 +38,8 @@ jobs:
           OWNER_USER_ID: ${{ secrets.OWNER_USER_ID }}
           GARIMPO_BATCH: ${{ github.event.inputs.batch || '20' }}
           GARIMPO_DELAY: "1.5"
-        run: python -m garimpo_esteira.run enrich
+          # llm=mock por padrao (R$0, sem chave). Defina a variavel de repo
+          # GARIMPO_LLM=gemini + o secret GEMINI_API_KEY para copy via Gemini.
+          GARIMPO_LLM: ${{ vars.GARIMPO_LLM || 'mock' }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python -m garimpo_esteira.run pipeline

@@ -90,6 +90,9 @@ class JsonFileSink:
         raw["updated_at"] = _now()
         self._save()
 
+    def fetch_provenance(self, lead_id: str) -> list[dict]:
+        return [p for p in self._db["provenance"] if p["lead_id"] == lead_id]
+
     def set_status(self, lead_id, to_status, actor="system", note=None) -> None:
         raw = self._db["leads"].get(lead_id)
         if not raw:

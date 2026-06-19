@@ -31,6 +31,10 @@ class LeadSink(Protocol):
     def update_lead_fields(self, lead_id: str, fields: dict[str, object]) -> None:
         ...
 
+    def fetch_provenance(self, lead_id: str) -> list[dict]:
+        """Proveniência do lead (inclui sinais que não são coluna, ex.: ads_active)."""
+        ...
+
     def set_status(
         self, lead_id: str, to_status: LeadStatus, actor: str = "system", note: str | None = None
     ) -> None:

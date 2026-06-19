@@ -65,6 +65,14 @@ const run = async () => {
   const [{ n }] = await one('select count(*)::int n from public.lead_status_transitions')
   n === 24 ? ok(`24 transicoes seedadas`) : bad(`transicoes = ${n}/24`)
 
+  // colunas de rascunho (Fase 3 · migration 7)
+  const draftCols = (await one(
+    `select column_name from information_schema.columns
+     where table_name='leads' and column_name = any($1)`,
+    [["draft_msg1", "draft_msg2", "draft_model", "draft_generated_at"]],
+  )).map(r => r.column_name)
+  draftCols.length === 4 ? ok("colunas de rascunho (Fase 3)") : bad(`colunas de rascunho = ${draftCols.length}/4`)
+
   const rls = await one(
     `select relname from pg_class where relnamespace='public'::regnamespace and relrowsecurity and relname=any($1)`,
     [tables])

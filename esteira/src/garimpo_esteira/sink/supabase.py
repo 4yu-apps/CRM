@@ -13,6 +13,7 @@ _LEAD_COLS = (
     "id", "owner_id", "status", "business_name", "cnpj", "phone", "email",
     "instagram", "website", "maps_place_id", "maps_url", "rating", "reviews_count",
     "category", "address", "neighborhood", "city", "state", "owner_name", "opt_out",
+    "score", "score_reason", "draft_msg1", "draft_msg2", "draft_model", "draft_generated_at",
 )
 
 
@@ -76,6 +77,11 @@ class SupabaseSink:
             return
         r = self._client.patch(f"{self.base}/leads", params={"id": f"eq.{lead_id}"}, json=clean)
         r.raise_for_status()
+
+    def fetch_provenance(self, lead_id: str) -> list[dict]:
+        r = self._client.get(f"{self.base}/lead_field_provenance", params={"lead_id": f"eq.{lead_id}"})
+        r.raise_for_status()
+        return r.json()
 
     def set_status(self, lead_id, to_status, actor="system", note=None) -> None:
         # RPC do banco: valida transição + guarda LGPD + grava histórico.

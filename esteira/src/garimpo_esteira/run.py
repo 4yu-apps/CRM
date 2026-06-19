@@ -11,8 +11,10 @@ import json
 from pathlib import Path
 
 from .cascade import enrich_batch
-from .config import FIXTURES_DIR, Config, build_sink, build_sources
+from .config import FIXTURES_DIR, Config, build_provider, build_sink, build_sources
+from .draft_stage import draft_batch
 from .models import Lead
+from .score_stage import score_batch
 from .validation import is_present
 
 DEMO_OWNER = "00000000-0000-0000-0000-0000000000aa"
@@ -29,6 +31,8 @@ def _apply_overrides(cfg: Config, args: argparse.Namespace) -> Config:
         cfg.batch = args.batch
     if args.delay is not None:
         cfg.delay = args.delay
+    if getattr(args, "llm", None):
+        cfg.llm = args.llm
     return cfg
 
 
@@ -68,6 +72,45 @@ def cmd_enrich(cfg: Config) -> int:
     return 0
 
 
+def cmd_score(cfg: Config) -> int:
+    sink = build_sink(cfg)
+    print(f"score · sink={cfg.sink} batch={cfg.batch}")
+    results = score_batch(sink, batch=cfg.batch)
+    if not results:
+        print("  nada para pontuar (status=enriquecido vazio)")
+        return 0
+    for r in results:
+        print(f"  score={r.score} -> {r.decision} ({r.reason['verdict']})")
+    qual = sum(1 for r in results if r.decision == "qualificado")
+    print(f"resumo: {len(results)} pontuados · {qual} qualificados · {len(results) - qual} descartados")
+    _print_counts(sink)
+    return 0
+
+
+def cmd_draft(cfg: Config) -> int:
+    sink = build_sink(cfg)
+    provider = build_provider(cfg)
+    print(f"draft · sink={cfg.sink} llm={cfg.llm} ({provider.model}) batch={cfg.batch}")
+    results = draft_batch(sink, provider, batch=cfg.batch)
+    if not results:
+        print("  nada para rascunhar (status=qualificado vazio)")
+        return 0
+    for lead_id, (msg1, _msg2) in results:
+        print(f"  {lead_id}: {msg1[:70]}…")
+    print(f"resumo: {len(results)} rascunhos prontos")
+    _print_counts(sink)
+    return 0
+
+
+def cmd_pipeline(cfg: Config) -> int:
+    """enrich -> score -> draft em sequência (bruto ... -> rascunho_pronto)."""
+    print("pipeline: enrich -> score -> draft")
+    cmd_enrich(cfg)
+    cmd_score(cfg)
+    cmd_draft(cfg)
+    return 0
+
+
 def cmd_counts(cfg: Config) -> int:
     _print_counts(build_sink(cfg))
     return 0
@@ -81,24 +124,27 @@ def _print_counts(sink) -> None:
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="garimpo-esteira")
     sub = p.add_subparsers(dest="cmd", required=True)
-    for name in ("seed-demo", "enrich", "counts"):
+    for name in ("seed-demo", "enrich", "score", "draft", "pipeline", "counts"):
         sp = sub.add_parser(name)
         sp.add_argument("--sink", choices=["jsonfile", "supabase"])
         sp.add_argument("--json")
         sp.add_argument("--sources", choices=["real", "fixture"])
+        sp.add_argument("--llm", choices=["mock", "gemini"])
         sp.add_argument("--batch", type=int)
         sp.add_argument("--delay", type=float)
 
     args = p.parse_args(argv)
     cfg = _apply_overrides(Config.from_env(), args)
 
-    if args.cmd == "seed-demo":
-        return cmd_seed_demo(cfg)
-    if args.cmd == "enrich":
-        return cmd_enrich(cfg)
-    if args.cmd == "counts":
-        return cmd_counts(cfg)
-    return 1
+    dispatch = {
+        "seed-demo": cmd_seed_demo,
+        "enrich": cmd_enrich,
+        "score": cmd_score,
+        "draft": cmd_draft,
+        "pipeline": cmd_pipeline,
+        "counts": cmd_counts,
+    }
+    return dispatch[args.cmd](cfg)
 
 
 if __name__ == "__main__":

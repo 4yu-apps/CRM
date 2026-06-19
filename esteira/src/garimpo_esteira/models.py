@@ -57,6 +57,16 @@ class Lead:
     owner_name: str | None = None
     opt_out: bool = False
 
+    # qualificação (Fase 3)
+    score: int | None = None
+    score_reason: dict[str, Any] | None = None
+
+    # rascunho (Fase 3)
+    draft_msg1: str | None = None
+    draft_msg2: str | None = None
+    draft_model: str | None = None
+    draft_generated_at: str | None = None
+
     extra: dict[str, Any] = field(default_factory=dict)
 
     def get(self, name: str) -> Any:
