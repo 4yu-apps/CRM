@@ -176,6 +176,35 @@ e o resumo de estado + de onde retomar.
 
 ---
 
+## 5.1 Indice de detalhes (feature -> fase -> onde esta o passo a passo)
+
+Cada item abaixo tem o detalhe acionavel no `PLANO-DE-EXECUCAO.md` (PE) na fase
+indicada. Use isto pra ir direto ao ponto.
+
+| Feature | Fase | Onde (detalhe) |
+|---|---|---|
+| Google Calendar (linkar agenda; evento ao cair em Reuniao) | B6 | PE B6 + usado em C5 (Funil) e conectado em C8 (Config) |
+| Anotacoes do lead (`notes`) | B8 | PE B8 + aparece em C3 (Ficha) |
+| Valor sugerido pela IA (na **Reuniao**) | B8 | PE B8 (`suggested_value`/`_reason`) + C5/C3 |
+| Valor fechado (no **Fechou**: `deal_value`, mensal fixo ou por prazo) | B8 | PE B8 (`deal_value/deal_billing/deal_term_months`) + C5 |
+| 2 servicos (badge, scoring por servico, copy) | B1 | PE B1 + ja no front (types/service/Fila) |
+| Perfil salvo + onboarding + raio + autopilot | B2 + C8 | PE B2 e C8 |
+| Dedup nome+endereco (4a chave) | B2 | PE B2 |
+| Cobertura por zona (mapa Leaflet) | B3 + C4 | PE B3 e C4 |
+| Feed de atividade ("o que rolou") | B4 + C1 | PE B4 e C1 |
+| Deltas semanais dos KPIs | C6 | PE C6 (sai do historico de status) |
+| Funil: click=ficha, drag=transition valida | C5 | PE C5 + "Mapeamento do funil" |
+| LGPD opt-out | C3 | PE C3 (logica ja no banco) |
+| Historico do funil (timeline) | C3 | PE C3 |
+| Undo / arquivar / reativar | F0 (logica feita) + C3/C5 (UI) | codigo + PE C3/C5 |
+| Segunda mensagem (msg2) | feito na Fila (C2) | front (Fila) |
+| Mobile (PWA + wa.me) | C7 | PE C7 |
+| Captacao real do Maps (enche o banco) | B7 | PE B7 |
+| Gemini real (copy) | B5 | PE B5 |
+| Auth Google + multi-tenant + onboarding | A2 | PE A2 |
+
+---
+
 ## 6. Pendencias que dependem do dono (precisam do console/OK dele)
 
 - **db:push** (aplicar migrations no Supabase real): o classificador do harness
