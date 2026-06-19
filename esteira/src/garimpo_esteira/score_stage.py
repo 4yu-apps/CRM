@@ -18,9 +18,14 @@ def _ads_signal(provenance: list[dict]) -> bool | None:
 
 
 def score_one(lead, sink: LeadSink) -> ScoreResult:
-    signals = {"ads_active": _ads_signal(sink.fetch_provenance(lead.id))}
-    result = score_lead(lead, signals)
-    sink.update_lead_fields(lead.id, {"score": result.score, "score_reason": result.reason})
+    ads_active = _ads_signal(sink.fetch_provenance(lead.id))
+    result = score_lead(lead, {"ads_active": ads_active})
+    sink.update_lead_fields(lead.id, {
+        "score": result.score,
+        "score_reason": result.reason,
+        "service_target": result.service_target,
+        "ads_active": ads_active,
+    })
     if lead.status != result.decision:
         sink.set_status(lead.id, result.decision, actor="system", note=f"score {result.score}")
     return result

@@ -23,6 +23,43 @@ def test_mock_provider_returns_two_messages():
     assert p.model == "mock"
 
 
+def _gen(service_target, **kw):
+    base = dict(id="l", owner_id="o", business_name="Negocio X", rating=4.6,
+                reviews_count=200, service_target=service_target)
+    base.update(kw)
+    return MockDraftProvider().generate(Lead(**base))
+
+
+def test_copy_por_servico_difere():
+    assert _gen("trafego") != _gen("automacao")
+
+
+def test_trafego_copy_fala_de_anuncio():
+    m1, m2 = _gen("trafego")
+    assert "Negocio X" in m1
+    assert "anúncio" in m1.lower() or "tráfego" in m2.lower() or "trafego" in m2.lower()
+
+
+def test_automacao_copy_fala_de_atendimento():
+    m1, m2 = _gen("automacao", category="Clínica odontológica")
+    assert "Negocio X" in m1
+    blob = (m1 + " " + m2).lower()
+    assert "atendimento" in blob or "agend" in blob
+    assert "autom" in blob
+
+
+def test_ambos_cita_o_outro_servico():
+    m1, m2 = _gen("ambos")
+    assert "autom" in (m1 + " " + m2).lower()
+
+
+def test_sem_travessao_em_nenhum_servico():
+    for st in ("trafego", "automacao", "ambos", "indefinido"):
+        m1, m2 = _gen(st, category="Clínica")
+        assert "—" not in (m1 + m2)
+        assert "–" not in (m1 + m2)
+
+
 def test_draft_stage_advances_to_rascunho_pronto(tmp_path):
     sink = _sink(tmp_path)
     lid = _qualificado(sink, business_name="Forte", phone="44999990001", rating=4.7, reviews_count=200)

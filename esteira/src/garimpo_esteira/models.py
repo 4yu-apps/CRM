@@ -16,6 +16,9 @@ LeadSource = Literal[
     "website", "meta_ad_library", "manual", "extension",
 ]
 
+# Servico-alvo do lead (B1): decidido pelo score (trafego x automacao x ambos).
+ServiceTarget = Literal["trafego", "automacao", "ambos", "indefinido"]
+
 # Campos do lead que as fontes podem preencher (proveniência por campo).
 ENRICHABLE_FIELDS = (
     "phone", "email", "instagram", "website", "owner_name", "cnpj",
@@ -57,9 +60,11 @@ class Lead:
     owner_name: str | None = None
     opt_out: bool = False
 
-    # qualificação (Fase 3)
+    # qualificação (Fase 3 + B1)
     score: int | None = None
     score_reason: dict[str, Any] | None = None
+    service_target: ServiceTarget = "indefinido"
+    ads_active: bool | None = None      # "ja anuncia?" (null = desconhecido)
 
     # rascunho (Fase 3)
     draft_msg1: str | None = None

@@ -13,7 +13,8 @@ _LEAD_COLS = (
     "id", "owner_id", "status", "business_name", "cnpj", "phone", "email",
     "instagram", "website", "maps_place_id", "maps_url", "rating", "reviews_count",
     "category", "address", "neighborhood", "city", "state", "owner_name", "opt_out",
-    "score", "score_reason", "draft_msg1", "draft_msg2", "draft_model", "draft_generated_at",
+    "score", "score_reason", "service_target", "ads_active",
+    "draft_msg1", "draft_msg2", "draft_model", "draft_generated_at",
 )
 
 

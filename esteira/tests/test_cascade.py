@@ -81,7 +81,7 @@ def test_dedup_blocks_same_cnpj(tmp_path):
     assert dup is None
 
 
-def test_ad_library_signal_is_provenance_not_column(tmp_path):
+def test_ad_library_signal_is_provenance_not_set_by_enrichment(tmp_path):
     sink = _sink(tmp_path)
     lid = sink.insert_lead(Lead(id="", owner_id="o", status="bruto", cnpj="11.222.333/0001-44"))
     enrich_batch(sink, _sources(ad_probe=lambda _lead: True), batch=20, delay=0)
@@ -89,8 +89,9 @@ def test_ad_library_signal_is_provenance_not_column(tmp_path):
     db = json.loads((tmp_path / "db.json").read_text("utf-8"))
     ads = [p for p in db["provenance"] if p["field_name"] == "ads_active"]
     assert ads and ads[0]["value"] == "sim"
-    # ads_active não é coluna do lead
-    assert "ads_active" not in db["leads"][lid]
+    # ads_active virou coluna (B1), mas o enriquecimento NAO a preenche:
+    # quem promove o sinal pra coluna do lead e o estagio de score.
+    assert db["leads"][lid].get("ads_active") is None
 
 
 def test_failing_source_does_not_break_cascade(tmp_path):
