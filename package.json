@@ -4,11 +4,13 @@
   "private": true,
   "description": "Garimpo — CRM de prospeccao assistida por IA, humano no loop. Monorepo: db (Supabase) + esteira (Python) + front (Next.js) + extensao (Chrome MV3).",
   "scripts": {
+    "db:validate": "node scripts/validate-local.mjs",
     "db:push": "bash scripts/db-push.sh",
     "db:push:dry": "bash scripts/db-push.sh --dry-run",
     "db:verify": "node scripts/verify.mjs"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.3",
     "pg": "^8.13.0",
     "supabase": "^2.0.0"
   }
