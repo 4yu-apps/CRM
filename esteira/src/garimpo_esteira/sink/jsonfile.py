@@ -115,6 +115,52 @@ class JsonFileSink:
             "to_status": to, "actor": actor, "note": note, "changed_at": _now(),
         })
 
+    def log_activity(
+        self, owner_id: str, tipo: str, text: str, ref_count: int | None = None
+    ) -> None:
+        self._db.setdefault("activity", [])
+        self._db["activity"].append({
+            "id": self._next_id("act"),
+            "owner_id": owner_id,
+            "tipo": tipo,
+            "text": text,
+            "ref_count": ref_count,
+            "created_at": _now(),
+        })
+        self._save()
+
+    def upsert_coverage(
+        self,
+        owner_id: str,
+        region_key: str,
+        niche: str,
+        *,
+        region_name: str | None = None,
+        center_lat: float | None = None,
+        center_lng: float | None = None,
+        pct: float = 0,
+        result_count: int = 0,
+    ) -> None:
+        self._db.setdefault("coverage", [])
+        record = {
+            "owner_id": owner_id,
+            "region_key": region_key,
+            "niche": niche,
+            "region_name": region_name,
+            "center_lat": center_lat,
+            "center_lng": center_lng,
+            "pct": pct,
+            "result_count": result_count,
+            "covered_at": _now(),
+        }
+        for i, c in enumerate(self._db["coverage"]):
+            if c["owner_id"] == owner_id and c["region_key"] == region_key and c["niche"] == niche:
+                self._db["coverage"][i] = record
+                self._save()
+                return
+        self._db["coverage"].append(record)
+        self._save()
+
     # ---- util ----
     def counts(self) -> dict[str, int]:
         out: dict[str, int] = {}

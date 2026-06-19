@@ -10,11 +10,17 @@ Fonte de resultados e injetada: fixture (offline) ou Places (gated por chave).
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Iterable, Protocol, runtime_checkable
 
 from .models import Finding, Lead
 from .validation import clean
+
+
+def _region_key(term: str) -> str:
+    """Gera chave estavel de regiao a partir do termo de busca."""
+    return re.sub(r"[^a-z0-9]+", "-", term.lower()).strip("-")
 
 
 @runtime_checkable
@@ -55,15 +61,38 @@ def result_to_lead(raw: dict, owner_id: str) -> tuple[Lead, list[Finding]]:
 def discover(sink, maps_source: MapsSource, terms: Iterable[str], owner_id: str) -> dict:
     inserted, skipped = 0, 0
     for term in terms:
-        for raw in maps_source.search(term):
+        results = maps_source.search(term)
+        term_inserted = 0
+        for raw in results:
             lead, findings = result_to_lead(raw, owner_id)
             lead_id = sink.insert_lead(lead)
             if not lead_id:  # dedup
                 skipped += 1
                 continue
-            inserted += 1
+            term_inserted += 1
             for f in findings:
                 sink.record_provenance(lead_id, f.field_name, f.source, f.value, f.confidence)
+        inserted += term_inserted
+        if term_inserted > 0:
+            try:
+                sink.log_activity(
+                    owner_id,
+                    "busca",
+                    f"Varri {term} e achei {term_inserted} negocios novos",
+                    ref_count=term_inserted,
+                )
+            except Exception:
+                pass
+            try:
+                rkey = _region_key(term)
+                sink.upsert_coverage(
+                    owner_id,
+                    rkey,
+                    term,
+                    result_count=term_inserted,
+                )
+            except Exception:
+                pass
     return {"inserted": inserted, "skipped": skipped}
 
 

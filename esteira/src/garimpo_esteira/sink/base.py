@@ -39,3 +39,24 @@ class LeadSink(Protocol):
         self, lead_id: str, to_status: LeadStatus, actor: str = "system", note: str | None = None
     ) -> None:
         ...
+
+    def log_activity(
+        self, owner_id: str, tipo: str, text: str, ref_count: int | None = None
+    ) -> None:
+        """Registra uma atividade no log do usuario. Efeito colateral; falha silenciosa."""
+        ...
+
+    def upsert_coverage(
+        self,
+        owner_id: str,
+        region_key: str,
+        niche: str,
+        *,
+        region_name: str | None = None,
+        center_lat: float | None = None,
+        center_lng: float | None = None,
+        pct: float = 0,
+        result_count: int = 0,
+    ) -> None:
+        """Upsert de cobertura de varredura por (owner_id, region_key, niche)."""
+        ...

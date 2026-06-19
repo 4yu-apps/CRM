@@ -30,9 +30,22 @@ def draft_one(lead, provider: DraftProvider, sink: LeadSink) -> tuple[str, str] 
 def draft_batch(
     sink: LeadSink, provider: DraftProvider, *, batch: int = 20, status="qualificado"
 ) -> list[tuple[str, tuple[str, str]]]:
+    leads = sink.fetch_by_status(status, batch)
     out: list[tuple[str, tuple[str, str]]] = []
-    for lead in sink.fetch_by_status(status, batch):
+    for lead in leads:
         result = draft_one(lead, provider, sink)
         if result:
             out.append((lead.id, result))
+    if out and leads:
+        owner_id = leads[0].owner_id or ""
+        n = len(out)
+        try:
+            sink.log_activity(
+                owner_id,
+                "rascunho",
+                f"Escrevi a abordagem de {n} leads, prontos pra voce revisar",
+                ref_count=n,
+            )
+        except Exception:
+            pass
     return out

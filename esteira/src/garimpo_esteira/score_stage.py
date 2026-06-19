@@ -32,4 +32,19 @@ def score_one(lead, sink: LeadSink) -> ScoreResult:
 
 
 def score_batch(sink: LeadSink, *, batch: int = 20, status="enriquecido") -> list[ScoreResult]:
-    return [score_one(lead, sink) for lead in sink.fetch_by_status(status, batch)]
+    leads = sink.fetch_by_status(status, batch)
+    results = [score_one(lead, sink) for lead in leads]
+    discarded = [r for r in results if r.decision == "descartado"]
+    if discarded and leads:
+        owner_id = leads[0].owner_id or ""
+        n = len(discarded)
+        try:
+            sink.log_activity(
+                owner_id,
+                "descarte",
+                f"Descartei {n} que nao batem com o perfil",
+                ref_count=n,
+            )
+        except Exception:
+            pass
+    return results

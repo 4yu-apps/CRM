@@ -61,4 +61,16 @@ def enrich_batch(
         results.append(enrich_lead(lead, sources, sink))
         if delay and i < len(leads) - 1:
             time.sleep(delay)
+    if results:
+        owner_id = leads[0].owner_id or ""
+        n = len(results)
+        try:
+            sink.log_activity(
+                owner_id,
+                "enriquecimento",
+                f"Enriqueci {n} negocios com telefone, redes e site",
+                ref_count=n,
+            )
+        except Exception:
+            pass
     return results

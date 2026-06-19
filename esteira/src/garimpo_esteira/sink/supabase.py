@@ -92,5 +92,53 @@ class SupabaseSink:
         )
         r.raise_for_status()
 
+    def log_activity(
+        self, owner_id: str, tipo: str, text: str, ref_count: int | None = None
+    ) -> None:
+        try:
+            payload: dict = {"owner_id": owner_id, "tipo": tipo, "text": text}
+            if ref_count is not None:
+                payload["ref_count"] = ref_count
+            r = self._client.post(f"{self.base}/activity_log", json=payload)
+            r.raise_for_status()
+        except Exception:
+            pass  # log de atividade nao derruba o pipeline
+
+    def upsert_coverage(
+        self,
+        owner_id: str,
+        region_key: str,
+        niche: str,
+        *,
+        region_name: str | None = None,
+        center_lat: float | None = None,
+        center_lng: float | None = None,
+        pct: float = 0,
+        result_count: int = 0,
+    ) -> None:
+        try:
+            payload: dict = {
+                "owner_id": owner_id,
+                "region_key": region_key,
+                "niche": niche,
+                "pct": pct,
+                "result_count": result_count,
+            }
+            if region_name is not None:
+                payload["region_name"] = region_name
+            if center_lat is not None:
+                payload["center_lat"] = center_lat
+            if center_lng is not None:
+                payload["center_lng"] = center_lng
+            r = self._client.post(
+                f"{self.base}/scan_coverage",
+                params={"on_conflict": "owner_id,region_key,niche"},
+                headers={"Prefer": "resolution=merge-duplicates"},
+                json=payload,
+            )
+            r.raise_for_status()
+        except Exception:
+            pass  # cobertura nao derruba o pipeline
+
     def close(self) -> None:
         self._client.close()
