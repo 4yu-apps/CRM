@@ -1,17 +1,28 @@
 {
   "manifest_version": 3,
-  "name": "Garimpo — WhatsApp",
+  "name": "Garimpo — WhatsApp + Maps",
   "version": "0.1.0",
-  "description": "Card lateral read-only no WhatsApp Web: casa a conversa aberta com o lead e atualiza o status em 1 clique. Nunca envia.",
+  "description": "Card lateral read-only no WhatsApp Web e captacao de leads direto do Google Maps. Nunca envia.",
   "permissions": ["storage"],
   "host_permissions": [
     "https://web.whatsapp.com/*",
+    "https://www.google.com/maps/*",
+    "https://google.com/maps/*",
     "https://*.supabase.co/*"
   ],
   "content_scripts": [
     {
       "matches": ["https://web.whatsapp.com/*"],
       "js": ["content.bundle.js"],
+      "css": ["src/content/panel.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.google.com/maps/*",
+        "https://google.com/maps/*"
+      ],
+      "js": ["maps.bundle.js"],
       "css": ["src/content/panel.css"],
       "run_at": "document_idle"
     }

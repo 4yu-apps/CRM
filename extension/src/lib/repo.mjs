@@ -16,6 +16,15 @@ function mockRepo() {
       lead.status = to;
       return { ...lead };
     },
+    // Mock: simula insercao, detecta duplicata por maps_place_id.
+    async insertLead(lead) {
+      const dup = lead.maps_place_id &&
+        leads.find((l) => l.maps_place_id === lead.maps_place_id);
+      if (dup) return null;
+      const id = `mock-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      leads.push({ ...lead, id, status: "bruto" });
+      return id;
+    },
   };
 }
 
@@ -43,6 +52,21 @@ function supabaseRepo(cfg) {
       if (!r.ok) throw new Error(`transition: ${r.status} ${await r.text()}`);
       const data = await r.json();
       return Array.isArray(data) ? data[0] : data;
+    },
+    // Insere um lead bruto vindo do Google Maps. owner_id cai no default
+    // do banco (auth.uid() via RLS). Retorna o id do registro criado,
+    // ou null se ja existia (HTTP 409 = violacao do indice unico place_id).
+    async insertLead(lead) {
+      const r = await fetch(`${base}/leads`, {
+        method: "POST",
+        headers: { ...headers, Prefer: "return=representation" },
+        body: JSON.stringify({ ...lead, status: "bruto" }),
+      });
+      if (r.status === 409) return null; // duplicata: ja existe, pula
+      if (!r.ok) throw new Error(`insertLead: ${r.status} ${await r.text()}`);
+      const data = await r.json();
+      const row = Array.isArray(data) ? data[0] : data;
+      return row?.id ?? null;
     },
   };
 }

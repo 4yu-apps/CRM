@@ -1,0 +1,352 @@
+(() => {
+  // src/lib/config.mjs
+  var DEFAULTS = {
+    dataSource: "mock",
+    // mock | supabase
+    supabaseUrl: "",
+    anonKey: "",
+    accessToken: ""
+    // JWT do usuario logado (RLS)
+  };
+  async function getConfig() {
+    if (typeof chrome === "undefined" || !chrome.storage) return { ...DEFAULTS };
+    const stored = await chrome.storage.local.get(Object.keys(DEFAULTS));
+    return { ...DEFAULTS, ...stored };
+  }
+  function activeDataSource(cfg) {
+    return cfg.dataSource === "supabase" && cfg.supabaseUrl && cfg.anonKey ? "supabase" : "mock";
+  }
+
+  // src/lib/mock-data.mjs
+  var MOCK_LEADS = [
+    { id: "lead-1", business_name: "Studio Bella Estetica", phone: "44999990002", status: "rascunho_pronto", opt_out: false, city: "Maringa", score: 88 },
+    { id: "lead-2", business_name: "Hamburgueria do Ze", phone: "44999990003", status: "aprovado", opt_out: false, city: "Maringa", score: 88 },
+    { id: "lead-3", business_name: "Otica Visao Clara", phone: "44999990006", status: "enviado", opt_out: false, city: "Maringa", score: 68 },
+    { id: "lead-4", business_name: "Academia CorpoFit", phone: "44999990008", status: "respondeu", opt_out: false, city: "Maringa", score: 79 },
+    { id: "lead-5", business_name: "Clinica OdontoSorriso", phone: "44999990009", status: "interessado", opt_out: false, city: "Maringa", score: 85 },
+    { id: "lead-6", business_name: "Doceria Acucar & Arte", phone: "44999990015", status: "enriquecido", opt_out: true, city: "Maringa", score: null }
+  ];
+
+  // src/lib/repo.mjs
+  function mockRepo() {
+    const leads = MOCK_LEADS.map((l) => ({ ...l }));
+    return {
+      source: "mock",
+      async listLeads() {
+        return leads.map((l) => ({ ...l }));
+      },
+      async transition(id, to) {
+        const lead = leads.find((l) => l.id === id);
+        if (!lead) throw new Error("lead nao encontrado");
+        lead.status = to;
+        return { ...lead };
+      },
+      // Mock: simula insercao, detecta duplicata por maps_place_id.
+      async insertLead(lead) {
+        const dup = lead.maps_place_id && leads.find((l) => l.maps_place_id === lead.maps_place_id);
+        if (dup) return null;
+        const id = `mock-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+        leads.push({ ...lead, id, status: "bruto" });
+        return id;
+      }
+    };
+  }
+  function supabaseRepo(cfg) {
+    const base = cfg.supabaseUrl.replace(/\/$/, "") + "/rest/v1";
+    const headers = {
+      apikey: cfg.anonKey,
+      Authorization: `Bearer ${cfg.accessToken || cfg.anonKey}`,
+      "Content-Type": "application/json"
+    };
+    return {
+      source: "supabase",
+      async listLeads() {
+        const r = await fetch(`${base}/leads?select=*&order=updated_at.desc`, { headers });
+        if (!r.ok) throw new Error(`leads: ${r.status}`);
+        return r.json();
+      },
+      async transition(id, to) {
+        const r = await fetch(`${base}/rpc/transition_lead`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ p_lead_id: id, p_new_status: to, p_actor: "extension", p_note: null })
+        });
+        if (!r.ok) throw new Error(`transition: ${r.status} ${await r.text()}`);
+        const data = await r.json();
+        return Array.isArray(data) ? data[0] : data;
+      },
+      // Insere um lead bruto vindo do Google Maps. owner_id cai no default
+      // do banco (auth.uid() via RLS). Retorna o id do registro criado,
+      // ou null se ja existia (HTTP 409 = violacao do indice unico place_id).
+      async insertLead(lead) {
+        const r = await fetch(`${base}/leads`, {
+          method: "POST",
+          headers: { ...headers, Prefer: "return=representation" },
+          body: JSON.stringify({ ...lead, status: "bruto" })
+        });
+        if (r.status === 409) return null;
+        if (!r.ok) throw new Error(`insertLead: ${r.status} ${await r.text()}`);
+        const data = await r.json();
+        const row = Array.isArray(data) ? data[0] : data;
+        return row?.id ?? null;
+      }
+    };
+  }
+  function createRepo(cfg) {
+    return activeDataSource(cfg) === "supabase" ? supabaseRepo(cfg) : mockRepo();
+  }
+
+  // src/lib/maps-parse.mjs
+  function extractPlaceId(href) {
+    if (!href) return "";
+    const m1 = href.match(/[!,]1s([A-Za-z0-9_:-]{10,})/);
+    if (m1) return m1[1];
+    try {
+      const u = new URL(href, "https://www.google.com");
+      const p = u.searchParams.get("placeid") || u.searchParams.get("place_id");
+      if (p) return p;
+    } catch (_) {
+    }
+    return "";
+  }
+  function parseRatingText(text) {
+    if (!text) return { rating: null, reviews_count: null };
+    const ratingMatch = text.match(/\b(\d)[,.](\d)\b/);
+    if (!ratingMatch) return { rating: null, reviews_count: null };
+    const rating = parseFloat(`${ratingMatch[1]}.${ratingMatch[2]}`);
+    const afterRating = text.slice(text.indexOf(ratingMatch[0]) + ratingMatch[0].length);
+    const allNums = [...afterRating.matchAll(/\b(\d[\d.,]*\d|\d)\b/g)].map((m) => parseInt(m[1].replace(/[.,]/g, ""), 10)).filter((n) => !isNaN(n));
+    let reviews_count = null;
+    if (allNums.length > 0) {
+      const big = allNums.find((n) => n > 5);
+      reviews_count = big !== void 0 ? big : allNums[allNums.length - 1];
+    }
+    return {
+      rating: isNaN(rating) ? null : Math.min(5, Math.max(0, rating)),
+      reviews_count
+    };
+  }
+  function parseState(address) {
+    if (!address) return "";
+    const m = address.match(/[-,]\s*([A-Z]{2})\s*(?:\d{5}|$)/);
+    return m ? m[1] : "";
+  }
+  function parseCity(address) {
+    if (!address) return "";
+    const m = address.match(/,\s*([^,]+?)\s*-\s*[A-Z]{2}/);
+    return m ? m[1].trim() : "";
+  }
+  function parseCard(card) {
+    if (!card) return null;
+    let business_name = "";
+    const nameLink = card.querySelector("a[aria-label]");
+    if (nameLink) {
+      business_name = (nameLink.getAttribute("aria-label") || "").trim();
+    }
+    if (!business_name) {
+      const h = card.querySelector('[role="heading"], [role="img"][aria-label]');
+      business_name = h ? (h.getAttribute("aria-label") || h.textContent || "").trim() : "";
+    }
+    if (!business_name) {
+      for (const el of card.querySelectorAll("span, div")) {
+        const t = (el.textContent || "").trim();
+        if (t.length > 2 && t.length < 120 && !t.includes("\n")) {
+          business_name = t;
+          break;
+        }
+      }
+    }
+    let maps_url = "";
+    let maps_place_id = "";
+    const linkEl = card.querySelector('a[href*="/maps/"]') || card.querySelector('a[href*="google.com/maps"]');
+    if (linkEl) {
+      const href = linkEl.getAttribute("href") || "";
+      maps_url = href.startsWith("http") ? href : `https://www.google.com${href}`;
+      maps_place_id = extractPlaceId(href);
+    }
+    let rating = null;
+    let reviews_count = null;
+    const ratingEl = card.querySelector('[aria-label*="estrela"], [aria-label*="star"], [aria-label*="avalia"]');
+    if (ratingEl) {
+      const label = ratingEl.getAttribute("aria-label") || ratingEl.textContent || "";
+      const parsed = parseRatingText(label);
+      rating = parsed.rating;
+      reviews_count = parsed.reviews_count;
+    }
+    if (rating === null) {
+      for (const el of card.querySelectorAll("span")) {
+        const t = (el.textContent || "").trim();
+        if (/^[\d][,.][\d]$/.test(t)) {
+          rating = parseFloat(t.replace(",", "."));
+          break;
+        }
+      }
+    }
+    let category = "";
+    const catEl = card.querySelector('[jsaction*="category"], [data-value*="category"]');
+    if (catEl) category = (catEl.textContent || "").trim();
+    if (!category) {
+      const spans = Array.from(card.querySelectorAll("span"));
+      for (const sp of spans) {
+        const t = (sp.textContent || "").trim();
+        if (t.length > 1 && t.length < 60 && !/\d/.test(t) && !t.includes("\n") && t !== business_name) {
+          category = t;
+          break;
+        }
+      }
+    }
+    let address = "";
+    const addrEl = card.querySelector('[aria-label*="ndereco"], [aria-label*="Address"], [data-tooltip*="ndereco"]');
+    if (addrEl) address = (addrEl.getAttribute("aria-label") || addrEl.textContent || "").replace(/^[Ee]ndere[cç]o:\s*/i, "").trim();
+    if (!address) {
+      for (const el of card.querySelectorAll("span, div")) {
+        const t = (el.textContent || "").trim();
+        if (t.length > 10 && t.length < 200 && /\d/.test(t) && t.includes(",")) {
+          address = t;
+          break;
+        }
+      }
+    }
+    const state = parseState(address);
+    const city = parseCity(address);
+    return {
+      business_name,
+      maps_place_id,
+      maps_url,
+      rating,
+      reviews_count,
+      category,
+      address,
+      neighborhood: "",
+      // nao disponivel diretamente no card da lista
+      city,
+      state
+    };
+  }
+  function parseResultsList(root) {
+    if (!root) return [];
+    let cards = Array.from(root.querySelectorAll('[role="article"]'));
+    if (cards.length === 0) {
+      const links = Array.from(root.querySelectorAll('a[href*="/maps/place/"]'));
+      const parents = new Set(links.map((l) => l.closest("li, [jsaction], [data-result-index]") || l.parentElement));
+      cards = Array.from(parents).filter(Boolean);
+    }
+    return cards.map((c) => {
+      try {
+        return parseCard(c);
+      } catch (_) {
+        return null;
+      }
+    }).filter((r) => r && r.business_name);
+  }
+
+  // src/content/maps.mjs
+  var PANEL_ID = "garimpo-maps-panel";
+  async function init() {
+    mountPanel();
+    window.addEventListener("popstate", () => syncCount());
+    const obs = new MutationObserver(debounce(syncCount, 800));
+    obs.observe(document.body, { childList: true, subtree: true });
+    syncCount();
+  }
+  function mountPanel() {
+    if (document.getElementById(PANEL_ID)) return;
+    const panel = document.createElement("div");
+    panel.id = PANEL_ID;
+    panel.innerHTML = `
+    <div class="gm-head">
+      <span class="gm-logo">Garimpo</span>
+      <button class="gm-min" title="minimizar">_</button>
+    </div>
+    <div class="gm-body">
+      <p class="gm-hint">Busque negocios no Maps e clique para capturar.</p>
+      <button class="gm-capture" id="gm-capture-btn" disabled>Capturar</button>
+      <p class="gm-count" id="gm-count"></p>
+      <p class="gm-result" id="gm-result"></p>
+    </div>`;
+    document.body.append(panel);
+    panel.querySelector(".gm-min").addEventListener("click", () => {
+      panel.classList.toggle("gm-collapsed");
+    });
+    document.getElementById("gm-capture-btn").addEventListener("click", runCapture);
+  }
+  function syncCount() {
+    const results = parseResultsList(document);
+    const btn = document.getElementById("gm-capture-btn");
+    const countEl = document.getElementById("gm-count");
+    if (!btn) return;
+    if (results.length === 0) {
+      btn.disabled = true;
+      btn.textContent = "Capturar";
+      if (countEl) countEl.textContent = "Nenhum negocio visivel na lista.";
+      return;
+    }
+    btn.disabled = false;
+    btn.textContent = `Capturar ${results.length} negocio${results.length > 1 ? "s" : ""}`;
+    if (countEl) countEl.textContent = "";
+  }
+  async function runCapture() {
+    const btn = document.getElementById("gm-capture-btn");
+    const resultEl = document.getElementById("gm-result");
+    const countEl = document.getElementById("gm-count");
+    if (!btn) return;
+    const leads = parseResultsList(document);
+    if (leads.length === 0) {
+      if (resultEl) resultEl.textContent = "Nenhum negocio encontrado na lista atual.";
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = "Inserindo...";
+    if (resultEl) resultEl.textContent = "";
+    if (countEl) countEl.textContent = "";
+    let cfg;
+    try {
+      cfg = await getConfig();
+    } catch (e) {
+      showResult(`Erro ao ler configuracao: ${e.message}`, true);
+      btn.disabled = false;
+      syncCount();
+      return;
+    }
+    const repo = createRepo(cfg);
+    const isMock = repo.source === "mock";
+    let inserted = 0;
+    let duplicates = 0;
+    let errors = 0;
+    for (const lead of leads) {
+      try {
+        const id = await repo.insertLead(lead);
+        if (id === null) {
+          duplicates++;
+        } else {
+          inserted++;
+        }
+      } catch (e) {
+        errors++;
+        console.warn("[garimpo] erro ao inserir lead:", lead.business_name, e.message);
+      }
+    }
+    const parts = [];
+    if (inserted > 0) parts.push(`${inserted} capturado${inserted > 1 ? "s" : ""}`);
+    if (duplicates > 0) parts.push(`${duplicates} repetido${duplicates > 1 ? "s" : ""}`);
+    if (errors > 0) parts.push(`${errors} com erro`);
+    const msg = parts.join(", ") + (isMock ? " (modo mock)" : "");
+    showResult(msg, errors > 0 && inserted === 0);
+    btn.disabled = false;
+    btn.textContent = `Capturar ${leads.length} negocio${leads.length > 1 ? "s" : ""}`;
+  }
+  function showResult(msg, isError = false) {
+    const el = document.getElementById("gm-result");
+    if (!el) return;
+    el.textContent = msg;
+    el.className = isError ? "gm-result gm-err" : "gm-result gm-ok";
+  }
+  function debounce(fn, ms) {
+    let t;
+    return (...args) => {
+      clearTimeout(t);
+      t = setTimeout(() => fn(...args), ms);
+    };
+  }
+  init().catch((e) => console.error("[garimpo-maps]", e));
+})();

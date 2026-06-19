@@ -109,6 +109,35 @@ const run = async () => {
     [tables])
   rls.length === 4 ? ok('RLS ligado nas 4 tabelas') : bad(`RLS em ${rls.length}/4`)
 
+  // B2/B3/B4 — 3 tabelas novas (search_profile, scan_coverage, activity_log)
+  const newTables = ['search_profile', 'scan_coverage', 'activity_log']
+  const newTablesGot = (await one(
+    `select table_name from information_schema.tables where table_schema='public' and table_name = any($1)`,
+    [newTables])).map(r => r.table_name)
+  for (const t of newTables) newTablesGot.includes(t) ? ok(`tabela ${t}`) : bad(`tabela ${t} AUSENTE`)
+
+  // enum activity_type (5 labels)
+  const atLabels = (await one(
+    `select e.enumlabel from pg_enum e join pg_type t on t.oid=e.enumtypid where t.typname='activity_type'`
+  )).map(r => r.enumlabel)
+  atLabels.length === 5 ? ok('enum activity_type (5 valores)') : bad(`enum activity_type = ${atLabels.length}/5`)
+
+  // coluna leads.name_addr_normalized (gerada)
+  const nameAddrGen = await one(
+    `select 1 from information_schema.columns where table_name='leads' and column_name='name_addr_normalized' and is_generated='ALWAYS'`)
+  nameAddrGen.length ? ok('coluna leads.name_addr_normalized (gerada)') : bad('coluna leads.name_addr_normalized AUSENTE ou nao gerada')
+
+  // indice leads_owner_name_addr_uniq
+  const nameAddrIdx = await one(
+    `select 1 from pg_indexes where tablename='leads' and indexname='leads_owner_name_addr_uniq'`)
+  nameAddrIdx.length ? ok('indice leads_owner_name_addr_uniq') : bad('indice leads_owner_name_addr_uniq AUSENTE')
+
+  // RLS nas 3 tabelas novas
+  const newRls = await one(
+    `select relname from pg_class where relnamespace='public'::regnamespace and relrowsecurity and relname=any($1)`,
+    [newTables])
+  newRls.length === 3 ? ok('RLS ligado nas 3 tabelas novas') : bad(`RLS em ${newRls.length}/3 tabelas novas`)
+
   // ---- comportamento: dedup / normalizacao / historico ----
   section('Comportamento — insert, normalizacao, historico')
   const U1 = '11111111-1111-1111-1111-111111111111'

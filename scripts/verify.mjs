@@ -93,6 +93,31 @@ const checks = async () => {
      where table_name='leads' and column_name = any($1)`, [b8names]
   )).map(r => r.column_name)
   b8.length === b8names.length ? ok(`colunas B8 (${b8.length})`) : bad(`colunas B8 = ${b8.length}/${b8names.length}`)
+
+  // 10. B2/B3/B4 — 3 tabelas novas + enum activity_type + coluna gerada name_addr_normalized + indice
+  const newTables = ['search_profile', 'scan_coverage', 'activity_log']
+  const newTablesGot = (await q(
+    `select table_name from information_schema.tables where table_schema='public' and table_name = any($1)`,
+    [newTables])).map(r => r.table_name)
+  for (const t of newTables) newTablesGot.includes(t) ? ok(`tabela ${t}`) : bad(`tabela ${t} AUSENTE`)
+
+  const atLabels = (await q(
+    `select e.enumlabel from pg_enum e join pg_type t on t.oid=e.enumtypid where t.typname='activity_type'`
+  )).map(r => r.enumlabel)
+  atLabels.length === 5 ? ok(`enum activity_type (${atLabels.length} valores)`) : bad(`enum activity_type = ${atLabels.length}/5`)
+
+  const nameAddrGen = await q(
+    `select 1 from information_schema.columns where table_name='leads' and column_name='name_addr_normalized' and is_generated='ALWAYS'`)
+  nameAddrGen.length ? ok('coluna leads.name_addr_normalized (gerada)') : bad('coluna leads.name_addr_normalized AUSENTE ou nao gerada')
+
+  const nameAddrIdx = await q(
+    `select 1 from pg_indexes where tablename='leads' and indexname='leads_owner_name_addr_uniq'`)
+  nameAddrIdx.length ? ok('indice leads_owner_name_addr_uniq') : bad('indice leads_owner_name_addr_uniq AUSENTE')
+
+  const newRls = await q(
+    `select relname from pg_class where relnamespace='public'::regnamespace and relrowsecurity and relname=any($1)`,
+    [newTables])
+  newRls.length === 3 ? ok('RLS ligado nas 3 tabelas novas') : bad(`RLS em ${newRls.length}/3 tabelas novas`)
 }
 
 client.connect()

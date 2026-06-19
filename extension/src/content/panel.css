@@ -86,6 +86,66 @@
   font-size: 12px;
 }
 
+/* ---- Painel Maps (B7) ---- */
+#garimpo-maps-panel {
+  position: fixed;
+  bottom: 24px;
+  right: 20px;
+  width: 230px;
+  z-index: 2147483000;
+  background: #fff;
+  border: 1px solid #e4e4e7;
+  border-radius: 12px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.16);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 13px;
+  color: #18181b;
+  overflow: hidden;
+}
+#garimpo-maps-panel.gm-collapsed .gm-body { display: none; }
+
+#garimpo-maps-panel .gm-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #0f172a;
+  color: #fff;
+}
+#garimpo-maps-panel .gm-logo { font-weight: 700; }
+#garimpo-maps-panel .gm-min {
+  margin-left: auto;
+  background: transparent;
+  border: 0;
+  color: #fff;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}
+#garimpo-maps-panel .gm-body {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+#garimpo-maps-panel .gm-hint { color: #71717a; font-size: 12px; margin: 0; }
+#garimpo-maps-panel .gm-count { color: #71717a; font-size: 11px; margin: 0; }
+#garimpo-maps-panel .gm-result { font-size: 12px; margin: 0; font-weight: 500; }
+#garimpo-maps-panel .gm-result.gm-ok { color: #047857; }
+#garimpo-maps-panel .gm-result.gm-err { color: #b91c1c; }
+#garimpo-maps-panel .gm-capture {
+  border: 1px solid #e4e4e7;
+  background: #0f172a;
+  color: #fff;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  font-weight: 500;
+}
+#garimpo-maps-panel .gm-capture:hover:not(:disabled) { background: #1e293b; }
+#garimpo-maps-panel .gm-capture:disabled { opacity: .45; cursor: not-allowed; }
+
 #gp-toast {
   position: fixed;
   bottom: 20px;
