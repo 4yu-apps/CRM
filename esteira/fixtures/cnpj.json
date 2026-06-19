@@ -1,0 +1,26 @@
+{
+  "11222333000144": {
+    "cnpj": "11222333000144",
+    "razao_social": "STUDIO BELLA ESTETICA LTDA",
+    "nome_fantasia": "Studio Bella Estetica",
+    "ddd_telefone_1": "44 99999-0002",
+    "email": "contato@studiobella.com.br",
+    "qsa": [{ "nome_socio": "Marina Alves" }]
+  },
+  "22333444000155": {
+    "cnpj": "22333444000155",
+    "razao_social": "HAMBURGUERIA DO ZE LTDA",
+    "nome_fantasia": "Hamburgueria do Ze",
+    "ddd_telefone_1": "4433330003",
+    "email": null,
+    "qsa": [{ "nome_socio": "Jose Pereira" }]
+  },
+  "33444555000166": {
+    "cnpj": "33444555000166",
+    "razao_social": "AUTO CENTER TURBO EIRELI",
+    "nome_fantasia": "Auto Center Turbo",
+    "ddd_telefone_1": "(44) 3030-0012",
+    "email": "turbo@autocenter.com",
+    "qsa": [{ "nome_socio": "Carlos Menezes" }]
+  }
+}

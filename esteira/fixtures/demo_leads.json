@@ -1,0 +1,39 @@
+[
+  {
+    "business_name": "Studio Bella Estetica",
+    "cnpj": "11.222.333/0001-44",
+    "category": "Estetica",
+    "city": "Maringa",
+    "state": "PR",
+    "neighborhood": "Zona 1",
+    "instagram": "instagram.com/studiobella",
+    "maps_place_id": "demo_place_1"
+  },
+  {
+    "business_name": "Hamburgueria do Ze",
+    "cnpj": "22.333.444/0001-55",
+    "category": "Hamburgueria",
+    "city": "Maringa",
+    "state": "PR",
+    "neighborhood": "Centro",
+    "maps_place_id": "demo_place_2"
+  },
+  {
+    "business_name": "Auto Center Turbo",
+    "cnpj": "33.444.555/0001-66",
+    "category": "Oficina mecanica",
+    "city": "Maringa",
+    "state": "PR",
+    "website": "autocenterturbo.com.br",
+    "maps_place_id": "demo_place_3"
+  },
+  {
+    "business_name": "Pizzaria Forno di Maria",
+    "category": "Pizzaria",
+    "city": "Maringa",
+    "state": "PR",
+    "neighborhood": "Zona 7",
+    "phone": "(44) 99999-0001",
+    "maps_place_id": "demo_place_4"
+  }
+]

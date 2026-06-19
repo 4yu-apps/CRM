@@ -1,0 +1,41 @@
+name: esteira
+
+# Roda a cascata de enriquecimento de graca no cron do GitHub Actions.
+# Sem maquina ligada: le 'bruto' no Supabase, enriquece, escreve 'enriquecido'.
+# Precisa dos secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, OWNER_USER_ID.
+
+on:
+  schedule:
+    - cron: "0 9 * * *" # 09:00 UTC diario
+  workflow_dispatch:
+    inputs:
+      batch:
+        description: "Tamanho do lote"
+        default: "20"
+
+concurrency:
+  group: esteira
+  cancel-in-progress: false
+
+jobs:
+  enrich:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: esteira
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e .
+      - name: Enriquecer (bruto -> enriquecido)
+        env:
+          GARIMPO_SINK: supabase
+          GARIMPO_SOURCES: real
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          OWNER_USER_ID: ${{ secrets.OWNER_USER_ID }}
+          GARIMPO_BATCH: ${{ github.event.inputs.batch || '20' }}
+          GARIMPO_DELAY: "1.5"
+        run: python -m garimpo_esteira.run enrich

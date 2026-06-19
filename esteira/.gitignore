@@ -1,0 +1,13 @@
+# venv / build
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# segredos
+.env
+
+# store local do sink jsonfile (qualquer garimpo*.json na raiz da esteira)
+/garimpo*.json
