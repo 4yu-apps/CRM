@@ -8,14 +8,23 @@ o funil em 1 clique, sem sair do WhatsApp.
 escrita é o status do lead no _nosso_ banco. Risco de ban desprezível: o
 WhatsApp fiscaliza envio, não leitura.
 
-## Instalar (modo dev, sem build)
+## Instalar (modo dev)
 
 1. Chrome → `chrome://extensions` → ativar **Modo do desenvolvedor**.
 2. **Carregar sem compactação** → selecionar a pasta `extension/`.
-3. Abrir `web.whatsapp.com`, abrir uma conversa. O card aparece no canto.
+3. Abrir **`web.whatsapp.com`** e **abrir uma conversa**. O card aparece no
+   canto superior direito **dentro do WhatsApp Web**.
+
+> ⚠️ **Não tem popup.** Clicar no ícone da extensão na barra **não faz nada** —
+> é proposital. A extensão é um painel que aparece **sobre o WhatsApp Web**, não
+> uma janelinha. Se não aparecer: recarregue a extensão e dê F5 no WhatsApp.
 
 Sem configurar nada, roda em **mock** (leads de exemplo). Os telefones do seed
 batem com `4499999000X` — útil pra testar o casamento.
+
+O script roda como um **bundle clássico** (`content.bundle.js`) injetado direto
+pelo manifest — evita o CSP do WhatsApp Web que bloqueia `import()` dinâmico.
+Se editar algo em `src/`, rode `npm run build` pra regerar o bundle.
 
 ## Ligar no Supabase
 
@@ -50,9 +59,9 @@ src/lib/
   repo.mjs               mock | supabase (REST + RPC transition_lead)
   config.mjs / mock-data.mjs
 src/content/
-  loader.js              carrega o ESM (padrao MV3)
   main.mjs               le o DOM, casa, renderiza o card, dispara transicoes
   panel.css
+content.bundle.js        bundle classico (esbuild) injetado pelo manifest
 src/options/             configuracao (mock/supabase)
 tests/                   match + state-machine (node --test, 13 testes)
 ```
