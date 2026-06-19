@@ -9,9 +9,11 @@ Monorepo (em construção, fase a fase):
 | Pasta        | Peça                | Fase |
 |--------------|---------------------|------|
 | `supabase/`  | Banco (Postgres)    | **0 ✓** |
-| `front/`     | CRM Next.js + shadcn (Vercel) | 1 |
+| `front/`     | CRM Next.js + shadcn (Vercel) | **1 ✓ (mock; liga no Supabase via env)** |
 | `esteira/`   | Scripts Python (GitHub Actions) | 2–3 |
 | `extension/` | Chrome MV3 read-only (WhatsApp Web) | 4 |
+
+Front: ver [`front/README.md`](front/README.md). Roda já em modo mock (`cd front && npm install && npm run dev`).
 
 ---
 

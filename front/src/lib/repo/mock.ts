@@ -1,0 +1,89 @@
+// Implementacao mock — em memoria, espelha o comportamento do banco:
+// valida transicoes, aplica guarda LGPD e grava historico (como os triggers).
+import { canTransition, nextStatuses, STATUS_META } from "../state-machine";
+import type { ActorType, FieldProvenance, Lead, LeadDetail, LeadEditable, LeadStatus, StatusHistory } from "../types";
+import { buildSeed, DEMO_OWNER } from "./mock-data";
+import type { LeadsRepo } from "./index";
+
+const seed = buildSeed();
+const store = {
+  leads: seed.leads,
+  provenance: seed.provenance,
+  history: seed.history,
+};
+
+let _hid = 1_000;
+const histId = () => `hist-live-${(++_hid).toString(36)}`;
+const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x));
+const find = (id: string) => store.leads.find((l) => l.id === id);
+
+async function list(): Promise<Lead[]> {
+  return clone(
+    [...store.leads].sort((a, b) => +new Date(b.updated_at) - +new Date(a.updated_at)),
+  );
+}
+
+async function detail(id: string): Promise<LeadDetail> {
+  const lead = find(id);
+  if (!lead) throw new Error("Lead nao encontrado");
+  const provenance: FieldProvenance[] = store.provenance
+    .filter((p) => p.lead_id === id)
+    .sort((a, b) => +new Date(b.found_at) - +new Date(a.found_at));
+  const history: StatusHistory[] = store.history
+    .filter((h) => h.lead_id === id)
+    .sort((a, b) => +new Date(b.changed_at) - +new Date(a.changed_at));
+  return clone({ lead, provenance, history });
+}
+
+async function update(id: string, patch: LeadEditable): Promise<Lead> {
+  const lead = find(id);
+  if (!lead) throw new Error("Lead nao encontrado");
+  Object.assign(lead, patch);
+  lead.updated_at = new Date().toISOString();
+  return clone(lead);
+}
+
+async function transition(
+  id: string,
+  to: LeadStatus,
+  actor: ActorType,
+  note?: string,
+): Promise<Lead> {
+  const lead = find(id);
+  if (!lead) throw new Error("Lead nao encontrado");
+
+  if (!nextStatuses(lead.status).includes(to)) {
+    throw new Error(
+      `Transicao invalida: ${STATUS_META[lead.status].label} -> ${STATUS_META[to].label}`,
+    );
+  }
+  if (!canTransition(lead.status, to, lead.opt_out)) {
+    throw new Error(`Lead com opt-out (LGPD) nao pode ir para ${STATUS_META[to].label}: contato bloqueado`);
+  }
+
+  const from = lead.status;
+  lead.status = to;
+  lead.updated_at = new Date().toISOString();
+  store.history.push({
+    id: histId(),
+    lead_id: id,
+    from_status: from,
+    to_status: to,
+    actor,
+    changed_by: actor === "system" ? null : DEMO_OWNER,
+    note: note ?? null,
+    changed_at: lead.updated_at,
+  });
+  return clone(lead);
+}
+
+async function setOptOut(id: string, value: boolean): Promise<Lead> {
+  const lead = find(id);
+  if (!lead) throw new Error("Lead nao encontrado");
+  lead.opt_out = value;
+  lead.opt_out_at = value ? new Date().toISOString() : null;
+  lead.updated_at = new Date().toISOString();
+  return clone(lead);
+}
+
+export const mockRepo: LeadsRepo = { list, detail, update, transition, setOptOut };
