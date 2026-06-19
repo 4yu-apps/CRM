@@ -86,7 +86,7 @@ export function DraftApproval({
           </Button>
         )}
         <span className="text-xs text-muted-foreground">
-          Envio e manual no WhatsApp — o sistema nunca dispara.
+          Envio e manual no WhatsApp, o sistema nunca dispara.
         </span>
       </div>
     </div>

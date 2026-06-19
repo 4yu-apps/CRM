@@ -2,9 +2,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { activeDataSource } from "@/lib/repo";
 import { useAuth } from "@/lib/auth";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -16,7 +14,6 @@ const LINKS = [
 export function NavBar() {
   const pathname = usePathname();
   const router = useRouter();
-  const source = activeDataSource();
   const { user, signOut } = useAuth();
 
   return (
@@ -24,9 +21,6 @@ export function NavBar() {
       <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-2.5 sm:px-6">
         <Link href="/" className="flex items-center gap-2.5">
           <Image src="/logo.png" alt="4YUmkt" width={1080} height={419} priority className="h-7 w-auto" />
-          <Badge variant={source === "supabase" ? "default" : "secondary"} className="font-normal">
-            {source === "supabase" ? "Supabase" : "mock"}
-          </Badge>
         </Link>
 
         {user && (

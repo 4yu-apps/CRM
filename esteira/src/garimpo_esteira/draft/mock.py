@@ -1,4 +1,4 @@
-"""Provedor de rascunho mock — template determinístico, offline, R$0.
+"""Provedor de rascunho mock: template determinístico, offline, R$0.
 
 Reproduz o fluxo de 2 mensagens usando os mesmos sinais do prompt real. Serve
 pra desenvolver e testar a esteira sem chave de LLM. Troca por Gemini via env.
@@ -17,7 +17,7 @@ class MockDraftProvider:
         nome = b["nome"]
 
         if b["nota"] is not None:
-            gancho = f"Vi {nome} no Maps — {b['nota']} com {b['avaliacoes'] or 0} avaliacoes"
+            gancho = f"Vi {nome} no Maps, {b['nota']} com {b['avaliacoes'] or 0} avaliacoes"
         else:
             gancho = f"Achei {nome} aqui na regiao"
 

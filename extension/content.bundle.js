@@ -86,7 +86,7 @@
     const d = onlyDigits(value);
     if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
     if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
-    return value || "\u2014";
+    return value || "-";
   }
 
   // src/lib/match.mjs
@@ -234,7 +234,7 @@
     <div class="gp-head">
       <span class="gp-logo">Garimpo</span>
       <span class="gp-src">${source}</span>
-      <button class="gp-min" title="minimizar">\u2014</button>
+      <button class="gp-min" title="minimizar">_</button>
     </div>
     <div class="gp-body"></div>
     <div class="gp-foot">read-only \xB7 nunca envia</div>`;

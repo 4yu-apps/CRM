@@ -33,7 +33,7 @@ export default function Home() {
         <div>
           <h1 className="text-xl font-bold tracking-tight">Leads</h1>
           <p className="text-sm text-muted-foreground">
-            CRM de prospeccao — humano no loop. A IA acha e rascunha; voce aprova e envia.
+            CRM de prospeccao com humano no loop. A IA acha e rascunha, voce aprova e envia.
           </p>
         </div>
         <NewLeadDialog

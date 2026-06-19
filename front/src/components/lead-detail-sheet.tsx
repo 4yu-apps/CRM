@@ -22,6 +22,7 @@ import { StatusBadge } from "./status-badge";
 import { StatusActions } from "./status-actions";
 import { DraftApproval } from "./draft-approval";
 import { ProvenanceList } from "./provenance-list";
+import { ScoreMeter } from "./score-meter";
 import { HistoryTimeline } from "./history-timeline";
 
 const EDIT_FIELDS: { key: keyof LeadEditable; label: string }[] = [
@@ -148,7 +149,7 @@ export function LeadDetailSheet({
 
   return (
     <Sheet open={!!leadId} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent className="w-full gap-0 overflow-y-auto sm:max-w-xl">
+      <SheetContent className="w-full gap-0 overflow-y-auto sm:max-w-2xl">
         {loading || !lead ? (
           <div className="space-y-4 p-6">
             <Skeleton className="h-8 w-2/3" />
@@ -181,7 +182,7 @@ export function LeadDetailSheet({
               </Section>
 
               {hasDraft && (
-                <Section title="Rascunho — ver, editar, aprovar">
+                <Section title="Rascunho: ver, editar, aprovar">
                   <DraftApproval
                     lead={lead}
                     onSaveDraft={saveDraft}
@@ -191,15 +192,8 @@ export function LeadDetailSheet({
               )}
 
               {lead.score_reason && (
-                <Section title={`Score · ${lead.score ?? lead.score_reason.total}`}>
-                  <ul className="space-y-1 rounded-md border p-3 text-sm">
-                    {lead.score_reason.criteria.map((c, i) => (
-                      <li key={i} className="flex items-start justify-between gap-3">
-                        <span className="text-muted-foreground">{c.note ?? c.label}</span>
-                        <span className="font-medium tabular-nums">{c.points}</span>
-                      </li>
-                    ))}
-                  </ul>
+                <Section title="Score">
+                  <ScoreMeter score={lead.score ?? lead.score_reason.total} reason={lead.score_reason} />
                 </Section>
               )}
 
@@ -238,7 +232,7 @@ export function LeadDetailSheet({
 
               <Separator />
 
-              <Section title="Proveniencia — quem achou o que">
+              <Section title="Proveniencia: quem achou o que">
                 <ProvenanceList items={detail.provenance} />
               </Section>
 

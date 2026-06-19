@@ -1,10 +1,10 @@
-"""Score do ICP — regras puras, determinísticas e EXPLICÁVEIS.
+"""Score do ICP: regras puras, determinísticas e EXPLICÁVEIS.
 
 Sem LLM: os critérios do ICP são números concretos (nota, volume de
 avaliações, descuido digital, já anuncia). Rule-based dá score explicável
 ("por que esse lead pontuou X"), de graça e testável. O LLM fica pro rascunho.
 
-ICP (seção 8 do mapa): nota 4,3+, 80–800 avaliações, sinais de descuido
+ICP (seção 8 do mapa): nota 4,3+, 80-800 avaliações, sinais de descuido
 digital (sem site / IG fraco = ouro pra quem vende design/SEO), e "já anuncia?".
 """
 from __future__ import annotations
@@ -33,17 +33,17 @@ def _rating_points(rating: float | None) -> tuple[int, str]:
     if rating >= 4.7:
         return 25, f"nota alta ({rating})"
     if rating >= 4.3:
-        return 20, f"nota boa ({rating}) — dentro do ICP"
+        return 20, f"nota boa ({rating}), dentro do ICP"
     if rating >= 4.0:
         return 10, f"nota ok ({rating})"
-    return 0, f"nota baixa ({rating}) — fora do ICP"
+    return 0, f"nota baixa ({rating}), fora do ICP"
 
 
 def _reviews_points(n: int | None) -> tuple[int, str]:
     if n is None:
         return 0, "sem volume de avaliacoes"
     if 80 <= n <= 800:
-        return 25, f"volume ideal ({n}) — 80–800"
+        return 25, f"volume ideal ({n}), 80-800"
     if 30 <= n < 80:
         return 12, f"volume baixo ({n})"
     if 800 < n <= 2000:
@@ -58,7 +58,7 @@ def _digital_neglect_points(lead: Lead) -> list[tuple[int, str]]:
     if is_present("website", lead.website):
         out.append((5, "ja tem site"))
     else:
-        out.append((20, "sem site — mina de ouro p/ design/SEO"))
+        out.append((20, "sem site, mina de ouro p/ design/SEO"))
     if is_present("instagram", lead.instagram):
         out.append((3, "tem Instagram"))
     else:
@@ -68,9 +68,9 @@ def _digital_neglect_points(lead: Lead) -> list[tuple[int, str]]:
 
 def _ads_points(ads_active: bool | None) -> tuple[int, str]:
     if ads_active is True:
-        return 5, "ja anuncia — aquecido, porem concorrido"
+        return 5, "ja anuncia, aquecido porem concorrido"
     if ads_active is False:
-        return 15, "nao anuncia — oportunidade de trafego"
+        return 15, "nao anuncia, oportunidade de trafego"
     return 8, "anuncio desconhecido"
 
 
@@ -97,7 +97,7 @@ def score_lead(lead: Lead, signals: dict[str, Any] | None = None) -> ScoreResult
     # regra dura: sem telefone não dá pra contatar no WhatsApp -> descarta
     if not contactable:
         decision: Decision = "descartado"
-        verdict = "sem telefone — nao da pra contatar no WhatsApp"
+        verdict = "sem telefone, nao da pra contatar no WhatsApp"
     else:
         decision = "qualificado" if total >= THRESHOLD else "descartado"
         verdict = "atingiu o corte do ICP" if decision == "qualificado" else "abaixo do corte do ICP"

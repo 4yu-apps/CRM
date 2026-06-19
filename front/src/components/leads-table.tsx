@@ -60,14 +60,14 @@ export function LeadsTable({
                 )}
               </TableCell>
               <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
-                {l.city ? `${l.city}/${l.state}` : "—"}
+                {l.city ? `${l.city}/${l.state}` : "-"}
                 {l.neighborhood && <div className="text-xs">{l.neighborhood}</div>}
               </TableCell>
               <TableCell>
                 <StatusBadge status={l.status} />
               </TableCell>
               <TableCell className="hidden sm:table-cell text-right tabular-nums">
-                {l.score ?? "—"}
+                {l.score ?? "-"}
               </TableCell>
               <TableCell className="hidden lg:table-cell">
                 {l.rating != null ? (
@@ -77,7 +77,7 @@ export function LeadsTable({
                     <span className="text-muted-foreground">({l.reviews_count ?? 0})</span>
                   </span>
                 ) : (
-                  "—"
+                  "-"
                 )}
               </TableCell>
               <TableCell className="hidden lg:table-cell text-sm tabular-nums">

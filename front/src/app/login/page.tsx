@@ -39,7 +39,7 @@ export default function LoginPage() {
       <h1 className="mb-1 text-xl font-bold tracking-tight">Entrar no CRM</h1>
       <p className="mb-6 text-sm text-muted-foreground">
         {mode === "mock"
-          ? "Modo mock — entre como demo pra explorar com dados de exemplo."
+          ? "Modo mock: entre como demo pra explorar com dados de exemplo."
           : "Use o e-mail e senha do seu usuario no Supabase."}
       </p>
 

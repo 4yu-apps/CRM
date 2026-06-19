@@ -37,7 +37,7 @@ def build_prompt(lead: Lead) -> str:
     if b["nota"] is not None:
         sinais.append(f"nota {b['nota']} no Google ({b['avaliacoes'] or 0} avaliacoes)")
     if not b["tem_site"]:
-        sinais.append("nao tem site (descuido digital — oportunidade de design/SEO)")
+        sinais.append("nao tem site (descuido digital, oportunidade de design/SEO)")
     if not b["tem_instagram"]:
         sinais.append("sem presenca no Instagram")
     sinais_txt = "; ".join(sinais) or "poucos sinais publicos"

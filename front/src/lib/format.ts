@@ -1,7 +1,7 @@
 // Formatadores pequenos (pt-BR).
 
 export function fmtPhone(raw: string | null): string {
-  if (!raw) return "—";
+  if (!raw) return "-";
   const d = raw.replace(/\D/g, "");
   if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
   if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
@@ -9,7 +9,7 @@ export function fmtPhone(raw: string | null): string {
 }
 
 export function fmtCnpj(raw: string | null): string {
-  if (!raw) return "—";
+  if (!raw) return "-";
   const d = raw.replace(/\D/g, "");
   if (d.length !== 14) return raw;
   return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`;

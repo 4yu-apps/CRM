@@ -78,7 +78,7 @@ function mountPanel(source) {
     <div class="gp-head">
       <span class="gp-logo">Garimpo</span>
       <span class="gp-src">${source}</span>
-      <button class="gp-min" title="minimizar">—</button>
+      <button class="gp-min" title="minimizar">_</button>
     </div>
     <div class="gp-body"></div>
     <div class="gp-foot">read-only · nunca envia</div>`;

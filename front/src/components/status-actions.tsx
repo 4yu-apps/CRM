@@ -21,7 +21,7 @@ export function StatusActions({
 }) {
   const nexts = nextStatuses(lead.status);
   if (nexts.length === 0) {
-    return <p className="text-sm text-muted-foreground">Status final — sem proximos passos.</p>;
+    return <p className="text-sm text-muted-foreground">Status final, sem proximos passos.</p>;
   }
 
   return (
