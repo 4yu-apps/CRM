@@ -33,6 +33,9 @@ export type ActorType = "human" | "system" | "extension";
 // Servico-alvo do lead (B1, dois servicos): trafego, automacao, ambos.
 export type ServiceTarget = "trafego" | "automacao" | "ambos" | "indefinido";
 
+// Tipo de cobranca do valor fechado (B8): mensal fixo ou por prazo X meses.
+export type DealBilling = "mensal_fixo" | "por_prazo";
+
 // score_reason (jsonb): score explicavel. summary = o "porque" em PT (motivo);
 // criteria = os sinais lidos (cada um com nota curta).
 export interface ScoreReason {
@@ -74,6 +77,15 @@ export interface Lead {
   opt_out_at: string | null;
 
   archived: boolean;
+
+  // Precificacao e negociacao (B8). Opcionais; nao travam o funil.
+  notes?: string | null;
+  suggested_value?: number | null;
+  suggested_value_reason?: string | null;
+  deal_value?: number | null;
+  deal_billing?: DealBilling | null;
+  deal_term_months?: number | null;
+  deal_closed_at?: string | null;
 
   created_at: string;
   updated_at: string;
@@ -123,6 +135,13 @@ export type LeadEditable = Partial<
     | "owner_name"
     | "draft_msg1"
     | "draft_msg2"
+    | "notes"
+    | "suggested_value"
+    | "suggested_value_reason"
+    | "deal_value"
+    | "deal_billing"
+    | "deal_term_months"
+    | "deal_closed_at"
   >
 >;
 
