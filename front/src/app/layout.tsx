@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Garimpo — CRM de prospeccao",
-  description: "CRM de prospeccao assistida por IA, com humano no loop.",
+  title: "CRM | 4YUmkt",
+  description: "CRM de prospeccao assistida por IA, com humano no loop. 4YUmkt.",
 };
 
 export default function RootLayout({

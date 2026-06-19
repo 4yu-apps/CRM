@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { activeDataSource } from "@/lib/repo";
 import { useAuth } from "@/lib/auth";
@@ -21,8 +22,10 @@ export function NavBar() {
   return (
     <header className="border-b">
       <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3 sm:px-6">
-        <Link href="/" className="flex items-center gap-2 font-bold tracking-tight">
-          Garimpo
+        <Link href="/" className="flex items-center gap-2">
+          <span className="inline-flex items-center rounded-md bg-zinc-900 px-2 py-1">
+            <Image src="/logo.png" alt="4YUmkt" width={1080} height={419} priority className="h-5 w-auto" />
+          </span>
           <Badge variant={source === "supabase" ? "default" : "secondary"} className="font-normal">
             {source === "supabase" ? "Supabase" : "mock"}
           </Badge>

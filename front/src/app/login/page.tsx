@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -30,7 +31,12 @@ export default function LoginPage() {
 
   return (
     <div className="mx-auto flex min-h-[70vh] w-full max-w-sm flex-col justify-center px-4">
-      <h1 className="mb-1 text-xl font-bold tracking-tight">Entrar no Garimpo</h1>
+      <div className="mb-6 flex justify-center">
+        <span className="inline-flex items-center rounded-lg bg-zinc-900 px-4 py-3">
+          <Image src="/logo.png" alt="4YUmkt" width={1080} height={419} priority className="h-8 w-auto" />
+        </span>
+      </div>
+      <h1 className="mb-1 text-xl font-bold tracking-tight">Entrar no CRM</h1>
       <p className="mb-6 text-sm text-muted-foreground">
         {mode === "mock"
           ? "Modo mock — entre como demo pra explorar com dados de exemplo."
