@@ -5,11 +5,13 @@ import { toast } from "sonner";
 import {
   Calendar,
   Check,
+  DownloadSimple,
   GearSix,
   GoogleLogo,
   Info,
   MapPin,
   Plus,
+  PuzzlePiece,
   Robot,
   Storefront,
   Tag,
@@ -464,7 +466,53 @@ export default function ConfigPage() {
         </div>
 
         {/* ------------------------------------------------------------------ */}
-        {/* 5. Google Calendar */}
+        {/* 5. Extensao Chrome */}
+        {/* ------------------------------------------------------------------ */}
+        <Section
+          title="Extensao Chrome"
+          sub="Uma extensao so. Ela aparece no Google Maps para capturar e no WhatsApp Web para atualizar o funil."
+          icon={<PuzzlePiece size={20} />}
+        >
+          <div className="rounded-[16px] border border-brand/20 bg-brand-50/70 p-4">
+            <div className="mb-4 text-[13.5px] leading-relaxed text-ink-2">
+              Baixe o arquivo, descompacte a pasta e carregue no Chrome em modo desenvolvedor.
+              Depois abra o Google Maps ou o WhatsApp Web. O painel aparece sozinho quando estiver no lugar certo.
+            </div>
+
+            <div className="grid gap-3 text-[13px] text-ink-2 sm:grid-cols-3">
+              {[
+                ["1", "Baixar e descompactar"],
+                ["2", "Abrir chrome://extensions"],
+                ["3", "Carregar a pasta"],
+              ].map(([n, text]) => (
+                <div key={n} className="flex gap-2 rounded-[13px] border border-border bg-card p-3">
+                  <span className="flex size-6 flex-none items-center justify-center rounded-full bg-brand text-[11px] font-bold text-white">
+                    {n}
+                  </span>
+                  <span className="font-semibold leading-snug">{text}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <a
+                href="/garimpo-extension.zip"
+                download
+                className="inline-flex items-center justify-center gap-2 rounded-[14px] px-5 py-3 text-sm font-bold text-white shadow-[0_6px_16px_var(--ring)] transition-transform hover:-translate-y-0.5"
+                style={{ background: "var(--grad)" }}
+              >
+                <DownloadSimple size={18} weight="bold" />
+                Baixar extensao
+              </a>
+              <div className="text-[12.5px] leading-relaxed text-muted-foreground">
+                No modo real, abra as Opcoes da extensao e entre com sua conta para ela gravar no seu CRM.
+              </div>
+            </div>
+          </div>
+        </Section>
+
+        {/* ------------------------------------------------------------------ */}
+        {/* 6. Google Calendar */}
         {/* ------------------------------------------------------------------ */}
         <Section
           title="Google Calendar"
