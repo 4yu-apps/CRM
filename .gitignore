@@ -1,0 +1,27 @@
+# --- secrets ---
+.env
+.env.*
+!.env.example
+
+# --- node ---
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# --- python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# --- supabase ---
+# local stack temp files; keep migrations/config.toml tracked
+supabase/.branches/
+supabase/.temp/
+supabase/.env
+
+# --- os / editor ---
+*:Zone.Identifier
+.DS_Store
+.vscode/
+.idea/

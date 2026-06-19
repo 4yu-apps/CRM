@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git init *)",
+      "Bash(git config *)",
+      "Bash(git branch *)",
+      "Bash(rm -f \"garimpo-mapa-do-projeto.md:Zone.Identifier\")"
+    ]
+  }
+}
