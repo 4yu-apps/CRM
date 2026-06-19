@@ -3,42 +3,28 @@ import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 
-// Gate de autenticacao e onboarding:
+// Gate de autenticacao:
 //   - sem sessao fora de /login -> redireciona pra /login
-//   - com sessao mas sem perfil cadastrado -> redireciona pra /config (onboarding)
 //   - modo mock nunca bloqueia (usuario demo, perfil demo ja existe)
-// hasProfile vem do contexto de auth (fonte unica). Depois de salvar a
-// Configuracao, o /config chama refreshProfile e o gate libera sem travar.
+// O perfil de busca e onboarding leve: a Config cria/atualiza search_profile,
+// mas a ausencia dele nao prende a navegacao. Isso evita o loop em /config para
+// contas novas ou perfis ainda nao salvos.
 export function AuthGate({ children }: { children: React.ReactNode }) {
-  const { user, loading, mode, hasProfile } = useAuth();
+  const { user, loading, mode } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
 
   // Sem sessao: manda pro login
   const needsLogin = mode === "supabase" && !loading && !user && pathname !== "/login";
 
-  // Com sessao mas sem perfil: manda pro config (onboarding), exceto se ja estiver la
-  const needsOnboarding =
-    mode === "supabase" &&
-    !loading &&
-    !!user &&
-    hasProfile === false &&
-    pathname !== "/config" &&
-    pathname !== "/login";
-
-  // Ainda resolvendo sessao ou perfil: renderiza nada para evitar flash
-  const isResolving = mode === "supabase" && (loading || (!!user && hasProfile === null));
+  // Ainda resolvendo sessao: renderiza nada para evitar flash
+  const isResolving = mode === "supabase" && loading;
 
   useEffect(() => {
     if (needsLogin) router.replace("/login");
   }, [needsLogin, router]);
 
-  useEffect(() => {
-    if (needsOnboarding) router.replace("/config");
-  }, [needsOnboarding, router]);
-
   if (isResolving) return null;
   if (needsLogin) return null;
-  if (needsOnboarding) return null;
   return <>{children}</>;
 }
