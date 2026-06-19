@@ -1,10 +1,10 @@
 # Garimpo · Esteira (Fases 2 e 3)
 
-Cascata em Python que leva o lead do `bruto` até o `rascunho_pronto`, sozinha:
+Cascata em Python que descobre e leva o lead até o `rascunho_pronto`, sozinha:
 
 ```
-bruto ──enrich──▶ enriquecido ──score──▶ qualificado ──draft──▶ rascunho_pronto
-                                     └──▶ descartado
+(Maps) ──discover──▶ bruto ──enrich──▶ enriquecido ──score──▶ qualificado ──draft──▶ rascunho_pronto
+                                                          └──▶ descartado
 ```
 
 - **enrich** (Fase 2): fontes gratuitas preenchem campos + proveniência + match rate.
@@ -21,15 +21,16 @@ cd esteira
 python3 -m venv .venv && . .venv/bin/activate
 pip install -e ".[dev]"
 
-# pipeline inteiro com fixtures + copy mock (deterministico)
-python -m garimpo_esteira.run seed-demo --sink jsonfile --json /tmp/g.json
-python -m garimpo_esteira.run pipeline  --sink jsonfile --json /tmp/g.json --sources fixture --llm mock --delay 0
+# descobrir leads (Maps fixture) + rodar o pipeline inteiro com copy mock
+python -m garimpo_esteira.run discover --sink jsonfile --json /tmp/g.json --maps fixture --terms "pizzaria,barbearia"
+python -m garimpo_esteira.run pipeline --sink jsonfile --json /tmp/g.json --sources fixture --llm mock --delay 0
 ```
 
-Estágios também rodam soltos: `enrich`, `score`, `draft`. Saída mostra campos
-preenchidos, % com telefone (meta ≥80%), score/decisão e os rascunhos.
+Estágios também rodam soltos: `discover`, `enrich`, `score`, `draft`. Saída
+mostra inseridos/dedup, campos preenchidos, % com telefone (meta ≥80%),
+score/decisão e os rascunhos.
 
-Testes: `python -m pytest` (45 testes, offline).
+Testes: `python -m pytest` (49 testes, offline).
 
 ## Fontes da cascata
 
@@ -87,6 +88,7 @@ src/garimpo_esteira/
   grid.py          grade do Maps (teto 120, subdivisao adaptativa)
   validation.py    valida conteudo, nao status HTTP
   match_rate.py    fracao de campos-alvo preenchidos
+  discovery.py     captacao Maps -> bruto (fixture | places), dedup por place_id
   scoring.py       regras ICP puras -> score + score_reason explicavel
   sources/         cnpj, website, instagram, ad_library (+ base)
   draft/           mock | gemini (+ prompt, base)
@@ -94,5 +96,5 @@ src/garimpo_esteira/
   cascade.py       enrich   (bruto -> enriquecido)
   score_stage.py   score    (enriquecido -> qualificado/descartado)
   draft_stage.py   draft    (qualificado -> rascunho_pronto)
-  run.py           CLI (seed-demo / enrich / score / draft / pipeline / counts)
+  run.py           CLI (discover / enrich / score / draft / pipeline / counts)
 ```

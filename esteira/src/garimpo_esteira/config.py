@@ -11,6 +11,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from .discovery import FixtureMapsSource, MapsSource
 from .draft.base import DraftProvider
 from .draft.mock import MockDraftProvider
 from .sink.base import LeadSink
@@ -34,6 +35,8 @@ class Config:
     llm: str = "mock"                 # mock | gemini
     gemini_key: str | None = None
     gemini_model: str = "gemini-flash-latest"
+    maps_mode: str = "fixture"        # fixture | places
+    maps_key: str | None = None
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -50,6 +53,8 @@ class Config:
             llm=os.getenv("GARIMPO_LLM", "mock"),
             gemini_key=os.getenv("GEMINI_API_KEY"),
             gemini_model=os.getenv("GEMINI_MODEL", "gemini-flash-latest"),
+            maps_mode=os.getenv("GARIMPO_MAPS", "fixture"),
+            maps_key=os.getenv("GOOGLE_MAPS_API_KEY"),
         )
 
 
@@ -99,3 +104,13 @@ def build_provider(cfg: Config) -> DraftProvider:
 
         return GeminiDraftProvider(cfg.gemini_key, cfg.gemini_model)
     return MockDraftProvider()
+
+
+def build_maps_source(cfg: Config) -> MapsSource:
+    if cfg.maps_mode == "places":
+        if not cfg.maps_key:
+            raise SystemExit("GARIMPO_MAPS=places exige GOOGLE_MAPS_API_KEY")
+        from .discovery import PlacesMapsSource
+
+        return PlacesMapsSource(cfg.maps_key)
+    return FixtureMapsSource(FIXTURES_DIR / "maps_results.json")

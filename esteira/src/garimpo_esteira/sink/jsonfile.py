@@ -57,7 +57,11 @@ class JsonFileSink:
         if key:
             for r in self._db["leads"].values():
                 if dedup_key(r.get("cnpj"), r.get("phone")) == key:
-                    return None  # duplicata
+                    return None  # duplicata por CNPJ/telefone
+        if lead.maps_place_id:
+            for r in self._db["leads"].values():
+                if r.get("maps_place_id") == lead.maps_place_id:
+                    return None  # duplicata por place_id do Maps
         lead_id = lead.id or self._next_id("lead")
         raw = asdict(lead)
         raw["id"] = lead_id

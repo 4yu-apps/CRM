@@ -11,7 +11,8 @@ import json
 from pathlib import Path
 
 from .cascade import enrich_batch
-from .config import FIXTURES_DIR, Config, build_provider, build_sink, build_sources
+from .config import FIXTURES_DIR, Config, build_maps_source, build_provider, build_sink, build_sources
+from .discovery import discover
 from .draft_stage import draft_batch
 from .models import Lead
 from .score_stage import score_batch
@@ -33,6 +34,8 @@ def _apply_overrides(cfg: Config, args: argparse.Namespace) -> Config:
         cfg.delay = args.delay
     if getattr(args, "llm", None):
         cfg.llm = args.llm
+    if getattr(args, "maps", None):
+        cfg.maps_mode = args.maps
     return cfg
 
 
@@ -68,6 +71,17 @@ def cmd_enrich(cfg: Config) -> int:
     avg = sum(r.match_rate for r in results) / len(results)
     pct_phone = int(with_phone / len(results) * 100)
     print(f"resumo: {len(results)} leads · match medio {int(avg * 100)}% · com telefone {pct_phone}% (meta >=80%)")
+    _print_counts(sink)
+    return 0
+
+
+def cmd_discover(cfg: Config, terms: list[str]) -> int:
+    sink = build_sink(cfg)
+    maps = build_maps_source(cfg)
+    owner = cfg.owner_id or DEMO_OWNER
+    print(f"discover · sink={cfg.sink} maps={cfg.maps_mode} termos={terms}")
+    res = discover(sink, maps, terms, owner)
+    print(f"  inseridos {res['inserted']} · ignorados (dedup) {res['skipped']}")
     _print_counts(sink)
     return 0
 
@@ -124,17 +138,23 @@ def _print_counts(sink) -> None:
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="garimpo-esteira")
     sub = p.add_subparsers(dest="cmd", required=True)
-    for name in ("seed-demo", "enrich", "score", "draft", "pipeline", "counts"):
+    for name in ("seed-demo", "discover", "enrich", "score", "draft", "pipeline", "counts"):
         sp = sub.add_parser(name)
         sp.add_argument("--sink", choices=["jsonfile", "supabase"])
         sp.add_argument("--json")
         sp.add_argument("--sources", choices=["real", "fixture"])
         sp.add_argument("--llm", choices=["mock", "gemini"])
+        sp.add_argument("--maps", choices=["fixture", "places"])
+        sp.add_argument("--terms", help="termos de busca separados por virgula (discover)")
         sp.add_argument("--batch", type=int)
         sp.add_argument("--delay", type=float)
 
     args = p.parse_args(argv)
     cfg = _apply_overrides(Config.from_env(), args)
+
+    if args.cmd == "discover":
+        terms = [t.strip() for t in (args.terms or "pizzaria").split(",") if t.strip()]
+        return cmd_discover(cfg, terms)
 
     dispatch = {
         "seed-demo": cmd_seed_demo,

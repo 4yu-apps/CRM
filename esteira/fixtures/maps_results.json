@@ -1,0 +1,34 @@
+{
+  "*": [
+    {
+      "name": "Pizzaria Nova Maringa",
+      "formatted_phone_number": "(44) 3025-1000",
+      "rating": 4.6,
+      "user_ratings_total": 210,
+      "category": "Pizzaria",
+      "formatted_address": "Av. Sao Paulo, 100",
+      "city": "Maringa",
+      "state": "PR",
+      "place_id": "disc_p1"
+    },
+    {
+      "name": "Barbearia Corte Fino",
+      "formatted_phone_number": "(44) 99888-2000",
+      "rating": 4.9,
+      "user_ratings_total": 95,
+      "category": "Barbearia",
+      "city": "Maringa",
+      "state": "PR",
+      "place_id": "disc_p2"
+    },
+    {
+      "name": "Cafeteria Grao Especial",
+      "rating": 4.7,
+      "user_ratings_total": 150,
+      "category": "Cafeteria",
+      "city": "Maringa",
+      "state": "PR",
+      "place_id": "disc_p3"
+    }
+  ]
+}
