@@ -1,7 +1,7 @@
 "use client";
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { activeDataSource } from "./repo";
+import { activeDataSource, getRepo } from "./repo";
 import { getSupabase } from "./supabase/client";
 
 export interface AuthUser {
@@ -14,6 +14,10 @@ interface AuthContextValue {
   session: Session | null;
   loading: boolean;
   mode: "mock" | "supabase";
+  // null = ainda verificando; true = tem perfil de busca; false = precisa de onboarding
+  hasProfile: boolean | null;
+  // Reavalia o perfil (chamar depois de salvar a Configuracao pra liberar o gate)
+  refreshProfile: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
@@ -30,6 +34,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(mode === "mock" ? DEMO_USER : null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(mode === "supabase");
+  // mock ja tem perfil demo; supabase comeca como "verificando" (null)
+  const [hasProfile, setHasProfile] = useState<boolean | null>(mode === "mock" ? true : null);
 
   useEffect(() => {
     if (mode !== "supabase") return;
@@ -47,6 +53,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     unsub = () => sub.subscription.unsubscribe();
     return () => unsub();
   }, [mode]);
+
+  const refreshProfile = useCallback(async () => {
+    if (mode !== "supabase") {
+      setHasProfile(true);
+      return;
+    }
+    try {
+      const profile = await getRepo().getProfile();
+      setHasProfile(!!profile);
+    } catch {
+      // erro de leitura do perfil nao bloqueia o app
+      setHasProfile(true);
+    }
+  }, [mode]);
+
+  // Verifica o perfil quando o usuario entra; limpa ao sair. O setState fica
+  // dentro de uma funcao async (nao sincrono no corpo do effect) pra respeitar
+  // a regra de lint set-state-in-effect.
+  useEffect(() => {
+    if (mode !== "supabase") return;
+    let alive = true;
+    void (async () => {
+      if (!user) {
+        if (alive) setHasProfile(null);
+        return;
+      }
+      await refreshProfile();
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [mode, user, refreshProfile]);
 
   const signIn = async (email: string, password: string) => {
     if (mode === "mock") {
@@ -93,10 +131,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await getSupabase().auth.signOut();
     setUser(null);
     setSession(null);
+    setHasProfile(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, mode, signIn, signUp, signInWithGoogle, signOut }}>
+    <AuthContext.Provider
+      value={{ user, session, loading, mode, hasProfile, refreshProfile, signIn, signUp, signInWithGoogle, signOut }}
+    >
       {children}
     </AuthContext.Provider>
   );

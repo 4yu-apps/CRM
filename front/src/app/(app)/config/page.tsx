@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   Calendar,
@@ -105,7 +106,8 @@ function Section({ title, sub, icon, children }: {
 // ---------------------------------------------------------------------------
 export default function ConfigPage() {
   const repo = getRepo();
-  const { signInWithGoogle, mode } = useAuth();
+  const { signInWithGoogle, mode, refreshProfile } = useAuth();
+  const router = useRouter();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -185,14 +187,19 @@ export default function ConfigPage() {
         autopilot,
       };
       await repo.saveProfile(input);
+      // Libera o gate de onboarding (fonte unica no contexto de auth).
+      await refreshProfile();
+      const wasOnboarding = isOnboarding;
       setIsOnboarding(false);
       toast.success("Tudo salvo. Ja estou rodando pra voce.");
+      // No primeiro acesso, manda pro Inicio depois de salvar o perfil.
+      if (wasOnboarding) router.push("/");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao salvar. Tenta de novo.");
     } finally {
       setSaving(false);
     }
-  }, [niches, city, state, radius, serviceTarget, autopilot, repo]);
+  }, [niches, city, state, radius, serviceTarget, autopilot, repo, refreshProfile, isOnboarding, router]);
 
   // Conectar Google Calendar
   const connectGoogle = useCallback(async () => {
