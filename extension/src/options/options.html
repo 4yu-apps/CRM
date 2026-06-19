@@ -29,8 +29,18 @@
     <label>ANON KEY (publishable)</label>
     <input id="anonKey" placeholder="ey..." />
 
-    <label>ACCESS TOKEN (JWT do usuario logado — RLS)</label>
-    <input id="accessToken" placeholder="ey... (sessao do front)" />
+    <fieldset style="margin-top:18px;border:1px solid #e4e4e7;border-radius:10px;padding:12px;">
+      <legend style="font-size:12px;color:#71717a;padding:0 6px;">Login (pega o token automatico)</legend>
+      <p class="muted" style="margin-top:0;">Preencha URL + anon key acima, depois entre com o usuario do Supabase.</p>
+      <label>E-mail</label>
+      <input id="email" type="email" placeholder="voce@exemplo.com" />
+      <label>Senha</label>
+      <input id="password" type="password" placeholder="senha" />
+      <div><button id="login" type="button">Entrar</button><span id="loginStatus" class="ok"></span></div>
+    </fieldset>
+
+    <label>ACCESS TOKEN (JWT — preenchido pelo login, ou cole o do front)</label>
+    <input id="accessToken" placeholder="ey... (sessao)" />
 
     <div><button id="save">Salvar</button><span id="status" class="ok"></span></div>
 
