@@ -70,6 +70,29 @@ const checks = async () => {
     `select indexname from pg_indexes where tablename='leads' and indexname like '%uniq'`
   )).map(r => r.indexname)
   idx.length >= 2 ? ok(`indices de dedup (${idx.length})`) : bad(`dedup indices = ${idx.length}`)
+
+  // 8. B1 — service_target (enum + coluna) + ads_active
+  const st = (await q(
+    `select e.enumlabel from pg_enum e join pg_type t on t.oid=e.enumtypid where t.typname='service_target'`
+  )).map(r => r.enumlabel)
+  st.length === 4 ? ok(`enum service_target (${st.length} alvos)`) : bad(`enum service_target = ${st.length}/4`)
+  const b1 = (await q(
+    `select column_name from information_schema.columns
+     where table_name='leads' and column_name = any($1)`, [['service_target', 'ads_active']]
+  )).map(r => r.column_name)
+  b1.length === 2 ? ok('colunas B1 (service_target, ads_active)') : bad(`colunas B1 = ${b1.length}/2`)
+
+  // 9. B8 — precificacao (enum deal_billing + 7 colunas)
+  const dbil = (await q(
+    `select e.enumlabel from pg_enum e join pg_type t on t.oid=e.enumtypid where t.typname='deal_billing'`
+  )).map(r => r.enumlabel)
+  dbil.length === 2 ? ok(`enum deal_billing (${dbil.length} tipos)`) : bad(`enum deal_billing = ${dbil.length}/2`)
+  const b8names = ['notes', 'suggested_value', 'suggested_value_reason', 'deal_value', 'deal_billing', 'deal_term_months', 'deal_closed_at']
+  const b8 = (await q(
+    `select column_name from information_schema.columns
+     where table_name='leads' and column_name = any($1)`, [b8names]
+  )).map(r => r.column_name)
+  b8.length === b8names.length ? ok(`colunas B8 (${b8.length})`) : bad(`colunas B8 = ${b8.length}/${b8names.length}`)
 }
 
 client.connect()

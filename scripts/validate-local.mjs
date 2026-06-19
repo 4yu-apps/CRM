@@ -81,6 +81,29 @@ const run = async () => {
   )).map(r => r.column_name)
   draftCols.length === 4 ? ok("colunas de rascunho (Fase 3)") : bad(`colunas de rascunho = ${draftCols.length}/4`)
 
+  // B1 — service_target (enum + coluna) + ads_active
+  const stLabels = (await one(
+    `select e.enumlabel from pg_enum e join pg_type t on t.oid=e.enumtypid where t.typname='service_target'`
+  )).map(r => r.enumlabel)
+  stLabels.length === 4 ? ok('enum service_target (4 alvos)') : bad(`enum service_target = ${stLabels.length}/4`)
+  const b1Cols = (await one(
+    `select column_name from information_schema.columns
+     where table_name='leads' and column_name = any($1)`, [["service_target", "ads_active"]]
+  )).map(r => r.column_name)
+  b1Cols.length === 2 ? ok('colunas B1 (service_target, ads_active)') : bad(`colunas B1 = ${b1Cols.length}/2`)
+
+  // B8 — precificacao (enum deal_billing + 7 colunas)
+  const dbLabels = (await one(
+    `select e.enumlabel from pg_enum e join pg_type t on t.oid=e.enumtypid where t.typname='deal_billing'`
+  )).map(r => r.enumlabel)
+  dbLabels.length === 2 ? ok('enum deal_billing (2 tipos)') : bad(`enum deal_billing = ${dbLabels.length}/2`)
+  const b8 = ["notes", "suggested_value", "suggested_value_reason", "deal_value", "deal_billing", "deal_term_months", "deal_closed_at"]
+  const b8Cols = (await one(
+    `select column_name from information_schema.columns
+     where table_name='leads' and column_name = any($1)`, [b8]
+  )).map(r => r.column_name)
+  b8Cols.length === b8.length ? ok('colunas B8 (precificacao)') : bad(`colunas B8 = ${b8Cols.length}/${b8.length}`)
+
   const rls = await one(
     `select relname from pg_class where relnamespace='public'::regnamespace and relrowsecurity and relname=any($1)`,
     [tables])
