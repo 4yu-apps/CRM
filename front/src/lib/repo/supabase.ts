@@ -28,6 +28,13 @@ async function detail(id: string): Promise<LeadDetail> {
   };
 }
 
+async function create(input: LeadEditable): Promise<Lead> {
+  // owner_id e status caem nos defaults do banco (auth.uid() / 'bruto').
+  const { data, error } = await getSupabase().from("leads").insert(input).select().single();
+  if (error) throw new Error(error.message);
+  return data as Lead;
+}
+
 async function update(id: string, patch: LeadEditable): Promise<Lead> {
   const { data, error } = await getSupabase()
     .from("leads")
@@ -67,4 +74,4 @@ async function setOptOut(id: string, value: boolean): Promise<Lead> {
   return data as Lead;
 }
 
-export const supabaseRepo: LeadsRepo = { list, detail, update, transition, setOptOut };
+export const supabaseRepo: LeadsRepo = { list, detail, create, update, transition, setOptOut };

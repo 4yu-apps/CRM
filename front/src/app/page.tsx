@@ -5,6 +5,7 @@ import { StatsBar } from "@/components/stats-bar";
 import { FunnelFilter, type StatusFilter } from "@/components/funnel-filter";
 import { LeadsTable } from "@/components/leads-table";
 import { LeadDetailSheet } from "@/components/lead-detail-sheet";
+import { NewLeadDialog } from "@/components/new-lead-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Home() {
@@ -28,11 +29,20 @@ export default function Home() {
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
-      <div className="mb-6">
-        <h1 className="text-xl font-bold tracking-tight">Leads</h1>
-        <p className="text-sm text-muted-foreground">
-          CRM de prospeccao — humano no loop. A IA acha e rascunha; voce aprova e envia.
-        </p>
+      <div className="mb-6 flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight">Leads</h1>
+          <p className="text-sm text-muted-foreground">
+            CRM de prospeccao — humano no loop. A IA acha e rascunha; voce aprova e envia.
+          </p>
+        </div>
+        <NewLeadDialog
+          repo={repo}
+          onCreated={(id) => {
+            void refresh();
+            setSelected(id);
+          }}
+        />
       </div>
 
       {error && (

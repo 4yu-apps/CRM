@@ -9,6 +9,8 @@ import { supabaseRepo } from "./supabase";
 export interface LeadsRepo {
   list(): Promise<Lead[]>;
   detail(id: string): Promise<LeadDetail>;
+  /** Cria lead manual (status inicial 'bruto'). */
+  create(input: LeadEditable): Promise<Lead>;
   update(id: string, patch: LeadEditable): Promise<Lead>;
   /** Muda status validando a maquina de estados + guarda LGPD. Lanca erro se invalido. */
   transition(id: string, to: LeadStatus, actor: ActorType, note?: string): Promise<Lead>;

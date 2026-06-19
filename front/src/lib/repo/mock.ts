@@ -14,6 +14,8 @@ const store = {
 
 let _hid = 1_000;
 const histId = () => `hist-live-${(++_hid).toString(36)}`;
+let _nid = 0;
+const leadId = () => `lead-new-${(++_nid).toString(36)}`;
 const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x));
 const find = (id: string) => store.leads.find((l) => l.id === id);
 
@@ -33,6 +35,53 @@ async function detail(id: string): Promise<LeadDetail> {
     .filter((h) => h.lead_id === id)
     .sort((a, b) => +new Date(b.changed_at) - +new Date(a.changed_at));
   return clone({ lead, provenance, history });
+}
+
+async function create(input: LeadEditable): Promise<Lead> {
+  const now = new Date().toISOString();
+  const id = leadId();
+  const lead: Lead = {
+    id,
+    owner_id: DEMO_OWNER,
+    status: "bruto",
+    business_name: null,
+    cnpj: null,
+    phone: null,
+    email: null,
+    instagram: null,
+    website: null,
+    maps_place_id: null,
+    maps_url: null,
+    rating: null,
+    reviews_count: null,
+    category: null,
+    address: null,
+    neighborhood: null,
+    city: null,
+    state: null,
+    owner_name: null,
+    score: null,
+    score_reason: null,
+    opt_out: false,
+    opt_out_at: null,
+    created_at: now,
+    updated_at: now,
+    draft_msg1: null,
+    draft_msg2: null,
+    ...input,
+  };
+  store.leads.push(lead);
+  store.history.push({
+    id: histId(),
+    lead_id: id,
+    from_status: null,
+    to_status: "bruto",
+    actor: "human",
+    changed_by: DEMO_OWNER,
+    note: "criado manualmente",
+    changed_at: now,
+  });
+  return clone(lead);
 }
 
 async function update(id: string, patch: LeadEditable): Promise<Lead> {
@@ -86,4 +135,4 @@ async function setOptOut(id: string, value: boolean): Promise<Lead> {
   return clone(lead);
 }
 
-export const mockRepo: LeadsRepo = { list, detail, update, transition, setOptOut };
+export const mockRepo: LeadsRepo = { list, detail, create, update, transition, setOptOut };
