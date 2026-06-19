@@ -11,11 +11,12 @@ Monorepo (em construção, fase a fase):
 | `supabase/`  | Banco (Postgres)    | **0 ✓** |
 | `front/`     | CRM Next.js + shadcn (Vercel) | **1 ✓ (mock; liga no Supabase via env)** |
 | `esteira/`   | Cascata Python: enrich + score + rascunho (GitHub Actions) | **2 ✓ · 3 ✓** |
-| `extension/` | Chrome MV3 read-only (WhatsApp Web) | 4 |
+| `extension/` | Chrome MV3 read-only (WhatsApp Web) | **4 ✓ (mock; liga no Supabase nas opcoes)** |
 
 - Front: ver [`front/README.md`](front/README.md). Roda em mock (`cd front && npm install && npm run dev`).
-- Esteira: ver [`esteira/README.md`](esteira/README.md). Roda offline (`cd esteira && python -m garimpo_esteira.run seed-demo … && … enrich --sources fixture`).
-- CI: `.github/workflows/ci.yml` valida schema (pglite), testes da esteira (pytest) e build do front a cada push.
+- Esteira: ver [`esteira/README.md`](esteira/README.md). Roda offline (`cd esteira && python -m garimpo_esteira.run seed-demo … && … pipeline --sources fixture --llm mock`).
+- Extensão: ver [`extension/README.md`](extension/README.md). Carrega sem build em `chrome://extensions` (modo dev).
+- CI: `.github/workflows/ci.yml` valida schema (pglite), testes da esteira (pytest), da extensão (node) e build do front a cada push.
 
 ---
 

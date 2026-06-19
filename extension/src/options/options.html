@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Garimpo — configuracao</title>
+    <style>
+      body { font-family: ui-sans-serif, system-ui, sans-serif; max-width: 520px; margin: 40px auto; padding: 0 16px; color: #18181b; }
+      h1 { font-size: 20px; }
+      p.muted { color: #71717a; font-size: 13px; }
+      label { display: block; margin: 14px 0 4px; font-weight: 600; font-size: 13px; }
+      input, select { width: 100%; padding: 8px; border: 1px solid #d4d4d8; border-radius: 8px; font-size: 13px; }
+      button { margin-top: 18px; padding: 9px 16px; border: 0; border-radius: 8px; background: #0f172a; color: #fff; font-weight: 600; cursor: pointer; }
+      .ok { color: #047857; font-size: 13px; margin-left: 10px; }
+    </style>
+  </head>
+  <body>
+    <h1>Garimpo — configuracao</h1>
+    <p class="muted">Sem preencher, a extensao roda em <b>mock</b> (dados de exemplo). Para usar o banco real, escolha supabase e preencha as chaves.</p>
+
+    <label>Fonte de dados</label>
+    <select id="dataSource">
+      <option value="mock">mock (offline)</option>
+      <option value="supabase">supabase</option>
+    </select>
+
+    <label>SUPABASE_URL</label>
+    <input id="supabaseUrl" placeholder="https://<ref>.supabase.co" />
+
+    <label>ANON KEY (publishable)</label>
+    <input id="anonKey" placeholder="ey..." />
+
+    <label>ACCESS TOKEN (JWT do usuario logado — RLS)</label>
+    <input id="accessToken" placeholder="ey... (sessao do front)" />
+
+    <div><button id="save">Salvar</button><span id="status" class="ok"></span></div>
+
+    <script src="options.js"></script>
+  </body>
+</html>

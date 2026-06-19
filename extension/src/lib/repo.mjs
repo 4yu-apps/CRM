@@ -1,0 +1,52 @@
+// Camada de dados da extensao — mock | supabase. Mesma interface.
+// READ-ONLY sobre o WhatsApp; a unica escrita e no NOSSO banco (status do lead).
+import { MOCK_LEADS } from "./mock-data.mjs";
+import { activeDataSource } from "./config.mjs";
+
+function mockRepo() {
+  const leads = MOCK_LEADS.map((l) => ({ ...l }));
+  return {
+    source: "mock",
+    async listLeads() {
+      return leads.map((l) => ({ ...l }));
+    },
+    async transition(id, to) {
+      const lead = leads.find((l) => l.id === id);
+      if (!lead) throw new Error("lead nao encontrado");
+      lead.status = to;
+      return { ...lead };
+    },
+  };
+}
+
+function supabaseRepo(cfg) {
+  const base = cfg.supabaseUrl.replace(/\/$/, "") + "/rest/v1";
+  const headers = {
+    apikey: cfg.anonKey,
+    Authorization: `Bearer ${cfg.accessToken || cfg.anonKey}`,
+    "Content-Type": "application/json",
+  };
+  return {
+    source: "supabase",
+    async listLeads() {
+      const r = await fetch(`${base}/leads?select=*&order=updated_at.desc`, { headers });
+      if (!r.ok) throw new Error(`leads: ${r.status}`);
+      return r.json();
+    },
+    async transition(id, to) {
+      // RPC do banco: valida transicao + guarda LGPD + grava historico.
+      const r = await fetch(`${base}/rpc/transition_lead`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ p_lead_id: id, p_new_status: to, p_actor: "extension", p_note: null }),
+      });
+      if (!r.ok) throw new Error(`transition: ${r.status} ${await r.text()}`);
+      const data = await r.json();
+      return Array.isArray(data) ? data[0] : data;
+    },
+  };
+}
+
+export function createRepo(cfg) {
+  return activeDataSource(cfg) === "supabase" ? supabaseRepo(cfg) : mockRepo();
+}

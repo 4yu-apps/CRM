@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Garimpo — WhatsApp",
+  "version": "0.1.0",
+  "description": "Card lateral read-only no WhatsApp Web: casa a conversa aberta com o lead e atualiza o status em 1 clique. Nunca envia.",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://web.whatsapp.com/*",
+    "https://*.supabase.co/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://web.whatsapp.com/*"],
+      "js": ["src/content/loader.js"],
+      "css": ["src/content/panel.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["src/content/main.mjs", "src/lib/*.mjs"],
+      "matches": ["https://web.whatsapp.com/*"]
+    }
+  ],
+  "options_page": "src/options/options.html",
+  "action": { "default_title": "Garimpo" }
+}

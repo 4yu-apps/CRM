@@ -30,6 +30,19 @@ jobs:
       - run: pip install -e ".[dev]"
       - run: python -m pytest
 
+  extension-tests:
+    name: Fase 4 · extensao (node --test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: extension
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm test
+
   front-build:
     name: Fase 1 · front (lint + build)
     runs-on: ubuntu-latest

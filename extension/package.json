@@ -1,0 +1,10 @@
+{
+  "name": "garimpo-extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Extensao Chrome MV3 read-only sobre o WhatsApp Web (Garimpo).",
+  "scripts": {
+    "test": "node --test"
+  }
+}
