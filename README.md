@@ -4,9 +4,16 @@ CRM de prospecção assistida por IA — barato, com **humano no loop**. A IA
 encontra, enriquece, pontua e rascunha. O humano aprova e envia. Nunca o
 contrário. Mapa completo do projeto: [`garimpo-mapa-do-projeto.md`](garimpo-mapa-do-projeto.md).
 
-**Status:** as 6 fases (0–5) estão construídas e rodam offline (mock / jsonfile
-/ fixture). Falta só **linkar o Supabase** (aplicar migrations + preencher env)
-e **deploy do front na Vercel** — feito no fim, sem reescrever nada.
+**Status:** tudo que não depende de infra está **pronto e rodando offline** —
+as 6 fases (0–5) + login (front e extensão), criar lead manual e a captação
+(Maps → bruto). Falta **só você**: aplicar as migrations no Supabase (+ env) e
+o deploy do front na Vercel. Nenhuma reescrita — é plugar chaves.
+
+**Ao linkar:**
+1. Supabase: criar projeto → `.env` → `npm run db:push && npm run db:verify`
+2. Front: `front/.env.local` (`NEXT_PUBLIC_DATA_SOURCE=supabase` + url/anon) → login com usuário do Supabase
+3. Vercel: deploy de `front/` (hobby)
+4. Esteira/extensão: secrets no GitHub Actions + login nas opções da extensão
 
 Monorepo:
 
