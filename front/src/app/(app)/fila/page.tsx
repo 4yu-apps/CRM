@@ -162,7 +162,7 @@ export default function FilaPage() {
     );
   }
 
-  const service = SERVICE_META[cur.service_target];
+  const service = SERVICE_META[cur.service_target] ?? SERVICE_META.indefinido;
   const msg = msgOf(cur);
   const pct = total ? Math.round((reviewed / total) * 100) : 0;
 
