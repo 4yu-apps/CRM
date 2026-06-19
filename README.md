@@ -1,33 +1,114 @@
-# Garimpo
+# CRM | 4YUmkt
 
 CRM de prospecção assistida por IA — barato, com **humano no loop**. A IA
 encontra, enriquece, pontua e rascunha. O humano aprova e envia. Nunca o
-contrário. Mapa completo do projeto: [`garimpo-mapa-do-projeto.md`](garimpo-mapa-do-projeto.md).
+contrário. (Codinome interno: **Garimpo**.) Mapa estratégico:
+[`garimpo-mapa-do-projeto.md`](garimpo-mapa-do-projeto.md).
 
-**Status:** tudo que não depende de infra está **pronto e rodando offline** —
-as 6 fases (0–5) + login (front e extensão), criar lead manual e a captação
-(Maps → bruto). Falta **só você**: aplicar as migrations no Supabase (+ env) e
-o deploy do front na Vercel. Nenhuma reescrita — é plugar chaves.
-
-**Ao linkar:**
-1. Supabase: criar projeto → `.env` → `npm run db:push && npm run db:verify`
-2. Front: `front/.env.local` (`NEXT_PUBLIC_DATA_SOURCE=supabase` + url/anon) → login com usuário do Supabase
-3. Vercel: deploy de `front/` (hobby)
-4. Esteira/extensão: secrets no GitHub Actions + login nas opções da extensão
+**Status: NO AR** → **https://crm.4yumkt.com.br**
+- Banco + Auth + RLS no **Supabase** · front na **Vercel** · esteira no
+  **GitHub Actions** (cron diário) · extensão no **WhatsApp Web**.
+- As 6 fases (0–5) construídas, testadas e em produção. Falta só o **resto
+  operacional** abaixo (captação real do Maps + IA + modelo de 2 serviços).
 
 Monorepo:
 
-| Pasta        | Peça                | Fase |
+| Pasta        | Peça                | Estado |
 |--------------|---------------------|------|
-| `supabase/`  | Banco (Postgres)    | **0 ✓** |
-| `front/`     | CRM Next.js + shadcn (Vercel): leads + **dashboard** | **1 ✓ · 5 ✓ (mock; liga no Supabase via env)** |
-| `esteira/`   | Cascata Python: enrich + score + rascunho (GitHub Actions) | **2 ✓ · 3 ✓** |
-| `extension/` | Chrome MV3 read-only (WhatsApp Web) | **4 ✓ (mock; liga no Supabase nas opcoes)** |
+| `supabase/`  | Banco (Postgres)    | **✓ no ar** |
+| `front/`     | CRM Next.js + shadcn (Vercel): leads + dashboard + login | **✓ no ar** |
+| `esteira/`   | Cascata Python: enrich + score + rascunho (GitHub Actions) | **✓ no ar (cron)** |
+| `extension/` | Chrome MV3 read-only (WhatsApp Web) | **✓ funcionando** |
 
 - Front: ver [`front/README.md`](front/README.md). Roda em mock (`cd front && npm install && npm run dev`).
 - Esteira: ver [`esteira/README.md`](esteira/README.md). Roda offline (`cd esteira && python -m garimpo_esteira.run seed-demo … && … pipeline --sources fixture --llm mock`).
 - Extensão: ver [`extension/README.md`](extension/README.md). Carrega sem build em `chrome://extensions` (modo dev).
 - CI: `.github/workflows/ci.yml` valida schema (pglite), testes da esteira (pytest), da extensão (node) e build do front a cada push.
+
+---
+
+## Para ser 100% operável + modelo de serviços (tráfego × automação)
+
+> Reflexão de produto. O trilho técnico funciona ponta a ponta; o que falta é
+> **lead real em escala** e **dois ajustes de produto** (IA real + 2 serviços).
+
+### O que falta pra operar com lead REAL (não-demo)
+
+1. **Captação real do Maps (R$0)** — capturador **dentro da extensão**. Hoje o
+   lead entra por "Novo lead" (manual) ou fixture/demo. Caminho R$0: um botão
+   *"garimpar esta busca"* no Maps que joga os negócios da tela como `bruto` no
+   banco (carimbando **região + segmento**). A lógica de grade (contorna o teto
+   de ~120) já existe em `esteira/grid.py`. *(Alternativa paga: Places API — já
+   tem cliente em `esteira/discovery.py`, mas custa, não é R$0.)*
+2. **Linkar a IA real (Gemini free)** — a copy do rascunho hoje é template
+   (`mock`). Pra copy de verdade: `GEMINI_API_KEY` (free tier) + `GARIMPO_LLM=gemini`
+   (no `.env` e nos secrets do GitHub).
+3. **Modelo de 2 serviços** (tráfego × automação) — ver abaixo. É o ajuste mais
+   importante de produto.
+4. *(Opcional)* **nome→CNPJ** — o Maps dá telefone/nome, não CNPJ. Pra enriquecer
+   o nome do dono via CNPJ falta um passo "nome do negócio → CNPJ". Sem isso, o
+   telefone (que já vem do Maps) já basta pra contatar.
+
+### Pra que a IA serve — e pra que NÃO
+
+- **Score = regras puras, SEM IA** (determinístico, explicável, R$0).
+- **IA serve pra:** (a) **escrever a copy** (rascunho de 2 msgs) — já existe;
+  (b) **classificar qual serviço encaixa** (tráfego/automação/ambos) — a construir.
+- **IA NÃO serve pra capturar o Maps** — é leitura de dado estruturado (nome,
+  telefone, nota), não precisa de IA.
+- **Falta:** plugar a chave do Gemini pra (a) e (b) saírem do mock.
+
+### Maps: região e segmento são SEUS, por busca (não é hardcoded)
+
+Nada é fixo. Cada **garimpada = segmento (tipo de negócio) + região (cidade/área)**.
+Quer SP? roda região=SP. Depois RJ? região=RJ. Só pizzarias? segmento=pizzaria.
+O banco já guarda `category` (segmento) + `city`/`state`/`neighborhood` (região),
+então **filtra e separa por isso** no front.
+
+Modelo mental: **campanha de captação** = `{ segmento, região, serviço-alvo }`.
+Uma garimpada por campanha. Ex.: "pizzarias em Maringá pra tráfego", depois
+"clínicas em SP pra automação".
+
+### Os 2 serviços: tráfego × automação (chatbot) × ambos
+
+Você vende **dois produtos**, e um lead pode servir pra um, pro outro, ou pros
+dois. O sistema precisa **separar e cruzar** isso:
+
+**1. Dimensão `service_target` no lead** — `trafego | automacao | ambos | indefinido`.
+Vem da campanha (você mira um serviço) OU a IA/score decide depois.
+
+**2. ICP (score) diferente por serviço:**
+
+| Sinal | Tráfego (ads) quente quando… | Automação (chatbot) quente quando… |
+|---|---|---|
+| Nota / avaliações | nota alta + volume bom (demanda pra escalar) | **muito** volume (muito cliente = muito atendimento) |
+| Anúncio | **NÃO** anuncia (oportunidade de começar) | indiferente |
+| Site / presença | sem site / IG fraco (descuido digital) | sem site / agendamento manual |
+| Atendimento | — | responde devagar / WhatsApp é o canal / agenda na mão |
+
+→ O score vira **dois scores** (`trafego_score`, `automacao_score`) no
+`score_reason`. Passou nos dois = **ambos** = oportunidade de vender o pacote.
+
+**3. Copy (rascunho) diferente por serviço** — pitch de tráfego ≠ pitch de
+chatbot. O provider de rascunho recebe o `service_target` e escreve a mensagem
+certa. "Ambos" → lidera com o serviço de score mais alto e menciona o outro
+como upsell.
+
+**4. No funil/dashboard** — filtra e mede por serviço (leads/fechados de tráfego
+vs automação vs ambos).
+
+> **Decisão:** adicionar `service_target` (lead) + ICP/score por serviço + copy
+> por serviço. A captação mira um serviço por campanha; o score ainda **sinaliza
+> o OUTRO serviço quando encaixa** (cross-sell). Assim você nunca perde a
+> oportunidade dos 2.
+
+### Ordem sugerida de construção
+
+1. **Modelo de 2 serviços** — schema (`service_target`) + score por serviço +
+   copy por serviço. É o que dá sentido de negócio ao resto.
+2. **Linkar Gemini** — copy real (e, depois, a classificação de serviço por IA).
+3. **Captação Maps na extensão** — lead real, R$0.
+4. *(Opcional)* **nome→CNPJ** — enriquecer o nome do dono.
 
 ---
 
