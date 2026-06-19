@@ -4,12 +4,16 @@ CRM de prospecção assistida por IA — barato, com **humano no loop**. A IA
 encontra, enriquece, pontua e rascunha. O humano aprova e envia. Nunca o
 contrário. Mapa completo do projeto: [`garimpo-mapa-do-projeto.md`](garimpo-mapa-do-projeto.md).
 
-Monorepo (em construção, fase a fase):
+**Status:** as 6 fases (0–5) estão construídas e rodam offline (mock / jsonfile
+/ fixture). Falta só **linkar o Supabase** (aplicar migrations + preencher env)
+e **deploy do front na Vercel** — feito no fim, sem reescrever nada.
+
+Monorepo:
 
 | Pasta        | Peça                | Fase |
 |--------------|---------------------|------|
 | `supabase/`  | Banco (Postgres)    | **0 ✓** |
-| `front/`     | CRM Next.js + shadcn (Vercel) | **1 ✓ (mock; liga no Supabase via env)** |
+| `front/`     | CRM Next.js + shadcn (Vercel): leads + **dashboard** | **1 ✓ · 5 ✓ (mock; liga no Supabase via env)** |
 | `esteira/`   | Cascata Python: enrich + score + rascunho (GitHub Actions) | **2 ✓ · 3 ✓** |
 | `extension/` | Chrome MV3 read-only (WhatsApp Web) | **4 ✓ (mock; liga no Supabase nas opcoes)** |
 

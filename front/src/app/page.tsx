@@ -1,12 +1,10 @@
 "use client";
 import { useMemo, useState } from "react";
 import { useLeads } from "@/hooks/use-leads";
-import { activeDataSource } from "@/lib/repo";
 import { StatsBar } from "@/components/stats-bar";
 import { FunnelFilter, type StatusFilter } from "@/components/funnel-filter";
 import { LeadsTable } from "@/components/leads-table";
 import { LeadDetailSheet } from "@/components/lead-detail-sheet";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Home() {
@@ -14,8 +12,6 @@ export default function Home() {
   const [status, setStatus] = useState<StatusFilter>("todos");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
-
-  const source = activeDataSource();
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -32,19 +28,12 @@ export default function Home() {
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
-      <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
-            Garimpo
-            <Badge variant={source === "supabase" ? "default" : "secondary"} className="font-normal">
-              {source === "supabase" ? "Supabase" : "mock"}
-            </Badge>
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            CRM de prospeccao — humano no loop. A IA acha e rascunha; voce aprova e envia.
-          </p>
-        </div>
-      </header>
+      <div className="mb-6">
+        <h1 className="text-xl font-bold tracking-tight">Leads</h1>
+        <p className="text-sm text-muted-foreground">
+          CRM de prospeccao — humano no loop. A IA acha e rascunha; voce aprova e envia.
+        </p>
+      </div>
 
       {error && (
         <div className="mb-4 rounded-md border border-rose-300 bg-rose-50 p-3 text-sm text-rose-700 dark:bg-rose-950/30 dark:text-rose-300">
