@@ -1,6 +1,6 @@
-// Seed do modo mock — leads de exemplo (Maringa/PR, ICP de trafego/design).
+// Seed do modo mock: leads de exemplo (Maringa/PR), portados do claude-design-ref.
 // Espelha a forma do schema. Timestamps relativos para parecer "vivo".
-import type { FieldProvenance, Lead, LeadSource, StatusHistory } from "../types";
+import type { FieldProvenance, Lead, LeadSource, LeadStatus, ScoreReason, ServiceTarget, StatusHistory } from "../types";
 
 export const DEMO_OWNER = "00000000-0000-0000-0000-0000000000aa";
 
@@ -10,331 +10,365 @@ const hoursAgo = (h: number) => new Date(now() - h * 3600_000).toISOString();
 
 let _id = 0;
 const uid = (p: string) => `${p}-${(++_id).toString(36).padStart(4, "0")}`;
+const slug = (s: string) => s.toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g, "");
 
 interface SeedSpec {
   business_name: string;
   category: string;
-  city?: string;
-  neighborhood?: string;
-  cnpj?: string;
-  phone?: string;
-  email?: string;
+  neighborhood: string;
+  phone: string;
   instagram?: string;
-  website?: string;
+  site?: boolean;
+  cnpj?: string;
   owner_name?: string;
-  rating?: number;
-  reviews_count?: number;
-  status: Lead["status"];
-  score?: number;
-  scoreNote?: string;
+  rating: number;
+  reviews_count: number;
+  status: LeadStatus;
+  service: ServiceTarget;
+  ads?: boolean;
+  score: number;
+  motivo: string;
+  sinais: string[];
+  draft1: string;
+  draft2: string;
   opt_out?: boolean;
   archived?: boolean;
-  draft1?: string;
-  draft2?: string;
   createdDaysAgo: number;
   updatedHoursAgo: number;
-  // proveniencia: [campo, fonte, valor, confianca?]
-  prov?: [string, LeadSource, string, number?][];
-  // historico de status (do mais antigo ao atual), [status, ator, horasAtras, nota?]
-  hist?: [Lead["status"], StatusHistory["actor"], number, string?][];
 }
 
 const SPECS: SeedSpec[] = [
   {
-    business_name: "Pizzaria Forno di Maria",
-    category: "Pizzaria",
-    city: "Maringa",
+    business_name: "Burguer do Tonho",
+    category: "Hamburgueria",
     neighborhood: "Zona 7",
-    phone: "44999990001",
-    rating: 4.6,
-    reviews_count: 312,
-    status: "bruto",
+    phone: "44998123344",
+    instagram: "@burgerdotonho",
+    site: true,
+    cnpj: "31.402.118/0001-09",
+    owner_name: "Antônio Ferreira",
+    rating: 4.7,
+    reviews_count: 324,
+    status: "rascunho_pronto",
+    service: "trafego",
+    ads: false,
+    score: 84,
+    motivo:
+      "Nota 4,7 com 324 avaliacoes, ainda nao anuncia e o site nao tem rastreamento. Negocio movimentado que ainda nao investe em trafego, bate certinho com o seu perfil.",
+    sinais: [
+      "Perfil ativo no Instagram, mas sem anuncio rodando",
+      "Site no ar e sem pixel instalado",
+      "Bastante avaliacao recente, movimento real",
+    ],
+    draft1:
+      "Oi Antonio, tudo certo? Vi o movimento do Burguer do Tonho aqui na Zona 7 e o trabalho de voces ficou muito bom. Eu ajudo hamburgueria daqui a lotar mais nos dias parados com anuncio bem feito. Posso te mostrar rapidinho como funciona?",
+    draft2:
+      "Funciona assim: monto o anuncio pra quem busca hamburguer perto, voce recebe o pedido e eu acompanho o resultado. Te mando um exemplo de como ficaria pro Burguer do Tonho?",
     createdDaysAgo: 0,
-    updatedHoursAgo: 3,
-    prov: [["business_name", "google_maps", "Pizzaria Forno di Maria", 1], ["phone", "google_maps", "(44) 99999-0001", 0.9]],
-    hist: [["bruto", "system", 3]],
+    updatedHoursAgo: 2,
   },
   {
     business_name: "Studio Bella Estetica",
     category: "Estetica",
-    city: "Maringa",
-    neighborhood: "Zona 1",
-    cnpj: "11222333000144",
-    phone: "44999990002",
-    instagram: "@studiobella",
-    rating: 4.8,
-    reviews_count: 198,
-    owner_name: "Marina Alves",
-    status: "enriquecido",
-    createdDaysAgo: 2,
-    updatedHoursAgo: 20,
-    prov: [
-      ["business_name", "google_maps", "Studio Bella Estetica", 1],
-      ["phone", "google_maps", "(44) 99999-0002", 0.95],
-      ["cnpj", "cnpj_brasilapi", "11.222.333/0001-44", 1],
-      ["owner_name", "cnpj_brasilapi", "Marina Alves", 0.8],
-      ["instagram", "instagram", "@studiobella", 0.7],
-    ],
-    hist: [["bruto", "system", 48], ["enriquecido", "system", 20]],
-  },
-  {
-    business_name: "Hamburgueria do Ze",
-    category: "Hamburgueria",
-    city: "Maringa",
-    neighborhood: "Centro",
-    cnpj: "22333444000155",
-    phone: "44999990003",
-    rating: 4.4,
-    reviews_count: 540,
-    owner_name: "Jose Pereira",
-    status: "qualificado",
-    score: 82,
-    scoreNote: "Nota 4.4, 540 avaliacoes, sem site (descuido digital), nao anuncia.",
-    createdDaysAgo: 4,
-    updatedHoursAgo: 26,
-    prov: [
-      ["phone", "google_maps", "(44) 99999-0003", 0.95],
-      ["cnpj", "cnpj_brasilapi", "22.333.444/0001-55", 1],
-      ["website", "website", "(ausente)", 1],
-    ],
-    hist: [["bruto", "system", 96], ["enriquecido", "system", 50], ["qualificado", "system", 26, "score 82"]],
-  },
-  {
-    business_name: "Petshop Amigo Fiel",
-    category: "Petshop",
-    city: "Maringa",
-    neighborhood: "Zona 5",
-    phone: "44999990004",
-    instagram: "@amigofielpet",
-    rating: 4.7,
-    reviews_count: 121,
+    neighborhood: "Zona Sul",
+    phone: "44996442210",
+    instagram: "@studiobella.mga",
+    site: false,
+    cnpj: "42.118.903/0001-55",
+    owner_name: "Marina Lopes",
+    rating: 4.9,
+    reviews_count: 186,
     status: "rascunho_pronto",
-    score: 76,
-    scoreNote: "Nota 4.7, presenca fraca no IG, sem trafego pago detectado.",
-    draft1: "Oi! Vi o Amigo Fiel no Maps, 4.7 com 121 avaliacoes e um IG bem cuidado. Voces ja rodam anuncio pra atrair cliente novo da regiao?",
-    draft2: "Pergunto porque com esse nivel de avaliacao da pra escalar agendamento com trafego local barato. Faz sentido eu te mandar 2-3 ideias rapidas?",
-    createdDaysAgo: 5,
-    updatedHoursAgo: 6,
-    prov: [
-      ["phone", "google_maps", "(44) 99999-0004", 0.95],
-      ["instagram", "instagram", "@amigofielpet", 0.85],
+    service: "trafego",
+    ads: false,
+    score: 86,
+    motivo:
+      "Nota 4,9, Instagram caprichado e nenhum anuncio rodando. Clinica de estetica com prova social forte e sem site, o tipo que cresce rapido com trafego pago.",
+    sinais: [
+      "Instagram bonito e ativo, sem impulsionamento",
+      "Nao tem site nem rastreamento",
+      "Avaliacoes altas e constantes",
     ],
-    hist: [
-      ["bruto", "system", 120], ["enriquecido", "system", 70],
-      ["qualificado", "system", 30, "score 76"], ["rascunho_pronto", "system", 6],
-    ],
+    draft1:
+      "Oi Marina! Vi o trabalho do Studio Bella e o capricho de voces chama atencao. Eu ajudo clinica de estetica daqui a encher a agenda nos horarios vagos com anuncio certo pro publico da regiao. Te mostro como?",
+    draft2:
+      "A ideia e simples: anuncio pra mulheres da regiao que procuram esse tipo de servico, e voce so recebe quem ja chega interessado. Posso montar um exemplo pra voce ver?",
+    createdDaysAgo: 0,
+    updatedHoursAgo: 3,
   },
   {
     business_name: "Barbearia Navalha de Ouro",
     category: "Barbearia",
-    city: "Maringa",
-    neighborhood: "Zona 7",
-    phone: "44999990005",
+    neighborhood: "Centro",
+    phone: "44992037788",
     instagram: "@navalhadeouro",
-    rating: 4.9,
-    reviews_count: 88,
-    status: "aprovado",
-    score: 71,
-    draft1: "Fala! Navalha de Ouro com 4.9 e fila, da pra transformar essa procura em agenda cheia o mes todo com anuncio local.",
-    draft2: "Te mando uma previa de campanha sem compromisso?",
-    createdDaysAgo: 6,
-    updatedHoursAgo: 2,
-    prov: [["phone", "google_maps", "(44) 99999-0005", 0.95], ["instagram", "instagram", "@navalhadeouro", 0.9]],
-    hist: [
-      ["bruto", "system", 144], ["enriquecido", "system", 90],
-      ["qualificado", "system", 40], ["rascunho_pronto", "system", 12],
-      ["aprovado", "human", 2, "copy ok, ajustei a abertura"],
-    ],
-  },
-  {
-    business_name: "Otica Visao Clara",
-    category: "Otica",
-    city: "Maringa",
-    phone: "44999990006",
-    rating: 4.5,
-    reviews_count: 230,
-    status: "enviado",
-    score: 68,
-    createdDaysAgo: 7,
-    updatedHoursAgo: 5,
-    prov: [["phone", "google_maps", "(44) 99999-0006", 0.95]],
-    hist: [
-      ["bruto", "system", 168], ["enriquecido", "system", 120],
-      ["qualificado", "system", 60], ["rascunho_pronto", "system", 30],
-      ["aprovado", "human", 10], ["enviado", "human", 5, "mandei no WhatsApp"],
-    ],
-  },
-  {
-    business_name: "Restaurante Sabor Caseiro",
-    category: "Restaurante",
-    city: "Maringa",
-    phone: "44999990007",
-    rating: 4.3,
-    reviews_count: 410,
-    status: "sem_resposta",
-    score: 64,
-    createdDaysAgo: 10,
-    updatedHoursAgo: 48,
-    prov: [["phone", "google_maps", "(44) 99999-0007", 0.9]],
-    hist: [
-      ["bruto", "system", 240], ["enriquecido", "system", 180],
-      ["qualificado", "system", 120], ["rascunho_pronto", "system", 96],
-      ["aprovado", "human", 80], ["enviado", "human", 72],
-      ["sem_resposta", "extension", 48, "2 dias sem retorno"],
-    ],
-  },
-  {
-    business_name: "Academia CorpoFit",
-    category: "Academia",
-    city: "Maringa",
-    phone: "44999990008",
-    instagram: "@corpofit",
-    rating: 4.6,
-    reviews_count: 360,
-    status: "respondeu",
-    score: 79,
-    createdDaysAgo: 9,
-    updatedHoursAgo: 8,
-    prov: [["phone", "google_maps", "(44) 99999-0008", 0.95], ["instagram", "instagram", "@corpofit", 0.8]],
-    hist: [
-      ["bruto", "system", 216], ["enriquecido", "system", 160],
-      ["qualificado", "system", 100], ["rascunho_pronto", "system", 70],
-      ["aprovado", "human", 50], ["enviado", "human", 40],
-      ["respondeu", "extension", 8, "respondeu pedindo proposta"],
-    ],
-  },
-  {
-    business_name: "Clinica OdontoSorriso",
-    category: "Clinica odontologica",
-    city: "Maringa",
-    phone: "44999990009",
+    site: true,
+    cnpj: "29.880.441/0001-12",
+    owner_name: "Diego Martins",
     rating: 4.8,
-    reviews_count: 150,
-    status: "interessado",
-    score: 85,
-    createdDaysAgo: 12,
-    updatedHoursAgo: 12,
-    prov: [["phone", "google_maps", "(44) 99999-0009", 0.95]],
-    hist: [
-      ["bruto", "system", 288], ["enriquecido", "system", 220],
-      ["qualificado", "system", 150], ["rascunho_pronto", "system", 110],
-      ["aprovado", "human", 90], ["enviado", "human", 80],
-      ["respondeu", "extension", 40], ["interessado", "human", 12, "quer entender o investimento"],
-    ],
+    reviews_count: 541,
+    status: "rascunho_pronto",
+    service: "trafego",
+    ads: false,
+    score: 81,
+    motivo:
+      "541 avaliacoes com nota 4,8, no Centro, e ainda nao anuncia. Barbearia consolidada que pode encher os horarios da semana com pouco investimento.",
+    sinais: ["Volume muito alto de avaliacoes", "Site simples, sem rastreamento", "Sem anuncio ativo"],
+    draft1:
+      "E ai Diego, suave? A Navalha de Ouro tem uma fila de cliente fiel, da pra ver pelas avaliacoes. Eu ajudo barbearia a encher os horarios parados da semana com anuncio. Quer que eu te mostre rapidinho?",
+    draft2:
+      "Pego os horarios mais fracos e coloco anuncio pra quem ta procurando barbeiro perto. Voce enche a agenda sem depender so do boca a boca. Te mando um exemplo?",
+    createdDaysAgo: 1,
+    updatedHoursAgo: 5,
   },
   {
-    business_name: "Mercado Bom Preco",
-    category: "Mercearia",
-    city: "Maringa",
-    phone: "44999990010",
-    rating: 4.2,
-    reviews_count: 620,
-    status: "reuniao",
+    business_name: "Pet Lar",
+    category: "Petshop",
+    neighborhood: "Jd. Alvorada",
+    phone: "44991156620",
+    instagram: "@petlar.mga",
+    site: false,
+    cnpj: "37.660.215/0001-80",
+    owner_name: "Claudia Reis",
+    rating: 4.6,
+    reviews_count: 98,
+    status: "rascunho_pronto",
+    service: "automacao",
+    ads: false,
     score: 73,
-    createdDaysAgo: 14,
-    updatedHoursAgo: 30,
-    prov: [["phone", "google_maps", "(44) 99999-0010", 0.9]],
-    hist: [
-      ["bruto", "system", 336], ["enriquecido", "system", 260],
-      ["qualificado", "system", 190], ["rascunho_pronto", "system", 150],
-      ["aprovado", "human", 120], ["enviado", "human", 110],
-      ["respondeu", "extension", 70], ["interessado", "human", 50],
-      ["reuniao", "human", 30, "reuniao marcada pra sexta"],
+    motivo:
+      "Petshop de bairro com clientela fiel e agendamento de banho e tosa tudo na mao pelo WhatsApp. Tipo de negocio que ganha tempo e nao perde cliente com atendimento automatico.",
+    sinais: [
+      "Atende e agenda tudo manual no WhatsApp",
+      "Movimento constante de banho e tosa",
+      "Sem site nem chatbot",
     ],
+    draft1:
+      "Oi Claudia, tudo bem? O Pet Lar tem uma clientela fiel ali no Alvorada. Eu monto um atendimento automatico no WhatsApp que agenda banho e tosa sozinho, sem voce perder cliente na correria. Quer que eu te mostre como funciona?",
+    draft2:
+      "O chatbot responde na hora, marca o horario e ja manda o lembrete pro cliente. Voce so chega e atende. Te mostro um exemplo rodando?",
+    createdDaysAgo: 1,
+    updatedHoursAgo: 6,
   },
   {
-    business_name: "Floricultura Jardim Secreto",
-    category: "Floricultura",
-    city: "Maringa",
-    phone: "44999990011",
-    instagram: "@jardimsecreto",
-    rating: 4.9,
-    reviews_count: 95,
-    status: "proposta",
-    score: 80,
-    createdDaysAgo: 18,
-    updatedHoursAgo: 20,
-    prov: [["phone", "google_maps", "(44) 99999-0011", 0.95], ["instagram", "instagram", "@jardimsecreto", 0.85]],
-    hist: [
-      ["bruto", "system", 432], ["enriquecido", "system", 360],
-      ["qualificado", "system", 280], ["rascunho_pronto", "system", 230],
-      ["aprovado", "human", 180], ["enviado", "human", 170],
-      ["respondeu", "extension", 120], ["interessado", "human", 90],
-      ["reuniao", "human", 50], ["proposta", "human", 20, "proposta de R$ 1.500/mes"],
-    ],
-  },
-  {
-    business_name: "Auto Center Turbo",
-    category: "Oficina mecanica",
-    city: "Maringa",
-    phone: "44999990012",
-    rating: 4.5,
-    reviews_count: 280,
-    status: "fechado",
-    score: 78,
-    createdDaysAgo: 25,
-    updatedHoursAgo: 60,
-    prov: [["phone", "google_maps", "(44) 99999-0012", 0.9]],
-    hist: [
-      ["bruto", "system", 600], ["enriquecido", "system", 520],
-      ["qualificado", "system", 440], ["rascunho_pronto", "system", 380],
-      ["aprovado", "human", 320], ["enviado", "human", 300],
-      ["respondeu", "extension", 240], ["interessado", "human", 200],
-      ["reuniao", "human", 140], ["proposta", "human", 90],
-      ["fechado", "human", 60, "fechou R$ 1.800/mes 🎉"],
-    ],
-  },
-  {
-    business_name: "Lava-Jato Gota Limpa",
-    category: "Lava-jato",
-    city: "Maringa",
-    phone: "44999990013",
-    rating: 3.9,
-    reviews_count: 40,
-    status: "perdido",
-    score: 41,
-    scoreNote: "Nota abaixo de 4.3 e poucas avaliacoes.",
-    createdDaysAgo: 20,
-    updatedHoursAgo: 96,
-    prov: [["phone", "google_maps", "(44) 99999-0013", 0.85]],
-    hist: [
-      ["bruto", "system", 480], ["enriquecido", "system", 400],
-      ["qualificado", "system", 320], ["rascunho_pronto", "system", 280],
-      ["aprovado", "human", 230], ["enviado", "human", 220],
-      ["respondeu", "extension", 180], ["interessado", "human", 150],
-      ["perdido", "human", 96, "achou caro, parou de responder"],
-    ],
-  },
-  {
-    business_name: "Salao Glamour",
-    category: "Salao de beleza",
-    city: "Maringa",
-    phone: "44999990014",
-    rating: 4.1,
-    reviews_count: 60,
-    status: "descartado",
-    archived: true,
-    createdDaysAgo: 8,
-    updatedHoursAgo: 50,
-    prov: [["phone", "google_maps", "(44) 99999-0014", 0.6]],
-    hist: [["bruto", "system", 192], ["enriquecido", "system", 120], ["descartado", "human", 50, "numero errado"]],
-  },
-  {
-    business_name: "Doceria Acucar & Arte",
-    category: "Doceria",
-    city: "Maringa",
-    phone: "44999990015",
-    instagram: "@acucareart",
+    business_name: "Cantina Nonna",
+    category: "Restaurante",
+    neighborhood: "Zona 5",
+    phone: "44998771045",
+    instagram: "@cantinanonna",
+    site: true,
+    cnpj: "33.204.778/0001-31",
+    owner_name: "Paolo Bianchi",
     rating: 4.7,
-    reviews_count: 140,
-    status: "enriquecido",
-    opt_out: true,
+    reviews_count: 412,
+    status: "rascunho_pronto",
+    service: "trafego",
+    ads: false,
+    score: 70,
+    motivo:
+      "Restaurante com nota 4,7 e 412 avaliacoes. Tem site com rastreamento mas nao anuncia, entao a base ja esta pronta pra comecar a campanha sem atrito.",
+    sinais: ["Site ja tem pixel instalado", "Ainda nao roda anuncio", "Avaliacoes fortes e movimento alto"],
+    draft1:
+      "Ola Paolo, tudo certo? A Cantina Nonna ja tem uma estrutura boa de site. Eu ajudo restaurante a encher as mesas nos dias mais fracos com anuncio bem direcionado. Quer ver como ficaria pra voces?",
+    draft2:
+      "Como ja tem pixel, da pra comecar rapido e medir tudo. Anuncio pros dias parados, foco em quem ta perto na hora da fome. Te mando uma previa?",
+    createdDaysAgo: 2,
+    updatedHoursAgo: 8,
+  },
+  {
+    business_name: "Doce Encanto Confeitaria",
+    category: "Confeitaria",
+    neighborhood: "Zona 7",
+    phone: "44995503322",
+    instagram: "@doceencanto.mga",
+    site: false,
+    cnpj: "40.991.336/0001-07",
+    owner_name: "Fernanda Souza",
+    rating: 4.8,
+    reviews_count: 154,
+    status: "rascunho_pronto",
+    service: "trafego",
+    ads: false,
+    score: 80,
+    motivo:
+      "Confeitaria com nota 4,8, foco em encomendas e festas, sem site e sem anuncio. Ticket bom e publico que busca por proximidade, bate com o perfil.",
+    sinais: ["Trabalha com encomenda, ticket alto", "Sem site e sem anuncio", "Instagram com fotos boas dos produtos"],
+    draft1:
+      "Oi Fernanda! Os bolos do Doce Encanto estao lindos no Instagram. Eu ajudo confeitaria a receber mais pedido de festa e encomenda com anuncio pra regiao. Te mostro como funciona?",
+    draft2:
+      "Coloco anuncio pra quem procura bolo de festa e encomenda perto de voce. Chega mais pedido sem voce ter que correr atras. Posso te mandar um exemplo?",
     createdDaysAgo: 3,
-    updatedHoursAgo: 18,
-    prov: [["phone", "google_maps", "(44) 99999-0015", 0.9], ["instagram", "instagram", "@acucareart", 0.8]],
-    hist: [["bruto", "system", 72], ["enriquecido", "system", 18]],
+    updatedHoursAgo: 10,
+  },
+  {
+    business_name: "FitZone Academia",
+    category: "Academia",
+    neighborhood: "Novo Centro",
+    phone: "44994401199",
+    instagram: "@fitzone.mga",
+    site: true,
+    cnpj: "28.115.660/0001-44",
+    owner_name: "Rodrigo Alves",
+    rating: 4.5,
+    reviews_count: 268,
+    status: "enviado",
+    service: "trafego",
+    ads: true,
+    score: 64,
+    motivo:
+      "Academia que ja anuncia, entao o angulo aqui e otimizacao, nao primeiro contato. Da pra baixar o custo por matricula.",
+    sinais: ["Ja roda anuncio", "Site com rastreamento", "Volume bom de avaliacao"],
+    draft1:
+      "Oi Rodrigo, vi que a FitZone ja anuncia. Eu ajudo academia a baixar o custo por matricula e melhorar o retorno. Posso dar uma olhada no que esta rodando?",
+    draft2: "Faco um diagnostico rapido do que ta no ar e te mostro onde da pra economizar. Sem compromisso, topa?",
+    createdDaysAgo: 4,
+    updatedHoursAgo: 5,
+  },
+  {
+    business_name: "Odonto Sorria",
+    category: "Odontologia",
+    neighborhood: "Centro",
+    phone: "44993302255",
+    instagram: "@odontosorria",
+    site: true,
+    cnpj: "30.770.118/0001-90",
+    owner_name: "Helena Costa",
+    rating: 4.9,
+    reviews_count: 702,
+    status: "enviado",
+    service: "ambos",
+    ads: false,
+    score: 88,
+    motivo:
+      "Clinica com reputacao altissima e 702 avaliacoes, ainda sem anuncio. Volume alto pra escalar com trafego e agendamento todo manual pra automatizar, encaixa nos dois servicos.",
+    sinais: ["Reputacao altissima, 702 avaliacoes", "Ainda nao anuncia", "Agendamento todo manual no WhatsApp"],
+    draft1:
+      "Oi Dra. Helena, a Odonto Sorria tem uma reputacao invejavel. Eu ajudo clinica a transformar isso em mais agendamento, com anuncio e com atendimento automatico no WhatsApp. Posso mostrar?",
+    draft2:
+      "Da pra anunciar pra quem procura dentista perto e ainda automatizar o agendamento pra nao perder ninguem. Te mostro os dois lados rapidinho?",
+    createdDaysAgo: 5,
+    updatedHoursAgo: 9,
+  },
+  {
+    business_name: "Cafe Origem",
+    category: "Cafeteria",
+    neighborhood: "Zona 7",
+    phone: "44998774400",
+    instagram: "@cafeorigem",
+    site: false,
+    cnpj: "41.220.665/0001-18",
+    owner_name: "Lucas Prado",
+    rating: 4.8,
+    reviews_count: 233,
+    status: "respondeu",
+    service: "trafego",
+    ads: false,
+    score: 76,
+    motivo: "Cafeteria charmosa, publico jovem, otima pra anuncio local. Sem anuncio rodando ainda.",
+    sinais: ["Publico jovem e engajado", "Sem anuncio", "Boa presenca no Instagram"],
+    draft1:
+      "Oi Lucas! O Cafe Origem tem uma vibe otima. Eu ajudo cafeteria a atrair mais gente da regiao com anuncio. Bora conversar?",
+    draft2: "Anuncio pra quem ta perto procurando cafe e um lugar bom pra trabalhar. Te mando um exemplo?",
+    createdDaysAgo: 6,
+    updatedHoursAgo: 8,
+  },
+  {
+    business_name: "Auto Spa Brilho",
+    category: "Estetica automotiva",
+    neighborhood: "Zona 8",
+    phone: "44991128080",
+    instagram: "@autospabrilho",
+    site: false,
+    cnpj: "35.991.220/0001-66",
+    owner_name: "Tiago Nunes",
+    rating: 4.7,
+    reviews_count: 141,
+    status: "interessado",
+    service: "trafego",
+    ads: false,
+    score: 79,
+    motivo: "Servico de ticket alto, sem anuncio, demanda crescente. Bom alvo pra trafego local.",
+    sinais: ["Ticket alto", "Sem anuncio", "Demanda crescente na regiao"],
+    draft1:
+      "Fala Tiago! O Auto Spa Brilho entrega um acabamento top. Eu ajudo a trazer mais agendamento de polimento e vitrificacao com anuncio. Te mostro?",
+    draft2: "Coloco anuncio pra quem procura esse servico na regiao e o agendamento enche. Posso te mostrar como?",
+    createdDaysAgo: 7,
+    updatedHoursAgo: 12,
+  },
+  {
+    business_name: "Studio Namaste Yoga",
+    category: "Bem-estar",
+    neighborhood: "Zona Sul",
+    phone: "44992205511",
+    instagram: "@studionamaste",
+    site: true,
+    cnpj: "43.005.118/0001-22",
+    owner_name: "Beatriz Lima",
+    rating: 5.0,
+    reviews_count: 88,
+    status: "reuniao",
+    service: "trafego",
+    ads: false,
+    score: 82,
+    motivo: "Nota maxima, nicho fiel, otimo pra captacao de novas turmas com trafego.",
+    sinais: ["Nota 5,0", "Nicho fiel", "Sem anuncio"],
+    draft1:
+      "Oi Beatriz! O Studio Namaste tem nota maxima. Eu ajudo studio a lotar as turmas novas com anuncio pro publico certo. Marca uma conversa rapida comigo?",
+    draft2: "A gente atrai gente da regiao interessada em yoga e enche as turmas novas. Te mostro um exemplo na call?",
+    createdDaysAgo: 8,
+    updatedHoursAgo: 30,
+  },
+  {
+    business_name: "Pilates Corpo Leve",
+    category: "Pilates",
+    neighborhood: "Centro",
+    phone: "44996607733",
+    instagram: "@pilatescorpoleve",
+    site: true,
+    cnpj: "39.118.440/0001-03",
+    owner_name: "Camila Duarte",
+    rating: 4.9,
+    reviews_count: 175,
+    status: "fechado",
+    service: "trafego",
+    ads: true,
+    score: 78,
+    motivo: "Fechou contrato. Caso de sucesso, agenda cheia.",
+    sinais: ["Cliente ativo", "Agenda cheia", "Anuncio rodando com a gente"],
+    draft1: "Obrigado pela parceria, Camila! Seguimos otimizando os anuncios pra manter a agenda cheia.",
+    draft2: "Mes que vem ajusto a campanha pra focar nas turmas novas. Qualquer coisa, to por aqui.",
+    createdDaysAgo: 20,
+    updatedHoursAgo: 60,
   },
 ];
+
+const PROV_SOURCE: Record<string, LeadSource> = {
+  business_name: "google_maps",
+  phone: "google_maps",
+  owner_name: "cnpj_brasilapi",
+  cnpj: "cnpj_brasilapi",
+  instagram: "instagram",
+};
+
+const BASE_PATH: LeadStatus[] = ["bruto", "enriquecido", "qualificado", "rascunho_pronto", "aprovado", "enviado"];
+function pathFor(status: LeadStatus): LeadStatus[] {
+  switch (status) {
+    case "rascunho_pronto":
+      return BASE_PATH.slice(0, 4);
+    case "enviado":
+      return BASE_PATH;
+    case "respondeu":
+      return [...BASE_PATH, "respondeu"];
+    case "interessado":
+      return [...BASE_PATH, "respondeu", "interessado"];
+    case "reuniao":
+      return [...BASE_PATH, "respondeu", "reuniao"];
+    case "fechado":
+      return [...BASE_PATH, "respondeu", "interessado", "reuniao", "proposta", "fechado"];
+    default:
+      return [status];
+  }
+}
 
 export function buildSeed(): { leads: Lead[]; provenance: FieldProvenance[]; history: StatusHistory[] } {
   _id = 0;
@@ -344,65 +378,92 @@ export function buildSeed(): { leads: Lead[]; provenance: FieldProvenance[]; his
 
   for (const s of SPECS) {
     const id = uid("lead");
+    const website = s.site ? `https://${slug(s.business_name)}.com.br` : null;
+    const score_reason: ScoreReason = {
+      total: s.score,
+      summary: s.motivo,
+      criteria: s.sinais.map((note) => ({ label: "Sinal", points: 1, note })),
+    };
     leads.push({
       id,
       owner_id: DEMO_OWNER,
       status: s.status,
       business_name: s.business_name,
       cnpj: s.cnpj ?? null,
-      phone: s.phone ?? null,
-      email: s.email ?? null,
+      phone: s.phone,
+      email: null,
       instagram: s.instagram ?? null,
-      website: s.website ?? null,
+      website,
       maps_place_id: `place_${id}`,
       maps_url: null,
-      rating: s.rating ?? null,
-      reviews_count: s.reviews_count ?? null,
-      category: s.category ?? null,
+      rating: s.rating,
+      reviews_count: s.reviews_count,
+      category: s.category,
       address: null,
-      neighborhood: s.neighborhood ?? null,
-      city: s.city ?? "Maringa",
+      neighborhood: s.neighborhood,
+      city: "Maringa",
       state: "PR",
       owner_name: s.owner_name ?? null,
-      score: s.score ?? null,
-      score_reason: s.score
-        ? { total: s.score, criteria: [{ label: "Score do ICP", points: s.score, note: s.scoreNote }] }
-        : null,
+      score: s.score,
+      score_reason,
+      service_target: s.service,
+      ads_active: s.ads ?? null,
       opt_out: s.opt_out ?? false,
       opt_out_at: s.opt_out ? hoursAgo(s.updatedHoursAgo) : null,
       archived: s.archived ?? false,
       created_at: daysAgo(s.createdDaysAgo),
       updated_at: hoursAgo(s.updatedHoursAgo),
-      draft_msg1: s.draft1 ?? null,
-      draft_msg2: s.draft2 ?? null,
+      draft_msg1: s.draft1,
+      draft_msg2: s.draft2,
     });
 
-    for (const [field, source, value, confidence] of s.prov ?? []) {
+    // proveniencia gerada dos campos preenchidos
+    const provFields: [string, string | null][] = [
+      ["business_name", s.business_name],
+      ["phone", s.phone],
+      ["owner_name", s.owner_name ?? null],
+      ["cnpj", s.cnpj ?? null],
+      ["instagram", s.instagram ?? null],
+    ];
+    for (const [field, value] of provFields) {
+      if (!value) continue;
       provenance.push({
         id: uid("prov"),
         lead_id: id,
         field_name: field,
-        source,
+        source: PROV_SOURCE[field],
         value,
-        confidence: confidence ?? null,
+        confidence: field === "business_name" ? 1 : 0.85,
         found_at: daysAgo(s.createdDaysAgo),
       });
     }
+    provenance.push({
+      id: uid("prov"),
+      lead_id: id,
+      field_name: "ads_active",
+      source: "meta_ad_library",
+      value: s.ads ? "sim" : "nao",
+      confidence: 0.8,
+      found_at: daysAgo(s.createdDaysAgo),
+    });
 
-    let prev: Lead["status"] | null = null;
-    for (const [status, actor, h, note] of s.hist ?? []) {
+    // historico gerado do caminho ate o status atual
+    const path = pathFor(s.status);
+    let prev: LeadStatus | null = null;
+    path.forEach((st, i) => {
+      const actor: StatusHistory["actor"] = i < 4 ? "system" : "human";
       history.push({
         id: uid("hist"),
         lead_id: id,
         from_status: prev,
-        to_status: status,
+        to_status: st,
         actor,
         changed_by: actor === "system" ? null : DEMO_OWNER,
-        note: note ?? null,
-        changed_at: hoursAgo(h),
+        note: null,
+        changed_at: hoursAgo(s.updatedHoursAgo + (path.length - 1 - i) * 12),
       });
-      prev = status;
-    }
+      prev = st;
+    });
   }
 
   return { leads, provenance, history };

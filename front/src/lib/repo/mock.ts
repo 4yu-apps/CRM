@@ -62,6 +62,8 @@ async function create(input: LeadEditable): Promise<Lead> {
     owner_name: null,
     score: null,
     score_reason: null,
+    service_target: "indefinido",
+    ads_active: null,
     opt_out: false,
     opt_out_at: null,
     archived: false,

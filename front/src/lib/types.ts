@@ -30,10 +30,14 @@ export type LeadSource =
 
 export type ActorType = "human" | "system" | "extension";
 
-// score_reason (jsonb) — score explicavel (criterio de aceite da Fase 3,
-// ja tipado aqui para o front exibir o "por que pontuou X").
+// Servico-alvo do lead (B1, dois servicos): trafego, automacao, ambos.
+export type ServiceTarget = "trafego" | "automacao" | "ambos" | "indefinido";
+
+// score_reason (jsonb): score explicavel. summary = o "porque" em PT (motivo);
+// criteria = os sinais lidos (cada um com nota curta).
 export interface ScoreReason {
   total: number;
+  summary?: string;
   criteria: { label: string; points: number; note?: string }[];
 }
 
@@ -63,6 +67,8 @@ export interface Lead {
 
   score: number | null;
   score_reason: ScoreReason | null;
+  service_target: ServiceTarget;
+  ads_active?: boolean | null;
 
   opt_out: boolean;
   opt_out_at: string | null;
