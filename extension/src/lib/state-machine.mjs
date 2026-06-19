@@ -39,11 +39,30 @@ export const STATUS_LABEL = {
 
 // Rotulos dos botoes (iguais aos do front/mapa). Default = STATUS_LABEL[to].
 const TRANSITION_LABELS = {
+  "bruto->enriquecido": "Enriquecer",
+  "bruto->descartado": "Descartar",
+  "enriquecido->qualificado": "Qualificar",
+  "enriquecido->descartado": "Descartar",
+  "qualificado->rascunho_pronto": "Gerar rascunho",
+  "qualificado->descartado": "Descartar",
+  "rascunho_pronto->descartado": "Descartar",
+  "enviado->respondeu": "Respondeu",
+  "enviado->sem_resposta": "Sem resposta",
   "enviado->descartado": "Numero errado",
   "respondeu->reuniao": "Agendou reuniao",
+  "respondeu->interessado": "Interessado",
+  "respondeu->sem_interesse": "Sem interesse",
+  "interessado->reuniao": "Agendar reuniao",
+  "interessado->proposta": "Virou proposta",
+  "interessado->perdido": "Marcar perdido",
+  "reuniao->proposta": "Virou proposta",
+  "reuniao->perdido": "Marcar perdido",
+  "proposta->fechado": "Fechar",
+  "proposta->perdido": "Marcar perdido",
   "rascunho_pronto->aprovado": "Aprovar",
   "aprovado->enviado": "Marquei enviado",
   "sem_resposta->enviado": "Reenviei (follow-up)",
+  "sem_resposta->descartado": "Descartar",
   "descartado->enriquecido": "Reativar",
 };
 

@@ -255,11 +255,12 @@
     panel.id = PANEL_ID;
     panel.innerHTML = `
     <div class="gm-head">
-      <span class="gm-logo">Garimpo</span>
-      <button class="gm-min" title="minimizar">_</button>
+      <span class="gm-mark">4Y</span>
+      <span class="gm-title">Capturar do Maps</span>
+      <button class="gm-min" title="Minimizar painel" aria-label="Minimizar painel">\u2212</button>
     </div>
     <div class="gm-body">
-      <p class="gm-hint">Busque negocios no Maps e clique para capturar.</p>
+      <p class="gm-hint">Abra uma busca no Google Maps. Eu leio os negocios visiveis e jogo os novos na fila.</p>
       <button class="gm-capture" id="gm-capture-btn" disabled>Capturar</button>
       <p class="gm-count" id="gm-count"></p>
       <p class="gm-result" id="gm-result"></p>
@@ -278,7 +279,7 @@
     if (results.length === 0) {
       btn.disabled = true;
       btn.textContent = "Capturar";
-      if (countEl) countEl.textContent = "Nenhum negocio visivel na lista.";
+      if (countEl) countEl.textContent = "Nenhum resultado visivel ainda.";
       return;
     }
     btn.disabled = false;
@@ -308,6 +309,12 @@
       syncCount();
       return;
     }
+    if (activeDataSource(cfg) === "supabase" && !cfg.accessToken) {
+      showResult("Entre nas Opcoes da extensao para ligar sua conta antes de capturar.", true);
+      btn.disabled = false;
+      syncCount();
+      return;
+    }
     const repo = createRepo(cfg);
     const isMock = repo.source === "mock";
     let inserted = 0;
@@ -330,7 +337,7 @@
     if (inserted > 0) parts.push(`${inserted} capturado${inserted > 1 ? "s" : ""}`);
     if (duplicates > 0) parts.push(`${duplicates} repetido${duplicates > 1 ? "s" : ""}`);
     if (errors > 0) parts.push(`${errors} com erro`);
-    const msg = parts.join(", ") + (isMock ? " (modo mock)" : "");
+    const msg = (parts.length ? parts.join(", ") : "Nada novo para capturar") + (isMock ? " (modo mock)" : "");
     showResult(msg, errors > 0 && inserted === 0);
     btn.disabled = false;
     btn.textContent = `Capturar ${leads.length} negocio${leads.length > 1 ? "s" : ""}`;

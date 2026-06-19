@@ -76,12 +76,13 @@ function mountPanel(source) {
   const panel = el("div", { id: PANEL_ID });
   panel.innerHTML = `
     <div class="gp-head">
+      <span class="gp-mark">4Y</span>
       <span class="gp-logo">Garimpo</span>
       <span class="gp-src">${source}</span>
-      <button class="gp-min" title="minimizar">_</button>
+      <button class="gp-min" title="Minimizar painel" aria-label="Minimizar painel">−</button>
     </div>
     <div class="gp-body"></div>
-    <div class="gp-foot">read-only · nunca envia</div>`;
+    <div class="gp-foot">Somente leitura. Quem envia e voce.</div>`;
   document.body.append(panel);
   panel.querySelector(".gp-min").addEventListener("click", () => panel.classList.toggle("gp-collapsed"));
 }
@@ -108,7 +109,7 @@ function renderBody(parsed, result) {
   }
   // nenhum match -> mostra o que leu + fallback manual
   const who = parsed.phone ? fmtPhone(parsed.phone) : parsed.name || "conversa";
-  body.append(el("p", { className: "gp-muted", textContent: `Sem lead casado para: ${who}` }));
+  body.append(el("p", { className: "gp-muted", textContent: `Nao achei lead casado para: ${who}` }));
   body.append(manualBox());
 }
 
@@ -143,8 +144,8 @@ function leadCard(lead, method) {
 
 function manualBox() {
   const box = el("div", { className: "gp-manual" });
-  const input = el("input", { type: "text", placeholder: "colar numero (ex: 44 99999-0002)" });
-  const go = el("button", { className: "gp-btn", textContent: "Casar" });
+  const input = el("input", { type: "text", placeholder: "Colar numero" });
+  const go = el("button", { className: "gp-btn", textContent: "Buscar" });
   go.addEventListener("click", () => {
     const p = parsePhone(input.value);
     if (!p) return toast("numero invalido", true);

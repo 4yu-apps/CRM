@@ -2,12 +2,12 @@
   position: fixed;
   top: 72px;
   right: 16px;
-  width: 280px;
+  width: 300px;
   z-index: 2147483000;
   background: #fff;
-  border: 1px solid #e4e4e7;
-  border-radius: 12px;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.16);
+  border: 1px solid #ded7f3;
+  border-radius: 16px;
+  box-shadow: 0 18px 50px rgba(32, 16, 64, 0.22);
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   font-size: 13px;
   color: #18181b;
@@ -20,12 +20,28 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 12px;
-  background: #0f172a;
+  padding: 11px 12px;
+  background: linear-gradient(135deg, #7c3aed, #4c1d95);
   color: #fff;
+}
+#garimpo-panel .gp-mark,
+#garimpo-maps-panel .gm-mark {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, .16);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .02em;
 }
 #garimpo-panel .gp-logo { font-weight: 700; }
 #garimpo-panel .gp-src {
+  margin-left: auto;
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: .04em;
@@ -34,7 +50,6 @@
   border-radius: 999px;
 }
 #garimpo-panel .gp-min {
-  margin-left: auto;
   background: transparent;
   border: 0;
   color: #fff;
@@ -43,7 +58,7 @@
   line-height: 1;
 }
 
-#garimpo-panel .gp-body { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+#garimpo-panel .gp-body { padding: 14px; display: flex; flex-direction: column; gap: 10px; }
 #garimpo-panel .gp-foot { padding: 6px 12px; font-size: 10px; color: #71717a; border-top: 1px solid #f4f4f5; }
 
 #garimpo-panel .gp-name { font-weight: 600; font-size: 14px; }
@@ -66,14 +81,16 @@
 
 #garimpo-panel .gp-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 #garimpo-panel .gp-btn, #garimpo-panel .gp-cand {
-  border: 1px solid #e4e4e7;
-  background: #fafafa;
-  border-radius: 8px;
-  padding: 6px 10px;
+  border: 1px solid #ded7f3;
+  background: #f7f2ff;
+  color: #4c1d95;
+  border-radius: 10px;
+  padding: 7px 10px;
   font-size: 12px;
   cursor: pointer;
+  font-weight: 700;
 }
-#garimpo-panel .gp-btn:hover, #garimpo-panel .gp-cand:hover { background: #f4f4f5; }
+#garimpo-panel .gp-btn:hover, #garimpo-panel .gp-cand:hover { background: #ede9fe; }
 #garimpo-panel .gp-btn:disabled { opacity: .45; cursor: not-allowed; }
 #garimpo-panel .gp-cand { width: 100%; text-align: left; }
 
@@ -91,12 +108,12 @@
   position: fixed;
   bottom: 24px;
   right: 20px;
-  width: 230px;
+  width: 286px;
   z-index: 2147483000;
   background: #fff;
-  border: 1px solid #e4e4e7;
-  border-radius: 12px;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.16);
+  border: 1px solid #ded7f3;
+  border-radius: 16px;
+  box-shadow: 0 18px 50px rgba(32, 16, 64, 0.22);
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   font-size: 13px;
   color: #18181b;
@@ -108,11 +125,11 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 12px;
-  background: #0f172a;
+  padding: 11px 12px;
+  background: linear-gradient(135deg, #7c3aed, #4c1d95);
   color: #fff;
 }
-#garimpo-maps-panel .gm-logo { font-weight: 700; }
+#garimpo-maps-panel .gm-title { font-weight: 800; }
 #garimpo-maps-panel .gm-min {
   margin-left: auto;
   background: transparent;
@@ -123,7 +140,7 @@
   line-height: 1;
 }
 #garimpo-maps-panel .gm-body {
-  padding: 12px;
+  padding: 14px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -134,16 +151,16 @@
 #garimpo-maps-panel .gm-result.gm-ok { color: #047857; }
 #garimpo-maps-panel .gm-result.gm-err { color: #b91c1c; }
 #garimpo-maps-panel .gm-capture {
-  border: 1px solid #e4e4e7;
-  background: #0f172a;
+  border: 0;
+  background: linear-gradient(135deg, #9f57ff, #5f22c8);
   color: #fff;
-  border-radius: 8px;
-  padding: 7px 10px;
-  font-size: 12px;
+  border-radius: 11px;
+  padding: 9px 11px;
+  font-size: 13px;
   cursor: pointer;
-  font-weight: 500;
+  font-weight: 800;
 }
-#garimpo-maps-panel .gm-capture:hover:not(:disabled) { background: #1e293b; }
+#garimpo-maps-panel .gm-capture:hover:not(:disabled) { filter: brightness(.96); }
 #garimpo-maps-panel .gm-capture:disabled { opacity: .45; cursor: not-allowed; }
 
 #gp-toast {

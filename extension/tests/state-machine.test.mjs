@@ -33,7 +33,7 @@ test("descartado pode ser reativado", () => {
 
 test("transitionLabel usa rotulo custom ou o padrao", () => {
   assert.equal(transitionLabel("enviado", "descartado"), "Numero errado");
-  assert.equal(transitionLabel("bruto", "enriquecido"), "Enriquecido");
+  assert.equal(transitionLabel("bruto", "enriquecido"), "Enriquecer");
 });
 
 test("toda transicao do mapa esta coberta", () => {

@@ -107,8 +107,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
       {/* sidebar desktop */}
       <aside className="hidden w-[250px] flex-none flex-col border-r border-border bg-card px-3.5 py-5 lg:flex">
-        <div className="flex items-center gap-2.5 px-2 pb-5.5">
-          <Image src="/logo.png" alt="4YUmkt" width={1080} height={419} priority className="h-8 w-auto" />
+        <div className="px-1 pb-5.5">
+          <span className="inline-flex items-center rounded-xl bg-zinc-950 px-3 py-2 shadow-sm">
+            <Image src="/logo.png" alt="4YUmkt" width={1080} height={419} priority className="h-7 w-auto" />
+          </span>
         </div>
 
         {nav()}

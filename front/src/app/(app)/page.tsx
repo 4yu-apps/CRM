@@ -269,7 +269,7 @@ export default function InicioPage() {
             <div className="flex flex-col gap-2">
               <ShortcutLink href="/fila" label="Ver a fila de aprovacao" />
               <ShortcutLink href="/buscar" label="Iniciar nova busca" />
-              <ShortcutLink href="/leads" label="Ver todos os leads" />
+              <ShortcutLink href="/funil" label="Ver funil completo" />
             </div>
           </div>
         </div>
