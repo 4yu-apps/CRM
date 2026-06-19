@@ -150,3 +150,45 @@ export interface LeadDetail {
   provenance: FieldProvenance[];
   history: StatusHistory[];
 }
+
+// Perfil de busca do dono (search_profile, 1 linha por owner).
+export interface SearchProfile {
+  owner_id: string;
+  niches: string[];
+  city: string | null;
+  state: string | null;
+  radius: string;                 // "5km" | "10km" | "25km" | "50km" | "cidade"
+  default_service_target: ServiceTarget;
+  autopilot: boolean;
+  created_at: string;
+  updated_at: string;
+}
+export type SearchProfileInput = Partial<Pick<SearchProfile,
+  "niches" | "city" | "state" | "radius" | "default_service_target" | "autopilot">>;
+
+// Cobertura de varredura por regiao/nicho (scan_coverage).
+export interface ScanCoverage {
+  id: string;
+  owner_id: string;
+  region_key: string;
+  region_name: string | null;
+  niche: string | null;
+  center_lat: number | null;
+  center_lng: number | null;
+  bbox: unknown | null;
+  pct: number;
+  result_count: number;
+  covered_at: string;
+}
+
+// Tipo de evento registrado no log de atividade.
+export type ActivityType = "busca" | "enriquecimento" | "descarte" | "rascunho" | "varredura";
+// Evento de atividade do dono (activity_log).
+export interface ActivityEvent {
+  id: string;
+  owner_id: string;
+  tipo: ActivityType;
+  text: string;
+  ref_count: number | null;
+  created_at: string;
+}

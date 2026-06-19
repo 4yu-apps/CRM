@@ -1,8 +1,8 @@
 // Implementacao mock — em memoria, espelha o comportamento do banco:
 // valida transicoes, aplica guarda LGPD e grava historico (como os triggers).
 import { canTransition, nextStatuses, STATUS_META } from "../state-machine";
-import type { ActorType, FieldProvenance, Lead, LeadDetail, LeadEditable, LeadStatus, StatusHistory } from "../types";
-import { buildSeed, DEMO_OWNER } from "./mock-data";
+import type { ActivityEvent, ActorType, FieldProvenance, Lead, LeadDetail, LeadEditable, LeadStatus, ScanCoverage, SearchProfile, SearchProfileInput, StatusHistory } from "../types";
+import { buildSeed, DEMO_ACTIVITY, DEMO_COVERAGE, DEMO_OWNER, DEMO_PROFILE } from "./mock-data";
 import type { LeadsRepo } from "./index";
 
 const seed = buildSeed();
@@ -10,6 +10,10 @@ const store = {
   leads: seed.leads,
   provenance: seed.provenance,
   history: seed.history,
+  // perfil em memoria: inicia com o demo e pode ser atualizado via saveProfile
+  profile: { ...DEMO_PROFILE } as SearchProfile,
+  coverage: DEMO_COVERAGE.map((c) => ({ ...c })),
+  activity: DEMO_ACTIVITY.map((a) => ({ ...a })),
 };
 
 let _hid = 1_000;
@@ -154,6 +158,33 @@ async function remove(id: string): Promise<void> {
   store.history = store.history.filter((h) => h.lead_id !== id);
 }
 
+async function getProfile(): Promise<SearchProfile | null> {
+  return clone(store.profile);
+}
+
+async function saveProfile(input: SearchProfileInput): Promise<SearchProfile> {
+  const now = new Date().toISOString();
+  Object.assign(store.profile, input, { updated_at: now });
+  return clone(store.profile);
+}
+
+async function listCoverage(niche?: string): Promise<ScanCoverage[]> {
+  const items = niche
+    ? store.coverage.filter((c) => c.niche === niche)
+    : store.coverage;
+  return clone(
+    [...items].sort((a, b) => +new Date(b.covered_at) - +new Date(a.covered_at)),
+  );
+}
+
+async function listActivity(limit = 20): Promise<ActivityEvent[]> {
+  return clone(
+    [...store.activity]
+      .sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at))
+      .slice(0, limit),
+  );
+}
+
 export const mockRepo: LeadsRepo = {
   list,
   detail,
@@ -163,4 +194,8 @@ export const mockRepo: LeadsRepo = {
   setOptOut,
   setArchived,
   remove,
+  getProfile,
+  saveProfile,
+  listCoverage,
+  listActivity,
 };

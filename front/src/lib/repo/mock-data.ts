@@ -1,6 +1,7 @@
 // Seed do modo mock: leads de exemplo (Maringa/PR), portados do claude-design-ref.
 // Espelha a forma do schema. Timestamps relativos para parecer "vivo".
-import type { FieldProvenance, Lead, LeadSource, LeadStatus, ScoreReason, ServiceTarget, StatusHistory } from "../types";
+// ATENCAO: dados dev-only. Nunca chegam ao banco de producao.
+import type { ActivityEvent, FieldProvenance, Lead, LeadSource, LeadStatus, ScoreReason, ScanCoverage, SearchProfile, ServiceTarget, StatusHistory } from "../types";
 
 export const DEMO_OWNER = "00000000-0000-0000-0000-0000000000aa";
 
@@ -468,3 +469,103 @@ export function buildSeed(): { leads: Lead[]; provenance: FieldProvenance[]; his
 
   return { leads, provenance, history };
 }
+
+// ---- Perfil de busca demo (dev-only, nao e dado de producao) ----
+export const DEMO_PROFILE: SearchProfile = {
+  owner_id: DEMO_OWNER,
+  niches: ["Hamburgueria", "Barbearia", "Estetica", "Restaurante", "Petshop"],
+  city: "Maringa",
+  state: "PR",
+  radius: "10km",
+  default_service_target: "trafego",
+  autopilot: false,
+  created_at: new Date(Date.now() - 30 * 86400_000).toISOString(),
+  updated_at: new Date(Date.now() - 2 * 86400_000).toISOString(),
+};
+
+// ---- Zonas de cobertura demo (dev-only, nao e dado de producao) ----
+export const DEMO_COVERAGE: ScanCoverage[] = [
+  {
+    id: "cov-0001",
+    owner_id: DEMO_OWNER,
+    region_key: "maringa-pr-hamburgueria",
+    region_name: "Maringa PR",
+    niche: "Hamburgueria",
+    center_lat: -23.4273,
+    center_lng: -51.9375,
+    bbox: null,
+    pct: 87,
+    result_count: 34,
+    covered_at: new Date(Date.now() - 1 * 86400_000).toISOString(),
+  },
+  {
+    id: "cov-0002",
+    owner_id: DEMO_OWNER,
+    region_key: "maringa-pr-barbearia",
+    region_name: "Maringa PR",
+    niche: "Barbearia",
+    center_lat: -23.4273,
+    center_lng: -51.9375,
+    bbox: null,
+    pct: 62,
+    result_count: 28,
+    covered_at: new Date(Date.now() - 3 * 86400_000).toISOString(),
+  },
+  {
+    id: "cov-0003",
+    owner_id: DEMO_OWNER,
+    region_key: "maringa-pr-estetica",
+    region_name: "Maringa PR",
+    niche: "Estetica",
+    center_lat: -23.4273,
+    center_lng: -51.9375,
+    bbox: null,
+    pct: 45,
+    result_count: 19,
+    covered_at: new Date(Date.now() - 5 * 86400_000).toISOString(),
+  },
+];
+
+// ---- Eventos de atividade demo (dev-only, nao e dado de producao) ----
+export const DEMO_ACTIVITY: ActivityEvent[] = [
+  {
+    id: "act-0001",
+    owner_id: DEMO_OWNER,
+    tipo: "varredura",
+    text: "Varredura em Hamburgueria retornou 34 resultados em Maringa PR",
+    ref_count: 34,
+    created_at: new Date(Date.now() - 1 * 3600_000).toISOString(),
+  },
+  {
+    id: "act-0002",
+    owner_id: DEMO_OWNER,
+    tipo: "enriquecimento",
+    text: "Enriquecimento de 8 leads com dados de CNPJ e Instagram",
+    ref_count: 8,
+    created_at: new Date(Date.now() - 4 * 3600_000).toISOString(),
+  },
+  {
+    id: "act-0003",
+    owner_id: DEMO_OWNER,
+    tipo: "rascunho",
+    text: "Rascunho gerado para Burguer do Tonho",
+    ref_count: 1,
+    created_at: new Date(Date.now() - 6 * 3600_000).toISOString(),
+  },
+  {
+    id: "act-0004",
+    owner_id: DEMO_OWNER,
+    tipo: "busca",
+    text: "Busca manual por barbearias no Centro de Maringa",
+    ref_count: 12,
+    created_at: new Date(Date.now() - 10 * 3600_000).toISOString(),
+  },
+  {
+    id: "act-0005",
+    owner_id: DEMO_OWNER,
+    tipo: "descarte",
+    text: "3 leads descartados apos analise de perfil",
+    ref_count: 3,
+    created_at: new Date(Date.now() - 2 * 86400_000).toISOString(),
+  },
+];

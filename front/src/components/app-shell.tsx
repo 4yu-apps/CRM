@@ -1,7 +1,7 @@
 "use client";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import {
@@ -14,6 +14,7 @@ import {
   GearSix,
   Sun,
   Moon,
+  SignOut,
 } from "@phosphor-icons/react";
 import { useAuth } from "@/lib/auth";
 import { useLeads } from "@/hooks/use-leads";
@@ -55,8 +56,14 @@ function titleFor(pathname: string): [string, string] {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
+  const router = useRouter();
   const { leads } = useLeads();
+
+  const handleSignOut = async () => {
+    await signOut();
+    router.replace("/login");
+  };
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -123,17 +130,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </span>
             </button>
           </div>
-          <div className="flex items-center gap-2.5 px-2.5 py-2">
+          <div className="flex items-center gap-2 px-2.5 py-2">
             <div
               className="flex size-9 flex-none items-center justify-center rounded-full text-sm font-bold text-white"
               style={{ background: "var(--grad)" }}
             >
-              {(user?.email ?? "RA").slice(0, 2).toUpperCase()}
+              {(user?.email ?? "?").slice(0, 2).toUpperCase()}
             </div>
-            <div className="min-w-0">
-              <div className="truncate text-sm font-bold">{user?.email ?? "Rafa Andrade"}</div>
-              <div className="text-xs text-faint">Gestor de tráfego</div>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm font-bold">{user?.email ?? "demo"}</div>
+              <div className="text-xs text-faint">Conta ativa</div>
             </div>
+            <button
+              type="button"
+              aria-label="Sair"
+              onClick={handleSignOut}
+              className="flex-none rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-accent/80 hover:text-foreground"
+              title="Sair"
+            >
+              <SignOut size={16} />
+            </button>
           </div>
         </div>
       </aside>

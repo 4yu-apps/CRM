@@ -1,7 +1,7 @@
 // Implementacao supabase — banco real. Inerte ate existir env + sessao logada.
 // A UI nao muda: mesma interface do mock.
 import { getSupabase } from "../supabase/client";
-import type { ActorType, Lead, LeadDetail, LeadEditable, LeadStatus } from "../types";
+import type { ActivityEvent, ActorType, Lead, LeadDetail, LeadEditable, LeadStatus, ScanCoverage, SearchProfile, SearchProfileInput } from "../types";
 import type { LeadsRepo } from "./index";
 
 async function list(): Promise<Lead[]> {
@@ -90,6 +90,48 @@ async function remove(id: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
+async function getProfile(): Promise<SearchProfile | null> {
+  // PGRST116 = "no rows" — retorna null sem lancar erro
+  const { data, error } = await getSupabase()
+    .from("search_profile")
+    .select("*")
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return (data ?? null) as SearchProfile | null;
+}
+
+async function saveProfile(input: SearchProfileInput): Promise<SearchProfile> {
+  // owner_id cai no default do banco (auth.uid()); RLS garante isolamento.
+  const { data, error } = await getSupabase()
+    .from("search_profile")
+    .upsert(input, { onConflict: "owner_id" })
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return data as SearchProfile;
+}
+
+async function listCoverage(niche?: string): Promise<ScanCoverage[]> {
+  let q = getSupabase()
+    .from("scan_coverage")
+    .select("*")
+    .order("covered_at", { ascending: false });
+  if (niche) q = q.eq("niche", niche);
+  const { data, error } = await q;
+  if (error) throw new Error(error.message);
+  return (data ?? []) as ScanCoverage[];
+}
+
+async function listActivity(limit = 20): Promise<ActivityEvent[]> {
+  const { data, error } = await getSupabase()
+    .from("activity_log")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(error.message);
+  return (data ?? []) as ActivityEvent[];
+}
+
 export const supabaseRepo: LeadsRepo = {
   list,
   detail,
@@ -99,4 +141,8 @@ export const supabaseRepo: LeadsRepo = {
   setOptOut,
   setArchived,
   remove,
+  getProfile,
+  saveProfile,
+  listCoverage,
+  listActivity,
 };
