@@ -5,6 +5,9 @@ encontra, enriquece, pontua e rascunha. O humano aprova e envia. Nunca o
 contrário. (Codinome interno: **Garimpo**.) Mapa estratégico:
 [`garimpo-mapa-do-projeto.md`](garimpo-mapa-do-projeto.md).
 
+> 🤖 **Continuando o projeto?** Leia [`PROXIMOS-PASSOS.md`](PROXIMOS-PASSOS.md) —
+> handoff com contexto, arquitetura, próximos passos e armadilhas.
+
 **Status: NO AR** → **https://crm.4yumkt.com.br**
 - Banco + Auth + RLS no **Supabase** · front na **Vercel** · esteira no
   **GitHub Actions** (cron diário) · extensão no **WhatsApp Web**.
