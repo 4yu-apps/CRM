@@ -50,8 +50,8 @@ const checks = async () => {
 
   // 4. transicoes seedadas
   const [{ n }] = await q('select count(*)::int n from public.lead_status_transitions')
-  n === 24 ? ok(`maquina de estados: ${n} transicoes`)
-    : bad(`transicoes = ${n}, esperado 24`)
+  n === 25 ? ok(`maquina de estados: ${n} transicoes`)
+    : bad(`transicoes = ${n}, esperado 25`)
 
   // 5. RPC transition_lead
   const fn = await q(`select 1 from pg_proc where proname='transition_lead'`)

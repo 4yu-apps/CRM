@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Star } from "lucide-react";
+import { Star, Archive, ArchiveRestore, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { LeadsRepo } from "@/lib/repo";
 import type { Lead, LeadDetail, LeadEditable, LeadStatus } from "@/lib/types";
@@ -63,11 +63,13 @@ export function LeadDetailSheet({
   const [loading, setLoading] = useState(false);
   const [edits, setEdits] = useState<LeadEditable>({});
   const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const load = useCallback(async () => {
     if (!leadId) return;
     setLoading(true);
     setEdits({});
+    setConfirmDelete(false);
     try {
       setDetail(await repo.detail(leadId));
     } catch (e) {
@@ -140,6 +142,30 @@ export function LeadDetailSheet({
       onChanged();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro");
+    }
+  };
+
+  const doArchive = async () => {
+    if (!lead) return;
+    try {
+      await repo.setArchived(lead.id, !lead.archived);
+      toast.success(lead.archived ? "Lead desarquivado" : "Lead arquivado");
+      await load();
+      onChanged();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao arquivar");
+    }
+  };
+
+  const doDelete = async () => {
+    if (!lead) return;
+    try {
+      await repo.remove(lead.id);
+      toast.success("Lead excluido");
+      onChanged();
+      onClose();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao excluir");
     }
   };
 
@@ -238,6 +264,53 @@ export function LeadDetailSheet({
 
               <Section title="Historico do funil">
                 <HistoryTimeline items={detail.history} />
+              </Section>
+
+              <Separator />
+
+              <Section title="Acoes">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button size="sm" variant="outline" onClick={doArchive}>
+                    {lead.archived ? (
+                      <>
+                        <ArchiveRestore className="size-4" /> Desarquivar
+                      </>
+                    ) : (
+                      <>
+                        <Archive className="size-4" /> Arquivar
+                      </>
+                    )}
+                  </Button>
+
+                  {!confirmDelete ? (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/30"
+                      onClick={() => setConfirmDelete(true)}
+                    >
+                      <Trash2 className="size-4" /> Excluir
+                    </Button>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">Excluir de vez?</span>
+                      <Button
+                        size="sm"
+                        className="bg-rose-600 text-white hover:bg-rose-700"
+                        onClick={doDelete}
+                      >
+                        Confirmar
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setConfirmDelete(false)}>
+                        Cancelar
+                      </Button>
+                    </span>
+                  )}
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Arquivar tira da lista sem apagar (da pra voltar). Excluir apaga o lead e o
+                  historico de vez.
+                </p>
               </Section>
             </div>
           </>

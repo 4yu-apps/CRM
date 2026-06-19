@@ -1,11 +1,11 @@
 "use client";
-import { isTerminal } from "@/lib/state-machine";
+import { EXIT_STATUSES } from "@/lib/state-machine";
 import type { Lead, LeadStatus } from "@/lib/types";
 
 const inSet = (l: Lead, ...s: LeadStatus[]) => s.includes(l.status);
 
 export function StatsBar({ leads }: { leads: Lead[] }) {
-  const ativos = leads.filter((l) => !isTerminal(l.status)).length;
+  const ativos = leads.filter((l) => !EXIT_STATUSES.includes(l.status)).length;
   const aguardandoAprovacao = leads.filter((l) => inSet(l, "rascunho_pronto")).length;
   const emConversa = leads.filter((l) => inSet(l, "respondeu", "interessado", "reuniao", "proposta")).length;
   const fechados = leads.filter((l) => inSet(l, "fechado")).length;

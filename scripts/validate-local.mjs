@@ -63,7 +63,15 @@ const run = async () => {
   labels.length === 15 ? ok(`enum lead_status (15 estados)`) : bad(`enum lead_status = ${labels.length}/15`)
 
   const [{ n }] = await one('select count(*)::int n from public.lead_status_transitions')
-  n === 24 ? ok(`24 transicoes seedadas`) : bad(`transicoes = ${n}/24`)
+  n === 25 ? ok(`25 transicoes seedadas`) : bad(`transicoes = ${n}/25`)
+
+  const react = await one(
+    `select 1 from public.lead_status_transitions where from_status='descartado' and to_status='enriquecido'`)
+  react.length ? ok('transicao reativar (descartado -> enriquecido)') : bad('transicao reativar AUSENTE')
+
+  const archivedCol = await one(
+    `select 1 from information_schema.columns where table_name='leads' and column_name='archived'`)
+  archivedCol.length ? ok('coluna archived (acoes de lead)') : bad('coluna archived AUSENTE')
 
   // colunas de rascunho (Fase 3 · migration 7)
   const draftCols = (await one(

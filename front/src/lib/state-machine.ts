@@ -15,8 +15,8 @@ export const TRANSITIONS: Record<LeadStatus, LeadStatus[]> = {
   interessado: ["reuniao", "proposta", "perdido"],
   reuniao: ["proposta", "perdido"],
   proposta: ["fechado", "perdido"],
-  // terminais
-  descartado: [],
+  // descartado pode ser reativado (volta pro funil). Os outros sao terminais.
+  descartado: ["enriquecido"],
   sem_interesse: [],
   fechado: [],
   perdido: [],
@@ -24,6 +24,11 @@ export const TRANSITIONS: Record<LeadStatus, LeadStatus[]> = {
 
 // Status que sao "contato": bloqueados pela guarda LGPD quando opt_out=true.
 export const CONTACT_STATUSES: LeadStatus[] = ["rascunho_pronto", "aprovado", "enviado"];
+
+// Status fora do funil ativo (descarte, sem interesse, perda, fechado-ganho).
+// Usado nas metricas de "ativos". Independe do grafo: descartado pode ser
+// reativado, mas continua fora do funil ativo ate voltar.
+export const EXIT_STATUSES: LeadStatus[] = ["descartado", "sem_interesse", "perdido", "fechado"];
 
 export function nextStatuses(status: LeadStatus): LeadStatus[] {
   return TRANSITIONS[status] ?? [];
@@ -75,6 +80,7 @@ const TRANSITION_LABELS: Record<string, string> = {
   "rascunho_pronto->aprovado": "Aprovar",
   "aprovado->enviado": "Marcar enviado",
   "sem_resposta->enviado": "Reenviar (follow-up)",
+  "descartado->enriquecido": "Reativar",
 };
 
 export function transitionLabel(from: LeadStatus, to: LeadStatus): string {

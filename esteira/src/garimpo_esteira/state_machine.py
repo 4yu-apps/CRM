@@ -19,7 +19,7 @@ TRANSITIONS: dict[LeadStatus, tuple[LeadStatus, ...]] = {
     "interessado": ("reuniao", "proposta", "perdido"),
     "reuniao": ("proposta", "perdido"),
     "proposta": ("fechado", "perdido"),
-    "descartado": (),
+    "descartado": ("enriquecido",),  # reativavel pelo dono (volta pro funil)
     "sem_interesse": (),
     "fechado": (),
     "perdido": (),

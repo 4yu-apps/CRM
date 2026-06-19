@@ -13,7 +13,7 @@ export const TRANSITIONS = {
   interessado: ["reuniao", "proposta", "perdido"],
   reuniao: ["proposta", "perdido"],
   proposta: ["fechado", "perdido"],
-  descartado: [],
+  descartado: ["enriquecido"],
   sem_interesse: [],
   fechado: [],
   perdido: [],
@@ -44,6 +44,7 @@ const TRANSITION_LABELS = {
   "rascunho_pronto->aprovado": "Aprovar",
   "aprovado->enviado": "Marquei enviado",
   "sem_resposta->enviado": "Reenviei (follow-up)",
+  "descartado->enriquecido": "Reativar",
 };
 
 const CONTACT_STATUSES = new Set(["rascunho_pronto", "aprovado", "enviado"]);

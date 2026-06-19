@@ -74,4 +74,29 @@ async function setOptOut(id: string, value: boolean): Promise<Lead> {
   return data as Lead;
 }
 
-export const supabaseRepo: LeadsRepo = { list, detail, create, update, transition, setOptOut };
+async function setArchived(id: string, value: boolean): Promise<Lead> {
+  const { data, error } = await getSupabase()
+    .from("leads")
+    .update({ archived: value })
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return data as Lead;
+}
+
+async function remove(id: string): Promise<void> {
+  const { error } = await getSupabase().from("leads").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+export const supabaseRepo: LeadsRepo = {
+  list,
+  detail,
+  create,
+  update,
+  transition,
+  setOptOut,
+  setArchived,
+  remove,
+};

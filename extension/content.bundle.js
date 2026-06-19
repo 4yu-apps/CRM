@@ -131,7 +131,7 @@
     interessado: ["reuniao", "proposta", "perdido"],
     reuniao: ["proposta", "perdido"],
     proposta: ["fechado", "perdido"],
-    descartado: [],
+    descartado: ["enriquecido"],
     sem_interesse: [],
     fechado: [],
     perdido: []
@@ -158,7 +158,8 @@
     "respondeu->reuniao": "Agendou reuniao",
     "rascunho_pronto->aprovado": "Aprovar",
     "aprovado->enviado": "Marquei enviado",
-    "sem_resposta->enviado": "Reenviei (follow-up)"
+    "sem_resposta->enviado": "Reenviei (follow-up)",
+    "descartado->enriquecido": "Reativar"
   };
   var CONTACT_STATUSES = /* @__PURE__ */ new Set(["rascunho_pronto", "aprovado", "enviado"]);
   function transitionLabel(from, to) {

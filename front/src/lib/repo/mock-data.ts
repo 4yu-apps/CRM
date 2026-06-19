@@ -28,6 +28,7 @@ interface SeedSpec {
   score?: number;
   scoreNote?: string;
   opt_out?: boolean;
+  archived?: boolean;
   draft1?: string;
   draft2?: string;
   createdDaysAgo: number;
@@ -312,6 +313,7 @@ const SPECS: SeedSpec[] = [
     rating: 4.1,
     reviews_count: 60,
     status: "descartado",
+    archived: true,
     createdDaysAgo: 8,
     updatedHoursAgo: 50,
     prov: [["phone", "google_maps", "(44) 99999-0014", 0.6]],
@@ -368,6 +370,7 @@ export function buildSeed(): { leads: Lead[]; provenance: FieldProvenance[]; his
         : null,
       opt_out: s.opt_out ?? false,
       opt_out_at: s.opt_out ? hoursAgo(s.updatedHoursAgo) : null,
+      archived: s.archived ?? false,
       created_at: daysAgo(s.createdDaysAgo),
       updated_at: hoursAgo(s.updatedHoursAgo),
       draft_msg1: s.draft1 ?? null,

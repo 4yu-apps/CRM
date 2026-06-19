@@ -15,6 +15,10 @@ export interface LeadsRepo {
   /** Muda status validando a maquina de estados + guarda LGPD. Lanca erro se invalido. */
   transition(id: string, to: LeadStatus, actor: ActorType, note?: string): Promise<Lead>;
   setOptOut(id: string, value: boolean): Promise<Lead>;
+  /** Arquiva/desarquiva: some da lista por padrao, reversivel. */
+  setArchived(id: string, value: boolean): Promise<Lead>;
+  /** Exclui de vez (hard delete; apaga proveniencia e historico em cascata). */
+  remove(id: string): Promise<void>;
 }
 
 export type DataSource = "mock" | "supabase";

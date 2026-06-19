@@ -64,6 +64,7 @@ async function create(input: LeadEditable): Promise<Lead> {
     score_reason: null,
     opt_out: false,
     opt_out_at: null,
+    archived: false,
     created_at: now,
     updated_at: now,
     draft_msg1: null,
@@ -135,4 +136,29 @@ async function setOptOut(id: string, value: boolean): Promise<Lead> {
   return clone(lead);
 }
 
-export const mockRepo: LeadsRepo = { list, detail, create, update, transition, setOptOut };
+async function setArchived(id: string, value: boolean): Promise<Lead> {
+  const lead = find(id);
+  if (!lead) throw new Error("Lead nao encontrado");
+  lead.archived = value;
+  lead.updated_at = new Date().toISOString();
+  return clone(lead);
+}
+
+async function remove(id: string): Promise<void> {
+  const i = store.leads.findIndex((l) => l.id === id);
+  if (i === -1) throw new Error("Lead nao encontrado");
+  store.leads.splice(i, 1);
+  store.provenance = store.provenance.filter((p) => p.lead_id !== id);
+  store.history = store.history.filter((h) => h.lead_id !== id);
+}
+
+export const mockRepo: LeadsRepo = {
+  list,
+  detail,
+  create,
+  update,
+  transition,
+  setOptOut,
+  setArchived,
+  remove,
+};

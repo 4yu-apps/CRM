@@ -22,7 +22,13 @@ test("opt-out bloqueia botoes de contato", () => {
 
 test("status final nao tem botoes", () => {
   assert.equal(contextualButtons("fechado").length, 0);
-  assert.equal(contextualButtons("descartado").length, 0);
+  assert.equal(contextualButtons("perdido").length, 0);
+  assert.equal(contextualButtons("sem_interesse").length, 0);
+});
+
+test("descartado pode ser reativado", () => {
+  const labels = contextualButtons("descartado").map((b) => b.label);
+  assert.deepEqual(labels, ["Reativar"]);
 });
 
 test("transitionLabel usa rotulo custom ou o padrao", () => {

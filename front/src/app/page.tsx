@@ -12,11 +12,13 @@ export default function Home() {
   const { leads, loading, error, refresh, repo } = useLeads();
   const [status, setStatus] = useState<StatusFilter>("todos");
   const [query, setQuery] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return leads.filter((l) => {
+      if (!showArchived && l.archived) return false;
       if (status !== "todos" && l.status !== status) return false;
       if (!q) return true;
       const hay = [l.business_name, l.city, l.neighborhood, l.phone, l.category, l.owner_name]
@@ -25,7 +27,9 @@ export default function Home() {
         .toLowerCase();
       return hay.includes(q);
     });
-  }, [leads, status, query]);
+  }, [leads, status, query, showArchived]);
+
+  const archivedCount = useMemo(() => leads.filter((l) => l.archived).length, [leads]);
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
@@ -71,8 +75,19 @@ export default function Home() {
             query={query}
             onQuery={setQuery}
           />
-          <div className="text-xs text-muted-foreground">
-            {filtered.length} de {leads.length} leads
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-sm text-muted-foreground">
+              {filtered.length} de {leads.length} leads
+            </div>
+            {archivedCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowArchived((v) => !v)}
+                className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+              >
+                {showArchived ? "Ocultar arquivados" : `Mostrar arquivados (${archivedCount})`}
+              </button>
+            )}
           </div>
           <LeadsTable leads={filtered} onSelect={setSelected} />
         </div>

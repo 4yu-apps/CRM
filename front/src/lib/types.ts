@@ -67,6 +67,8 @@ export interface Lead {
   opt_out: boolean;
   opt_out_at: string | null;
 
+  archived: boolean;
+
   created_at: string;
   updated_at: string;
 
