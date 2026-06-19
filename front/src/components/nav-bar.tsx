@@ -20,12 +20,10 @@ export function NavBar() {
   const { user, signOut } = useAuth();
 
   return (
-    <header className="border-b">
-      <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3 sm:px-6">
-        <Link href="/" className="flex items-center gap-2">
-          <span className="inline-flex items-center rounded-md bg-zinc-900 px-2 py-1">
-            <Image src="/logo.png" alt="4YUmkt" width={1080} height={419} priority className="h-5 w-auto" />
-          </span>
+    <header className="border-b border-zinc-800 bg-zinc-950 text-zinc-100">
+      <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-2.5 sm:px-6">
+        <Link href="/" className="flex items-center gap-2.5">
+          <Image src="/logo.png" alt="4YUmkt" width={1080} height={419} priority className="h-7 w-auto" />
           <Badge variant={source === "supabase" ? "default" : "secondary"} className="font-normal">
             {source === "supabase" ? "Supabase" : "mock"}
           </Badge>
@@ -39,7 +37,9 @@ export function NavBar() {
                 href={l.href}
                 className={cn(
                   "rounded-md px-3 py-1.5 text-sm transition-colors",
-                  pathname === l.href ? "bg-muted font-medium" : "text-muted-foreground hover:bg-muted/60",
+                  pathname === l.href
+                    ? "bg-zinc-800 font-medium text-white"
+                    : "text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-100",
                 )}
               >
                 {l.label}
@@ -50,10 +50,11 @@ export function NavBar() {
 
         {user && (
           <div className="ml-auto flex items-center gap-3">
-            <span className="hidden text-sm text-muted-foreground sm:inline">{user.email}</span>
+            <span className="hidden text-sm text-zinc-400 sm:inline">{user.email}</span>
             <Button
               variant="ghost"
               size="sm"
+              className="text-zinc-300 hover:bg-zinc-800 hover:text-white"
               onClick={async () => {
                 await signOut();
                 router.replace("/login");
