@@ -1,0 +1,192 @@
+"use client";
+import Image from "next/image";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useTheme } from "next-themes";
+import {
+  House,
+  Tray,
+  Funnel,
+  ChartLineUp,
+  MagnifyingGlass,
+  DeviceMobile,
+  GearSix,
+  Sun,
+  Moon,
+} from "@phosphor-icons/react";
+import { useAuth } from "@/lib/auth";
+import { useLeads } from "@/hooks/use-leads";
+import { cn } from "@/lib/utils";
+
+type NavItem = { href: string; label: string; Icon: typeof House };
+
+const NAV: NavItem[] = [
+  { href: "/", label: "Início", Icon: House },
+  { href: "/fila", label: "Fila de leads", Icon: Tray },
+  { href: "/funil", label: "Funil", Icon: Funnel },
+  { href: "/resultados", label: "Resultados", Icon: ChartLineUp },
+  { href: "/buscar", label: "Buscar", Icon: MagnifyingGlass },
+  { href: "/celular", label: "No celular", Icon: DeviceMobile },
+  { href: "/config", label: "Configuração", Icon: GearSix },
+];
+
+const TITLES: Record<string, [string, string]> = {
+  "/": ["Visão geral", "Seu ponto de partida do dia"],
+  "/fila": ["Fila de leads", "Revise, ajuste e aprove"],
+  "/funil": ["Funil", "Onde cada lead está agora"],
+  "/resultados": ["Resultados", "Tá valendo a pena?"],
+  "/buscar": ["Buscar leads", "Sob comando, quando você quiser"],
+  "/celular": ["No celular", "Acompanhe e envie pelo WhatsApp"],
+  "/config": ["Configuração", "Ajuste uma vez, eu cuido do resto"],
+  "/ficha": ["Ficha do lead", "Tudo que eu juntei sobre o negócio"],
+};
+
+function isActive(pathname: string, href: string): boolean {
+  if (href === "/") return pathname === "/";
+  if (href === "/fila") return pathname.startsWith("/fila") || pathname.startsWith("/ficha");
+  return pathname.startsWith(href);
+}
+
+function titleFor(pathname: string): [string, string] {
+  if (pathname.startsWith("/ficha")) return TITLES["/ficha"];
+  return TITLES[pathname] ?? ["", ""];
+}
+
+export function AppShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const { user } = useAuth();
+  const { leads } = useLeads();
+  const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  const queue = leads.filter((l) => l.status === "rascunho_pronto").length;
+  const [title, sub] = titleFor(pathname);
+  const isDark = mounted && resolvedTheme === "dark";
+
+  const nav = (extra?: string) => (
+    <nav className={cn("flex flex-col gap-0.5", extra)}>
+      {NAV.map(({ href, label, Icon }) => {
+        const active = isActive(pathname, href);
+        return (
+          <Link
+            key={href}
+            href={href}
+            className={cn(
+              "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+              active
+                ? "bg-accent font-bold text-brand"
+                : "text-ink-2 hover:bg-accent/60",
+            )}
+          >
+            <Icon size={19} weight={active ? "fill" : "regular"} />
+            <span className="flex-1">{label}</span>
+            {href === "/fila" && queue > 0 && (
+              <span
+                className="flex h-[21px] min-w-[21px] items-center justify-center rounded-full px-1.5 text-[11.5px] font-bold text-white"
+                style={{ background: "var(--grad)" }}
+              >
+                {queue}
+              </span>
+            )}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+
+  return (
+    <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
+      {/* sidebar desktop */}
+      <aside className="hidden w-[250px] flex-none flex-col border-r border-border bg-card px-3.5 py-5 lg:flex">
+        <div className="flex items-center gap-2.5 px-2 pb-5.5">
+          <Image src="/logo.png" alt="4YUmkt" width={1080} height={419} priority className="h-8 w-auto" />
+        </div>
+
+        {nav()}
+
+        <div className="mt-auto flex flex-col gap-3">
+          <div className="flex items-center justify-between rounded-xl bg-[var(--inset)] px-2.5 py-2">
+            <span className="text-[13px] font-semibold text-muted-foreground">
+              Tema {isDark ? "escuro" : "claro"}
+            </span>
+            <button
+              type="button"
+              aria-label="Alternar tema"
+              onClick={() => setTheme(isDark ? "light" : "dark")}
+              className="flex h-[26px] w-[46px] items-center rounded-full p-[3px]"
+              style={{ background: "var(--grad)", justifyContent: isDark ? "flex-end" : "flex-start" }}
+            >
+              <span className="flex size-5 items-center justify-center rounded-full bg-white text-brand-600">
+                {isDark ? <Moon size={12} weight="fill" /> : <Sun size={12} weight="fill" />}
+              </span>
+            </button>
+          </div>
+          <div className="flex items-center gap-2.5 px-2.5 py-2">
+            <div
+              className="flex size-9 flex-none items-center justify-center rounded-full text-sm font-bold text-white"
+              style={{ background: "var(--grad)" }}
+            >
+              {(user?.email ?? "RA").slice(0, 2).toUpperCase()}
+            </div>
+            <div className="min-w-0">
+              <div className="truncate text-sm font-bold">{user?.email ?? "Rafa Andrade"}</div>
+              <div className="text-xs text-faint">Gestor de tráfego</div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <div className="flex h-full min-w-0 flex-1 flex-col">
+        <header className="flex h-[66px] flex-none items-center justify-between border-b border-border bg-card px-6 sm:px-8">
+          <div className="min-w-0">
+            <div className="truncate text-lg font-bold tracking-tight">{title}</div>
+            <div className="truncate text-[12.5px] text-muted-foreground">{sub}</div>
+          </div>
+          <div className="flex items-center gap-3.5">
+            <div className="flex items-center gap-2.5 rounded-full border border-border bg-accent px-3.5 py-2">
+              <span
+                className="size-2.5 flex-none rounded-full"
+                style={{ background: "var(--brand)", animation: "pulseDot 1.8s ease-in-out infinite" }}
+              />
+              <span className="hidden text-[13px] font-semibold text-brand-700 sm:inline">
+                {queue > 0 ? `${queue} leads prontos pra você` : "Buscando novos leads"}
+              </span>
+            </div>
+          </div>
+        </header>
+
+        <main className="min-h-0 flex-1 overflow-y-auto p-6 pb-24 sm:p-8 lg:pb-8">{children}</main>
+
+        {/* nav mobile (bottom) */}
+        <div className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t border-border bg-card px-2 py-1.5 lg:hidden">
+          {NAV.map(({ href, label, Icon }) => {
+            const active = isActive(pathname, href);
+            return (
+              <Link
+                key={href}
+                href={href}
+                aria-label={label}
+                className={cn(
+                  "relative flex flex-col items-center gap-0.5 rounded-lg px-2 py-1.5",
+                  active ? "text-brand" : "text-faint",
+                )}
+              >
+                <Icon size={22} weight={active ? "fill" : "regular"} />
+                {href === "/fila" && queue > 0 && (
+                  <span
+                    className="absolute right-1 top-0 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold text-white"
+                    style={{ background: "var(--grad)" }}
+                  >
+                    {queue}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}

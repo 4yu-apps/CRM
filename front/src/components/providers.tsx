@@ -1,15 +1,14 @@
 "use client";
+import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/lib/auth";
-import { NavBar } from "./nav-bar";
 import { AuthGate } from "./auth-gate";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <AuthProvider>
-      <NavBar />
-      <main className="flex-1">
+    <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
+      <AuthProvider>
         <AuthGate>{children}</AuthGate>
-      </main>
-    </AuthProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
