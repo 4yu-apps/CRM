@@ -66,6 +66,10 @@ class Lead:
     service_target: ServiceTarget = "indefinido"
     ads_active: bool | None = None      # "ja anuncia?" (null = desconhecido)
 
+    # precificação (B8): valor sugerido pela IA/heuristica (a humana decide)
+    suggested_value: float | None = None
+    suggested_value_reason: str | None = None
+
     # rascunho (Fase 3)
     draft_msg1: str | None = None
     draft_msg2: str | None = None

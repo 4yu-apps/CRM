@@ -14,6 +14,7 @@ _LEAD_COLS = (
     "instagram", "website", "maps_place_id", "maps_url", "rating", "reviews_count",
     "category", "address", "neighborhood", "city", "state", "owner_name", "opt_out",
     "score", "score_reason", "service_target", "ads_active",
+    "suggested_value", "suggested_value_reason",
     "draft_msg1", "draft_msg2", "draft_model", "draft_generated_at",
 )
 

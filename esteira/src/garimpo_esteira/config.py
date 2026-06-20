@@ -37,6 +37,7 @@ class Config:
     gemini_model: str = "gemini-flash-latest"
     maps_mode: str = "fixture"        # fixture | places
     maps_key: str | None = None
+    maps_pages: int = 3               # paginas do Places por busca (~20 cada)
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -55,6 +56,7 @@ class Config:
             gemini_model=os.getenv("GEMINI_MODEL", "gemini-flash-latest"),
             maps_mode=os.getenv("GARIMPO_MAPS", "fixture"),
             maps_key=os.getenv("GOOGLE_MAPS_API_KEY"),
+            maps_pages=int(os.getenv("GARIMPO_MAPS_PAGES", "3")),
         )
 
 
@@ -112,5 +114,5 @@ def build_maps_source(cfg: Config) -> MapsSource:
             raise SystemExit("GARIMPO_MAPS=places exige GOOGLE_MAPS_API_KEY")
         from .discovery import PlacesMapsSource
 
-        return PlacesMapsSource(cfg.maps_key)
+        return PlacesMapsSource(cfg.maps_key, max_pages=cfg.maps_pages)
     return FixtureMapsSource(FIXTURES_DIR / "maps_results.json")

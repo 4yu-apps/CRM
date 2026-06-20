@@ -6,6 +6,7 @@ score + score_reason (explicável). Idempotente: lead já pontuado saiu de
 """
 from __future__ import annotations
 
+from .pricing import suggest_value
 from .scoring import ScoreResult, score_lead
 from .sink.base import LeadSink
 
@@ -20,12 +21,19 @@ def _ads_signal(provenance: list[dict]) -> bool | None:
 def score_one(lead, sink: LeadSink) -> ScoreResult:
     ads_active = _ads_signal(sink.fetch_provenance(lead.id))
     result = score_lead(lead, {"ads_active": ads_active})
-    sink.update_lead_fields(lead.id, {
+    fields: dict[str, object] = {
         "score": result.score,
         "score_reason": result.reason,
         "service_target": result.service_target,
         "ads_active": ads_active,
-    })
+    }
+    # B8: ja deixa um valor sugerido pro lead qualificado (aparece na ficha e na
+    # Reuniao). E sugestao com motivo; a humana decide na conversa.
+    if result.decision == "qualificado":
+        value, reason = suggest_value(result.service_target, lead.reviews_count, lead.rating)
+        fields["suggested_value"] = value
+        fields["suggested_value_reason"] = reason
+    sink.update_lead_fields(lead.id, fields)
     if lead.status != result.decision:
         sink.set_status(lead.id, result.decision, actor="system", note=f"score {result.score}")
     return result
