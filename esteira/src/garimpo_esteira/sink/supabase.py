@@ -34,13 +34,40 @@ class SupabaseSink:
     def _to_lead(self, row: dict) -> Lead:
         return Lead(**{k: row.get(k) for k in _LEAD_COLS if k in row})
 
-    def fetch_by_status(self, status: LeadStatus, limit: int) -> list[Lead]:
-        r = self._client.get(
-            f"{self.base}/leads",
-            params={"status": f"eq.{status}", "order": "created_at.asc", "limit": str(limit)},
-        )
+    def fetch_by_status(
+        self, status: LeadStatus, limit: int, owner_id: str | None = None
+    ) -> list[Lead]:
+        params = {"status": f"eq.{status}", "order": "created_at.asc", "limit": str(limit)}
+        if owner_id:
+            params["owner_id"] = f"eq.{owner_id}"
+        r = self._client.get(f"{self.base}/leads", params=params)
         r.raise_for_status()
         return [self._to_lead(row) for row in r.json()]
+
+    def fetch_autopilot_profiles(self) -> list[dict]:
+        try:
+            r = self._client.get(
+                f"{self.base}/search_profile",
+                params={
+                    "autopilot": "eq.true",
+                    "select": "owner_id,niches,city,state,radius,default_service_target",
+                },
+            )
+            r.raise_for_status()
+            return r.json()
+        except Exception:
+            return []
+
+    def fetch_covered_keys(self, owner_id: str) -> list[tuple[str, str]]:
+        try:
+            r = self._client.get(
+                f"{self.base}/scan_coverage",
+                params={"owner_id": f"eq.{owner_id}", "select": "region_key,niche"},
+            )
+            r.raise_for_status()
+            return [(row.get("region_key") or "", row.get("niche") or "") for row in r.json()]
+        except Exception:
+            return []
 
     def get_lead(self, lead_id: str) -> Lead | None:
         r = self._client.get(f"{self.base}/leads", params={"id": f"eq.{lead_id}", "limit": "1"})

@@ -1,8 +1,10 @@
 name: esteira
 
-# Roda a cascata de enriquecimento de graca no cron do GitHub Actions.
-# Sem maquina ligada: le 'bruto' no Supabase, enriquece, escreve 'enriquecido'.
-# Precisa dos secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, OWNER_USER_ID.
+# Roda o autopilot de graca no cron do GitHub Actions, sem PC ligado:
+# itera os perfis com autopilot, descobre no Google Maps (Places), enriquece,
+# pontua e rascunha, por usuario. Enche a fila sozinho.
+# Secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, OWNER_USER_ID,
+#          GOOGLE_MAPS_API_KEY (descoberta), GEMINI_API_KEY (copy, opcional).
 
 on:
   schedule:
@@ -29,7 +31,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -e .
-      - name: Pipeline (enrich -> score -> draft)
+      - name: Autopilot (descobre no Maps + enrich -> score -> draft, por usuario)
         env:
           GARIMPO_SINK: supabase
           GARIMPO_SOURCES: real
@@ -38,8 +40,14 @@ jobs:
           OWNER_USER_ID: ${{ secrets.OWNER_USER_ID }}
           GARIMPO_BATCH: ${{ github.event.inputs.batch || '20' }}
           GARIMPO_DELAY: "1.5"
+          # Descoberta oficial: Google Places (server-side, sem PC). Enquanto o
+          # secret GOOGLE_MAPS_API_KEY nao existir, o autopilot pausa a descoberta
+          # sem quebrar e sem injetar dado falso (guarda em run.py). A extensao do
+          # Maps fica em standby, nao entra aqui.
+          GARIMPO_MAPS: places
+          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
           # llm=mock por padrao (R$0, sem chave). Defina a variavel de repo
           # GARIMPO_LLM=gemini + o secret GEMINI_API_KEY para copy via Gemini.
           GARIMPO_LLM: ${{ vars.GARIMPO_LLM || 'mock' }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: python -m garimpo_esteira.run pipeline
+        run: python -m garimpo_esteira.run autopilot

@@ -43,25 +43,53 @@ class JsonFileSink:
         return Lead(**{k: v for k, v in raw.items() if k in _LEAD_FIELDS})
 
     # ---- LeadSink ----
-    def fetch_by_status(self, status: LeadStatus, limit: int) -> list[Lead]:
-        rows = [r for r in self._db["leads"].values() if r.get("status") == status]
+    def fetch_by_status(
+        self, status: LeadStatus, limit: int, owner_id: str | None = None
+    ) -> list[Lead]:
+        rows = [
+            r for r in self._db["leads"].values()
+            if r.get("status") == status and (owner_id is None or r.get("owner_id") == owner_id)
+        ]
         rows.sort(key=lambda r: r.get("created_at", ""))
         return [self._to_lead(r) for r in rows[:limit]]
+
+    def fetch_autopilot_profiles(self) -> list[dict]:
+        return [p for p in self._db.get("profiles", []) if p.get("autopilot")]
+
+    def fetch_covered_keys(self, owner_id: str) -> list[tuple[str, str]]:
+        return [
+            (c.get("region_key") or "", c.get("niche") or "")
+            for c in self._db.get("coverage", [])
+            if c.get("owner_id") == owner_id
+        ]
+
+    def upsert_profile(self, owner_id: str, **fields) -> None:
+        """Util offline: define/atualiza o perfil de busca de um dono."""
+        self._db.setdefault("profiles", [])
+        for p in self._db["profiles"]:
+            if p.get("owner_id") == owner_id:
+                p.update(owner_id=owner_id, **fields)
+                self._save()
+                return
+        self._db["profiles"].append({"owner_id": owner_id, **fields})
+        self._save()
 
     def get_lead(self, lead_id: str) -> Lead | None:
         raw = self._db["leads"].get(lead_id)
         return self._to_lead(raw) if raw else None
 
     def insert_lead(self, lead: Lead) -> str | None:
+        # dedup escopado ao dono (espelha os indices unicos (owner_id, ...) do schema)
+        same_owner = [r for r in self._db["leads"].values() if r.get("owner_id") == lead.owner_id]
         key = dedup_key(lead.cnpj, lead.phone)
         if key:
-            for r in self._db["leads"].values():
+            for r in same_owner:
                 if dedup_key(r.get("cnpj"), r.get("phone")) == key:
-                    return None  # duplicata por CNPJ/telefone
+                    return None  # duplicata por CNPJ/telefone (mesmo dono)
         if lead.maps_place_id:
-            for r in self._db["leads"].values():
+            for r in same_owner:
                 if r.get("maps_place_id") == lead.maps_place_id:
-                    return None  # duplicata por place_id do Maps
+                    return None  # duplicata por place_id do Maps (mesmo dono)
         lead_id = lead.id or self._next_id("lead")
         raw = asdict(lead)
         raw["id"] = lead_id

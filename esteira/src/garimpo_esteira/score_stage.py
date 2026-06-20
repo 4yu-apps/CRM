@@ -31,8 +31,10 @@ def score_one(lead, sink: LeadSink) -> ScoreResult:
     return result
 
 
-def score_batch(sink: LeadSink, *, batch: int = 20, status="enriquecido") -> list[ScoreResult]:
-    leads = sink.fetch_by_status(status, batch)
+def score_batch(
+    sink: LeadSink, *, batch: int = 20, status="enriquecido", owner_id: str | None = None
+) -> list[ScoreResult]:
+    leads = sink.fetch_by_status(status, batch, owner_id)
     results = [score_one(lead, sink) for lead in leads]
     discarded = [r for r in results if r.decision == "descartado"]
     if discarded and leads:

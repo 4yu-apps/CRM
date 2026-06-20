@@ -54,8 +54,9 @@ def enrich_batch(
     batch: int = 20,
     delay: float = 0.0,
     status: LeadStatus = "bruto",
+    owner_id: str | None = None,
 ) -> list[EnrichResult]:
-    leads = sink.fetch_by_status(status, batch)
+    leads = sink.fetch_by_status(status, batch, owner_id)
     results: list[EnrichResult] = []
     for i, lead in enumerate(leads):
         results.append(enrich_lead(lead, sources, sink))

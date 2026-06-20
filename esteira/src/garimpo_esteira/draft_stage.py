@@ -28,9 +28,10 @@ def draft_one(lead, provider: DraftProvider, sink: LeadSink) -> tuple[str, str] 
 
 
 def draft_batch(
-    sink: LeadSink, provider: DraftProvider, *, batch: int = 20, status="qualificado"
+    sink: LeadSink, provider: DraftProvider, *, batch: int = 20, status="qualificado",
+    owner_id: str | None = None,
 ) -> list[tuple[str, tuple[str, str]]]:
-    leads = sink.fetch_by_status(status, batch)
+    leads = sink.fetch_by_status(status, batch, owner_id)
     out: list[tuple[str, tuple[str, str]]] = []
     for lead in leads:
         result = draft_one(lead, provider, sink)

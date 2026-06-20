@@ -10,6 +10,7 @@ import argparse
 import json
 from pathlib import Path
 
+from .autopilot import run_autopilot
 from .cascade import enrich_batch
 from .config import FIXTURES_DIR, Config, build_maps_source, build_provider, build_sink, build_sources
 from .discovery import discover
@@ -125,6 +126,28 @@ def cmd_pipeline(cfg: Config) -> int:
     return 0
 
 
+def cmd_autopilot(cfg: Config) -> int:
+    """Multi-tenant: itera os perfis com autopilot, descobre (Maps) e roda o
+    pipeline por dono. E o que enche a fila sozinho, sem PC ligado."""
+    # Guarda: se for pra usar o Places real mas a chave ainda nao foi liberada,
+    # nao quebra o cron nem injeta dado de fixture no banco real. So avisa.
+    if cfg.maps_mode == "places" and not cfg.maps_key:
+        print("autopilot: GARIMPO_MAPS=places sem GOOGLE_MAPS_API_KEY; descoberta pausada (nada a fazer).")
+        return 0
+    sink = build_sink(cfg)
+    maps = build_maps_source(cfg)
+    provider = build_provider(cfg)
+    sources = build_sources(cfg)
+    print(f"autopilot · sink={cfg.sink} maps={cfg.maps_mode} llm={cfg.llm}")
+    summary = run_autopilot(sink, maps, provider, sources, batch=cfg.batch, delay=cfg.delay)
+    if not summary:
+        print("  nenhum perfil com autopilot ligado (nada a fazer)")
+    for s in summary:
+        print(f"  owner {str(s['owner_id'])[:8]}: {s['discovered']} descobertos")
+    _print_counts(sink)
+    return 0
+
+
 def cmd_counts(cfg: Config) -> int:
     _print_counts(build_sink(cfg))
     return 0
@@ -138,7 +161,7 @@ def _print_counts(sink) -> None:
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="garimpo-esteira")
     sub = p.add_subparsers(dest="cmd", required=True)
-    for name in ("seed-demo", "discover", "enrich", "score", "draft", "pipeline", "counts"):
+    for name in ("seed-demo", "discover", "enrich", "score", "draft", "pipeline", "autopilot", "counts"):
         sp = sub.add_parser(name)
         sp.add_argument("--sink", choices=["jsonfile", "supabase"])
         sp.add_argument("--json")
@@ -162,6 +185,7 @@ def main(argv: list[str] | None = None) -> int:
         "score": cmd_score,
         "draft": cmd_draft,
         "pipeline": cmd_pipeline,
+        "autopilot": cmd_autopilot,
         "counts": cmd_counts,
     }
     return dispatch[args.cmd](cfg)

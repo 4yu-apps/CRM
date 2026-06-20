@@ -11,8 +11,18 @@ from ..models import Lead, LeadStatus
 
 
 class LeadSink(Protocol):
-    def fetch_by_status(self, status: LeadStatus, limit: int) -> list[Lead]:
-        """Leads num status (mais antigos primeiro)."""
+    def fetch_by_status(
+        self, status: LeadStatus, limit: int, owner_id: str | None = None
+    ) -> list[Lead]:
+        """Leads num status (mais antigos primeiro). Se owner_id, so os do dono."""
+        ...
+
+    def fetch_autopilot_profiles(self) -> list[dict]:
+        """Perfis de busca com autopilot ligado (owner_id, niches, city, state...)."""
+        ...
+
+    def fetch_covered_keys(self, owner_id: str) -> list[tuple[str, str]]:
+        """Pares (region_key, niche) ja varridos pelo dono (memoria de cobertura)."""
         ...
 
     def get_lead(self, lead_id: str) -> Lead | None:

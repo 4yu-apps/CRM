@@ -111,37 +111,66 @@ class FixtureMapsSource:
 
 
 class PlacesMapsSource:
-    """Google Places (Text Search). Gated por chave. ATENCAO: tem custo (nao R$0).
-    Para R$0, a captacao vem pela extensao (varredura do Maps). Estrutural."""
+    """Google Places (Text Search New). Gated por chave. ATENCAO: tem custo.
+
+    Pagina ate max_pages (cada pagina ~20 resultados) via nextPageToken, pra
+    passar do teto de 20 por chamada. O campo rating + userRatingCount cai na
+    faixa Enterprise: 1 chamada traz ate 20 negocios COM nota/avaliacoes.
+    """
 
     name = "places"
+    URL = "https://places.googleapis.com/v1/places:searchText"
+    FIELDS = (
+        "places.displayName,places.nationalPhoneNumber,places.rating,"
+        "places.userRatingCount,places.formattedAddress,places.id,nextPageToken"
+    )
 
-    def __init__(self, api_key: str, timeout: float = 15.0):
+    def __init__(
+        self, api_key: str, timeout: float = 15.0, max_pages: int = 3, language: str = "pt-BR"
+    ):
         self._key = api_key
         self._timeout = timeout
+        self._max_pages = max_pages
+        self._language = language
 
-    def search(self, term: str) -> list[dict]:
+    def _fetch_page(self, term: str, page_token: str | None) -> tuple[list[dict], str | None]:
+        """Uma pagina da busca. Retorna (places_brutos, proximo_token).
+
+        Isolado pra testar a paginacao sem rede (monkeypatch deste metodo).
+        """
         import httpx
 
-        url = "https://places.googleapis.com/v1/places:searchText"
         headers = {
             "Content-Type": "application/json",
             "X-Goog-Api-Key": self._key,
-            "X-Goog-FieldMask": "places.displayName,places.nationalPhoneNumber,places.rating,"
-            "places.userRatingCount,places.formattedAddress,places.id",
+            "X-Goog-FieldMask": self.FIELDS,
         }
+        body: dict = {"textQuery": term, "languageCode": self._language}
+        if page_token:
+            body["pageToken"] = page_token
         with httpx.Client(timeout=self._timeout) as client:
-            r = client.post(url, headers=headers, json={"textQuery": term})
+            r = client.post(self.URL, headers=headers, json=body)
             r.raise_for_status()
-            places = r.json().get("places", [])
-        return [
-            {
-                "name": (p.get("displayName") or {}).get("text"),
-                "formatted_phone_number": p.get("nationalPhoneNumber"),
-                "rating": p.get("rating"),
-                "user_ratings_total": p.get("userRatingCount"),
-                "formatted_address": p.get("formattedAddress"),
-                "place_id": p.get("id"),
-            }
-            for p in places
-        ]
+            data = r.json()
+        return data.get("places", []), data.get("nextPageToken")
+
+    @staticmethod
+    def _to_raw(p: dict) -> dict:
+        return {
+            "name": (p.get("displayName") or {}).get("text"),
+            "formatted_phone_number": p.get("nationalPhoneNumber"),
+            "rating": p.get("rating"),
+            "user_ratings_total": p.get("userRatingCount"),
+            "formatted_address": p.get("formattedAddress"),
+            "place_id": p.get("id"),
+        }
+
+    def search(self, term: str) -> list[dict]:
+        out: list[dict] = []
+        token: str | None = None
+        for _ in range(self._max_pages):
+            places, token = self._fetch_page(term, token)
+            out.extend(self._to_raw(p) for p in places)
+            if not token:
+                break
+        return out
