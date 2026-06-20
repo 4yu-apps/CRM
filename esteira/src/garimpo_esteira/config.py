@@ -86,7 +86,8 @@ def build_sources(cfg: Config) -> list[Source]:
         return [
             CnpjSource(fetch=_fixture_cnpj_fetch()),
             InstagramSource(),
-            WebsiteSource(reachable=lambda _url: True),
+            # offline: confirma site sem rede e sem raspar (deterministico)
+            WebsiteSource(reachable=lambda _url: True, fetch_html=lambda _url: None),
             AdLibrarySource(),
         ]
     # real: CNPJ via BrasilAPI (grátis), site via HTTP, Ad Library se houver token

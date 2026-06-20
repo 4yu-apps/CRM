@@ -34,12 +34,14 @@ class MapsSource(Protocol):
 def result_to_lead(raw: dict, owner_id: str) -> tuple[Lead, list[Finding]]:
     name = raw.get("name")
     phone = clean("phone", raw.get("formatted_phone_number") or raw.get("phone"))
+    website = clean("website", raw.get("website"))
     lead = Lead(
         id="",
         owner_id=owner_id,
         status="bruto",
         business_name=name,
         phone=phone,
+        website=website,
         rating=raw.get("rating"),
         reviews_count=raw.get("user_ratings_total") or raw.get("reviews_count"),
         category=raw.get("category"),
@@ -55,6 +57,8 @@ def result_to_lead(raw: dict, owner_id: str) -> tuple[Lead, list[Finding]]:
         findings.append(Finding("business_name", "google_maps", name, 1.0))
     if phone:
         findings.append(Finding("phone", "google_maps", phone, 0.9))
+    if website:
+        findings.append(Finding("website", "google_maps", website, 0.95))
     return lead, findings
 
 
@@ -120,9 +124,12 @@ class PlacesMapsSource:
 
     name = "places"
     URL = "https://places.googleapis.com/v1/places:searchText"
+    # website, categoria e localizacao tambem vem do Maps (mesma faixa de preco,
+    # ja que pedimos nota/telefone). So social/email/CNPJ e que nao vem do Maps.
     FIELDS = (
         "places.displayName,places.nationalPhoneNumber,places.rating,"
-        "places.userRatingCount,places.formattedAddress,places.id,nextPageToken"
+        "places.userRatingCount,places.formattedAddress,places.id,"
+        "places.websiteUri,places.primaryTypeDisplayName,places.location,nextPageToken"
     )
 
     def __init__(
@@ -156,6 +163,7 @@ class PlacesMapsSource:
 
     @staticmethod
     def _to_raw(p: dict) -> dict:
+        loc = p.get("location") or {}
         return {
             "name": (p.get("displayName") or {}).get("text"),
             "formatted_phone_number": p.get("nationalPhoneNumber"),
@@ -163,6 +171,10 @@ class PlacesMapsSource:
             "user_ratings_total": p.get("userRatingCount"),
             "formatted_address": p.get("formattedAddress"),
             "place_id": p.get("id"),
+            "website": p.get("websiteUri"),
+            "category": (p.get("primaryTypeDisplayName") or {}).get("text"),
+            "lat": loc.get("latitude"),
+            "lng": loc.get("longitude"),
         }
 
     def search(self, term: str) -> list[dict]:
