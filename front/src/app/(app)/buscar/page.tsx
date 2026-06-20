@@ -8,9 +8,11 @@ import {
   MagnifyingGlass,
   MapTrifold,
   Robot,
+  Shuffle,
   Spinner,
 } from "@phosphor-icons/react";
 import { getRepo } from "@/lib/repo";
+import { fetchEstados, fetchMunicipios, type Municipio, type UF } from "@/lib/ibge";
 import type { ScanCoverage, SearchProfile, ServiceTarget } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -129,11 +131,17 @@ export default function BuscarPage() {
 
   // Campos do formulario
   const [niche, setNiche] = useState("");
+  const [uf, setUf] = useState("");
   const [city, setCity] = useState("");
   const [neighborhood, setNeighborhood] = useState("");
   const [radius, setRadius] = useState("10km");
   const [service, setService] = useState<ServiceTarget>("trafego");
   const [autopilot, setAutopilot] = useState(false);
+
+  // Listas vindas do IBGE para os selects em cascata
+  const [estados, setEstados] = useState<UF[]>([]);
+  const [municipios, setMunicipios] = useState<Municipio[]>([]);
+  const [loadingCidades, setLoadingCidades] = useState(false);
 
   // Estado de submit
   const [saving, setSaving] = useState(false);
@@ -148,6 +156,7 @@ export default function BuscarPage() {
       if (p) {
         setProfile(p);
         setNiche(p.niches[0] ?? "");
+        setUf(p.state ?? "");
         setCity(p.city ?? "");
         setRadius(p.radius ?? "10km");
         setService(p.default_service_target ?? "trafego");
@@ -174,6 +183,53 @@ export default function BuscarPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapNiche]);
 
+  // Carrega a lista de estados do IBGE uma vez, ao montar.
+  useEffect(() => {
+    fetchEstados().then(setEstados).catch(() => null);
+  }, []);
+
+  // Carrega as cidades sempre que a UF muda. Se a UF ficar vazia, limpa a lista.
+  // O setState sincrono aqui so zera a lista quando nao ha estado, fluxo de
+  // sincronizacao com a selecao do usuario, por isso o disable abaixo.
+  useEffect(() => {
+    if (!uf) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setMunicipios([]);
+      return;
+    }
+    let ativo = true;
+    setLoadingCidades(true);
+    fetchMunicipios(uf)
+      .then((lista) => {
+        if (ativo) setMunicipios(lista);
+      })
+      .catch(() => {
+        if (ativo) setMunicipios([]);
+      })
+      .finally(() => {
+        if (ativo) setLoadingCidades(false);
+      });
+    return () => {
+      ativo = false;
+    };
+  }, [uf]);
+
+  // Troca de estado: recarrega cidades (efeito acima) e limpa a cidade escolhida.
+  const handleUfChange = useCallback((novaUf: string) => {
+    setUf(novaUf);
+    setCity("");
+  }, []);
+
+  // Surpreenda-me: escolhe um ramo aleatorio da lista sugerida, mantendo
+  // estado e cidade. Util quando a pessoa nao sabe o que procurar.
+  const handleSurpreendaMe = useCallback(() => {
+    if (NICHE_OPTIONS.length === 0) return;
+    const sorteado =
+      NICHE_OPTIONS[Math.floor(Math.random() * NICHE_OPTIONS.length)];
+    setNiche(sorteado);
+    toast.success(`Ramo sorteado: ${sorteado}`);
+  }, []);
+
   const handleSave = useCallback(async () => {
     if (saving) return;
     setSaving(true);
@@ -182,6 +238,7 @@ export default function BuscarPage() {
       await repo.saveProfile({
         niches: niche ? [niche] : profile?.niches ?? [],
         city: city || null,
+        state: uf || null,
         radius,
         default_service_target: service,
         autopilot,
@@ -193,7 +250,7 @@ export default function BuscarPage() {
     } finally {
       setSaving(false);
     }
-  }, [saving, repo, niche, profile, city, radius, service, autopilot]);
+  }, [saving, repo, niche, profile, city, uf, radius, service, autopilot]);
 
   // Coordenadas para o mapa
   const mapCenter = (() => {
@@ -227,10 +284,26 @@ export default function BuscarPage() {
 
           {/* Ramo */}
           <div className="mb-4">
-            <label className="mb-1.5 block text-[12px] font-bold uppercase tracking-wider text-faint">
-              Ramo
-            </label>
+            <div className="mb-1.5 flex items-center justify-between">
+              <label
+                htmlFor="ramo-select"
+                className="block text-[12px] font-bold uppercase tracking-wider text-faint"
+              >
+                Ramo
+              </label>
+              <button
+                type="button"
+                onClick={handleSurpreendaMe}
+                title="Sorteia um ramo da lista pra voce comecar quando nao sabe o que procurar"
+                aria-label="Surpreenda-me: sortear um ramo aleatorio"
+                className="flex items-center gap-1.5 rounded-full border border-border-2 bg-surface-2 px-3 py-1 text-[12px] font-semibold text-ink-2 transition-colors hover:border-brand hover:bg-brand-50 hover:text-brand"
+              >
+                <Shuffle size={14} weight="bold" />
+                Surpreenda-me
+              </button>
+            </div>
             <select
+              id="ramo-select"
               value={niche}
               onChange={(e) => setNiche(e.target.value)}
               className="w-full rounded-xl border border-border-2 bg-surface-2 px-4 py-3.5 text-[14.5px] text-ink outline-none focus:border-brand"
@@ -244,30 +317,77 @@ export default function BuscarPage() {
             </select>
           </div>
 
-          {/* Cidade + Bairro/zona */}
+          {/* Estado + Cidade em cascata (dados do IBGE) */}
           <div className="mb-4 grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1.5 block text-[12px] font-bold uppercase tracking-wider text-faint">
-                Cidade
+              <label
+                htmlFor="estado-select"
+                className="mb-1.5 block text-[12px] font-bold uppercase tracking-wider text-faint"
+              >
+                Estado
               </label>
-              <input
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                placeholder="Ex: Maringa"
+              <select
+                id="estado-select"
+                value={uf}
+                onChange={(e) => handleUfChange(e.target.value)}
                 className="w-full rounded-xl border border-border-2 bg-surface-2 px-4 py-3.5 text-[14.5px] text-ink outline-none focus:border-brand"
-              />
+              >
+                <option value="">Escolha o estado</option>
+                {estados.map((e) => (
+                  <option key={e.id} value={e.sigla}>
+                    {e.nome} ({e.sigla})
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
-              <label className="mb-1.5 block text-[12px] font-bold uppercase tracking-wider text-faint">
-                Bairro ou zona
+              <label
+                htmlFor="cidade-select"
+                className="mb-1.5 block text-[12px] font-bold uppercase tracking-wider text-faint"
+              >
+                Cidade
               </label>
-              <input
-                value={neighborhood}
-                onChange={(e) => setNeighborhood(e.target.value)}
-                placeholder="Ex: Zona 7"
-                className="w-full rounded-xl border border-border-2 bg-surface-2 px-4 py-3.5 text-[14.5px] text-ink outline-none focus:border-brand"
-              />
+              <select
+                id="cidade-select"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                disabled={!uf || loadingCidades}
+                className="w-full rounded-xl border border-border-2 bg-surface-2 px-4 py-3.5 text-[14.5px] text-ink outline-none focus:border-brand disabled:opacity-60"
+              >
+                <option value="">
+                  {!uf
+                    ? "Escolha o estado antes"
+                    : loadingCidades
+                      ? "Carregando cidades..."
+                      : "Escolha a cidade"}
+                </option>
+                {municipios.map((m) => (
+                  <option key={m.id} value={m.nome}>
+                    {m.nome}
+                  </option>
+                ))}
+              </select>
             </div>
+          </div>
+
+          {/* Bairro ou zona (texto livre, opcional) */}
+          <div className="mb-4">
+            <label
+              htmlFor="bairro-input"
+              className="mb-1.5 block text-[12px] font-bold uppercase tracking-wider text-faint"
+            >
+              Bairro ou zona <span className="font-medium normal-case text-faint">(opcional)</span>
+            </label>
+            <input
+              id="bairro-input"
+              value={neighborhood}
+              onChange={(e) => setNeighborhood(e.target.value)}
+              placeholder="Ex: Zona 7. Deixe em branco pra cobrir a cidade toda."
+              className="w-full rounded-xl border border-border-2 bg-surface-2 px-4 py-3.5 text-[14.5px] text-ink outline-none focus:border-brand"
+            />
+            <p className="mt-1.5 text-[12px] text-faint">
+              Nao existe uma lista oficial de bairros, entao esse campo e livre e opcional.
+            </p>
           </div>
 
           {/* Raio */}
@@ -353,7 +473,9 @@ export default function BuscarPage() {
           <div className="mb-1 flex items-center justify-between">
             <div className="text-[17px] font-bold">Cobertura por regiao</div>
             {city && (
-              <span className="text-[12px] font-semibold text-faint">{city}</span>
+              <span className="text-[12px] font-semibold text-faint">
+                {uf ? `${city} / ${uf}` : city}
+              </span>
             )}
           </div>
           <p className="mb-5 text-[13.5px] text-muted-foreground">

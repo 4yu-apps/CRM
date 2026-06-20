@@ -20,6 +20,7 @@ import {
 import { getRepo } from "@/lib/repo";
 import { SERVICE_META } from "@/lib/service";
 import { useAuth } from "@/lib/auth";
+import { fetchEstados, fetchMunicipios, type Municipio, type UF } from "@/lib/ibge";
 import type { SearchProfile, SearchProfileInput, ServiceTarget } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -125,6 +126,11 @@ export default function ConfigPage() {
   const [serviceTarget, setServiceTarget] = useState<ServiceTarget>("indefinido");
   const [autopilot, setAutopilot] = useState(false);
 
+  // Listas vindas do IBGE para os selects em cascata (estado -> cidade)
+  const [estados, setEstados] = useState<UF[]>([]);
+  const [municipios, setMunicipios] = useState<Municipio[]>([]);
+  const [loadingCidades, setLoadingCidades] = useState(false);
+
   // Input de ramo personalizado
   const [nicheInput, setNicheInput] = useState("");
   const nicheRef = useRef<HTMLInputElement>(null);
@@ -152,6 +158,43 @@ export default function ConfigPage() {
       }
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Carrega a lista de estados do IBGE uma vez, ao montar.
+  useEffect(() => {
+    fetchEstados().then(setEstados).catch(() => null);
+  }, []);
+
+  // Carrega as cidades sempre que a UF muda. UF vazia limpa a lista.
+  // O setState sincrono aqui apenas zera a lista quando nao ha estado, fluxo
+  // de sincronizacao com a selecao do usuario, por isso o disable abaixo.
+  useEffect(() => {
+    if (!state) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setMunicipios([]);
+      return;
+    }
+    let ativo = true;
+    setLoadingCidades(true);
+    fetchMunicipios(state)
+      .then((lista) => {
+        if (ativo) setMunicipios(lista);
+      })
+      .catch(() => {
+        if (ativo) setMunicipios([]);
+      })
+      .finally(() => {
+        if (ativo) setLoadingCidades(false);
+      });
+    return () => {
+      ativo = false;
+    };
+  }, [state]);
+
+  // Troca de estado: recarrega cidades (efeito acima) e limpa a cidade escolhida.
+  const handleStateChange = useCallback((novaUf: string) => {
+    setState(novaUf);
+    setCity("");
   }, []);
 
   // Adicionar ramo
@@ -352,39 +395,69 @@ export default function ConfigPage() {
           icon={<MapPin size={20} />}
         >
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            {/* Cidade */}
-            <div className="sm:col-span-1">
-              <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-faint">
-                Cidade base
+            {/* Estado (UF) */}
+            <div>
+              <label
+                htmlFor="config-estado"
+                className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-faint"
+              >
+                Estado
               </label>
-              <input
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                placeholder="Ex: Maringa"
+              <select
+                id="config-estado"
+                value={state}
+                onChange={(e) => handleStateChange(e.target.value)}
                 className="w-full rounded-xl border border-border-2 bg-surface-2 px-3.5 py-2.5 text-sm outline-none focus:border-brand"
-              />
+              >
+                <option value="">Escolha o estado</option>
+                {estados.map((uf) => (
+                  <option key={uf.id} value={uf.sigla}>
+                    {uf.nome} ({uf.sigla})
+                  </option>
+                ))}
+              </select>
             </div>
 
-            {/* UF */}
+            {/* Cidade base (cascata a partir do estado) */}
             <div>
-              <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-faint">
-                UF
+              <label
+                htmlFor="config-cidade"
+                className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-faint"
+              >
+                Cidade base
               </label>
-              <input
-                value={state}
-                onChange={(e) => setState(e.target.value.toUpperCase().slice(0, 2))}
-                placeholder="PR"
-                maxLength={2}
-                className="w-full rounded-xl border border-border-2 bg-surface-2 px-3.5 py-2.5 text-sm uppercase outline-none focus:border-brand"
-              />
+              <select
+                id="config-cidade"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                disabled={!state || loadingCidades}
+                className="w-full rounded-xl border border-border-2 bg-surface-2 px-3.5 py-2.5 text-sm outline-none focus:border-brand disabled:opacity-60"
+              >
+                <option value="">
+                  {!state
+                    ? "Escolha o estado antes"
+                    : loadingCidades
+                      ? "Carregando cidades..."
+                      : "Escolha a cidade"}
+                </option>
+                {municipios.map((m) => (
+                  <option key={m.id} value={m.nome}>
+                    {m.nome}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* Raio */}
             <div>
-              <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-faint">
+              <label
+                htmlFor="config-raio"
+                className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-faint"
+              >
                 Raio de atuacao
               </label>
               <select
+                id="config-raio"
                 value={radius}
                 onChange={(e) => setRadius(e.target.value)}
                 className="w-full rounded-xl border border-border-2 bg-surface-2 px-3.5 py-2.5 text-sm outline-none focus:border-brand"
