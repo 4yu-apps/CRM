@@ -118,6 +118,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       options: {
         scopes: "openid email profile https://www.googleapis.com/auth/calendar.events",
         redirectTo,
+        // access_type=offline + prompt=consent fazem o Google devolver tambem o
+        // refresh token e reemitir o consentimento do escopo de calendario, em
+        // vez de pular a tela. Sem isso o provider_token costuma vir so na
+        // primeira vez e expira sem renovacao.
+        queryParams: {
+          access_type: "offline",
+          prompt: "consent",
+        },
       },
     });
     if (error) throw new Error(error.message);

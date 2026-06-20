@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { HandGrabbing, CalendarBlank, CurrencyDollar, X } from "@phosphor-icons/react";
 import { useLeads } from "@/hooks/use-leads";
 import { SERVICE_META } from "@/lib/service";
+import { createCalendarEvent } from "@/lib/calendar";
 import { cn } from "@/lib/utils";
 import type { Lead, LeadStatus, DealBilling } from "@/lib/types";
 
@@ -578,7 +579,39 @@ export default function FunilPage() {
       const col = KANBAN_COLUMNS.find((c) => c.id === "reuniao")!;
       const note = `Reuniao agendada para ${new Date(dateTime).toLocaleString("pt-BR")}`;
       setModal({ type: "none" });
+
+      // 1) Transicao + nota: o que o funil ja fazia. E o caminho principal e
+      // nunca e bloqueado pelo calendar.
       await executeTransition(lead, col, note);
+
+      // 2) Best-effort: criar o evento no Google Calendar. Qualquer falha aqui
+      // (sem token, token expirado, rede) so vira um aviso amigavel; jamais
+      // desfaz a transicao nem joga erro vermelho.
+      const service = SERVICE_META[lead.service_target] ?? SERVICE_META.indefinido;
+      const result = await createCalendarEvent(
+        {
+          business_name: lead.business_name,
+          phone: lead.phone,
+          service_label: service.label,
+        },
+        new Date(dateTime).toISOString()
+      );
+
+      if (result.ok) {
+        toast.success("Evento criado no seu Google Calendar.");
+      } else if (result.reason === "token_expirado") {
+        toast.message(
+          "Sua conexao com o Google expirou. Entre de novo com o Google na Configuracao pra criar o evento automaticamente."
+        );
+      } else if (result.reason === "sem_token") {
+        toast.message(
+          "Reuniao salva na nota. Conecte o Google Calendar na Configuracao pra criar o evento automaticamente."
+        );
+      } else {
+        toast.message(
+          "Reuniao salva na nota. Nao consegui criar o evento no Google Calendar agora; tente de novo mais tarde."
+        );
+      }
     },
     [modal, executeTransition]
   );
