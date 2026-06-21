@@ -125,18 +125,49 @@ function EditField({
 // ---------------------------------------------------------------------------
 // Linha de dado (leitura) com fonte
 // ---------------------------------------------------------------------------
-function DataRow({ label, value, prov }: { label: string; value: string; prov?: string | null }) {
+function DataRow({ label, value, prov, href }: { label: string; value: string; prov?: string | null; href?: string }) {
   return (
     <div className="flex items-start justify-between gap-3 border-b border-border py-2.5 last:border-0">
       <span className="text-[13.5px] text-muted-foreground">{label}</span>
-      <div className="text-right">
-        <span className="text-[13.5px] font-semibold text-ink">{value}</span>
+      <div className="min-w-0 text-right">
+        {href ? (
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="break-all text-[13.5px] font-semibold text-brand hover:underline"
+          >
+            {value}
+          </a>
+        ) : (
+          <span className="text-[13.5px] font-semibold text-ink">{value}</span>
+        )}
         {prov && (
           <span className="ml-1.5 text-[11px] text-faint">via {prov}</span>
         )}
       </div>
     </div>
   );
+}
+
+// Monta os links (abrem em nova aba). Retorna undefined quando nao da pra linkar.
+function igUrl(handle?: string | null): string | undefined {
+  const h = (handle ?? "").trim().replace(/^@/, "");
+  return h ? `https://instagram.com/${h}` : undefined;
+}
+function mailUrl(email?: string | null): string | undefined {
+  const e = (email ?? "").trim();
+  return e ? `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(e)}` : undefined;
+}
+function siteUrl(site?: string | null): string | undefined {
+  const s = (site ?? "").trim();
+  if (!s) return undefined;
+  return /^https?:\/\//i.test(s) ? s : `https://${s}`;
+}
+function waUrl(phone?: string | null): string | undefined {
+  const d = (phone ?? "").replace(/\D/g, "");
+  if (!d) return undefined;
+  return `https://wa.me/${d.startsWith("55") ? d : "55" + d}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -454,11 +485,11 @@ export default function FichaPage() {
             ) : (
               <div className="rounded-[14px] border border-border">
                 <DataRow label="Dono / responsavel" value={lead.owner_name ?? "-"} prov={provOf(provenance, "owner_name")} />
-                <DataRow label="Telefone" value={fmtPhone(lead.phone)} prov={provOf(provenance, "phone")} />
-                <DataRow label="E-mail" value={lead.email ?? "-"} prov={provOf(provenance, "email")} />
-                <DataRow label="Instagram" value={lead.instagram ?? "-"} prov={provOf(provenance, "instagram")} />
+                <DataRow label="Telefone" value={fmtPhone(lead.phone)} href={waUrl(lead.phone)} prov={provOf(provenance, "phone")} />
+                <DataRow label="E-mail" value={lead.email ?? "-"} href={mailUrl(lead.email)} prov={provOf(provenance, "email")} />
+                <DataRow label="Instagram" value={lead.instagram ?? "-"} href={igUrl(lead.instagram)} prov={provOf(provenance, "instagram")} />
                 <DataRow label="CNPJ" value={fmtCnpj(lead.cnpj)} prov={provOf(provenance, "cnpj")} />
-                <DataRow label="Site" value={lead.website ? lead.website : "Nao tem"} prov={provOf(provenance, "website")} />
+                <DataRow label="Site" value={lead.website ? lead.website : "Nao tem"} href={siteUrl(lead.website)} prov={provOf(provenance, "website")} />
                 <DataRow label="Ja anuncia?" value={lead.ads_active == null ? "Nao sei" : lead.ads_active ? "Sim" : "Ainda nao"} />
                 <DataRow label="Endereco" value={lead.address ?? "-"} prov={provOf(provenance, "address")} />
                 <DataRow label="Bairro" value={lead.neighborhood ?? "-"} prov={provOf(provenance, "neighborhood")} />
