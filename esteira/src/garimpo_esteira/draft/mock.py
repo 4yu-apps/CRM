@@ -1,11 +1,10 @@
 """Provedor de rascunho mock: template determinístico, offline, R$0.
 
-Reproduz o fluxo de 2 mensagens por serviço (B1) seguindo o GUIA-COPY-HUMANA:
-voz humana, curto, UMA pergunta, sem travessão, sem AI-tell. Regra de ouro
-aprendida na prática: NÃO abrir citando número de avaliações ou nota (soa
-raspado, "empresa X com 38 avaliações" não é como gente fala). Referencia o
-negócio de forma natural (nome, ramo, cidade) e varia a abertura por lead.
-A copy de verdade (mais lapidada) sai pelo Gemini; isto é o piso decente.
+Segue o GUIA-COPY-HUMANA com tom caloroso, de quem fala com um conhecido:
+cumprimento leve, diz que encontrou o negócio e gostou do trabalho, confirma o
+que eles fazem e faz UMA pergunta. Sem dumpar nota/avaliações, sem se apresentar
+como vendedor, sem travessão. A copy lapidada sai pela IA (Groq/Gemini); isto é
+o piso decente quando a IA não está ligada ou falha.
 """
 from __future__ import annotations
 
@@ -13,50 +12,36 @@ from ..models import Lead
 from .prompt import lead_brief
 
 
-def _pick(name: str, options: list[str]) -> str:
-    """Escolhe uma variante de forma estável por lead (varia sem ser aleatório)."""
-    i = sum(ord(c) for c in (name or "x")) % len(options)
-    return options[i]
-
-
 def _abertura(b: dict) -> str:
     nome = b["nome"]
-    cidade = b["cidade"]
     seg = (b["segmento"] or "").lower()
-    onde = f" em {cidade}" if cidade else " aqui na região"
-    opcoes = [
-        f"Oi, tudo bem? Vi a {nome}{onde} e curti o trabalho de vocês.",
-        f"Oi! Esbarrei na {nome} procurando {seg or 'negócio'}{onde}.",
-        f"Oi, tudo bem? Tava de olho em {seg or 'negócios'}{onde} e a {nome} me chamou atenção.",
-    ]
-    return _pick(nome, opcoes)
+    base = f"Oi, tudo bem? Encontrei a {nome} aqui na região e gostei muito do trabalho de vocês."
+    if seg:
+        base += f" Vi que vocês trabalham com {seg}, certo?"
+    return base
 
 
 def _trafego(b: dict) -> tuple[str, str]:
     if not b["tem_site"]:
-        pergunta = "Vocês têm site ou hoje o cliente chega mais pelo Instagram e indicação?"
+        pergunta = "Vocês já têm site ou hoje o cliente chega mais pelo Instagram e indicação?"
     elif not b["tem_instagram"]:
         pergunta = "Vocês divulgam mais no Instagram ou é mais no boca a boca?"
     else:
-        pergunta = "Vocês já rodam anúncio ou hoje o cliente chega mais por indicação?"
+        pergunta = "Vocês já fazem anúncio pra atrair cliente ou hoje é mais no boca a boca?"
     msg1 = f"{_abertura(b)} {pergunta}"
     msg2 = (
         "Eu trabalho com tráfego pra negócio local, pra você aparecer pra quem já está "
-        "procurando perto sem depender do alcance do Instagram. Posso te mandar um exemplo "
-        "rápido de como ficaria?"
+        "procurando perto sem depender do alcance do Instagram. Podemos trocar uma ideia? "
+        "posso te mandar um exemplo."
     )
     return msg1, msg2
 
 
 def _automacao(b: dict) -> tuple[str, str]:
-    nome = b["nome"]
-    cidade = b["cidade"]
-    onde = f" em {cidade}" if cidade else " aqui"
-    abertura = f"Oi! Vi a {nome}{onde}, parece ter um movimento bom de cliente."
-    msg1 = f"{abertura} O atendimento e os agendamentos de vocês hoje são tudo na mão pelo WhatsApp?"
+    msg1 = f"{_abertura(b)} O atendimento e os agendamentos de vocês hoje são tudo na mão pelo WhatsApp?"
     msg2 = (
-        "Eu monto um atendimento automático no WhatsApp que responde e agenda sozinho, pra "
-        "você não perder cliente nos horários de pico. Quer que eu te mostre como funciona?"
+        "Eu monto um atendimento automático no WhatsApp que responde e agenda sozinho, pra você "
+        "não perder cliente na correria. Podemos trocar uma ideia? posso te mostrar como funciona."
     )
     return msg1, msg2
 
@@ -73,7 +58,7 @@ class MockDraftProvider:
         if target == "ambos":
             # lidera com tráfego, cita a automação de leve no fim (upsell)
             msg1, msg2 = _trafego(b)
-            msg2 = msg2.rstrip(" ?") + ", e depois ainda dá pra automatizar o atendimento no WhatsApp?"
+            msg2 = msg2.rstrip(" .") + ". E depois ainda dá pra automatizar o atendimento no WhatsApp."
             return msg1, msg2
         # tráfego e indefinido caem no roteiro de tráfego
         return _trafego(b)
