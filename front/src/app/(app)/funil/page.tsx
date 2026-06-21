@@ -2,10 +2,11 @@
 import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { HandGrabbing, CalendarBlank, CurrencyDollar, X } from "@phosphor-icons/react";
+import { HandGrabbing, CalendarBlank, CurrencyDollar, X, DotsThreeVertical, CaretRight } from "@phosphor-icons/react";
 import { useLeads } from "@/hooks/use-leads";
 import { SERVICE_META } from "@/lib/service";
 import { createCalendarEvent } from "@/lib/calendar";
+import { canTransition } from "@/lib/state-machine";
 import { cn } from "@/lib/utils";
 import type { Lead, LeadStatus, DealBilling } from "@/lib/types";
 
@@ -301,9 +302,10 @@ function FunnelDealModal({ lead, onConfirm, onClose }: DealModalProps) {
 interface FunnelCardProps {
   lead: Lead;
   onDragStart: (e: React.DragEvent<HTMLDivElement>, lead: Lead) => void;
+  onMove: (lead: Lead) => void;
 }
 
-function FunnelCard({ lead, onDragStart }: FunnelCardProps) {
+function FunnelCard({ lead, onDragStart, onMove }: FunnelCardProps) {
   const router = useRouter();
   const service = SERVICE_META[lead.service_target] ?? SERVICE_META.indefinido;
 
@@ -328,6 +330,19 @@ function FunnelCard({ lead, onDragStart }: FunnelCardProps) {
             {lead.neighborhood ? ` · ${lead.neighborhood}` : ""}
           </div>
         </div>
+        {/* Mover: funciona no toque (no celular o arrastar nao rola). */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onMove(lead);
+          }}
+          aria-label="Mover este lead pra outro estagio"
+          title="Mover"
+          className="-mr-1 -mt-1 flex-none rounded-md p-1 text-faint transition-colors hover:bg-surface-2 hover:text-brand"
+        >
+          <DotsThreeVertical size={18} weight="bold" />
+        </button>
       </div>
       <div className="mt-2.5">
         <span
@@ -355,6 +370,7 @@ interface FunnelColumnProps {
   onDragLeave: () => void;
   onDrop: (e: React.DragEvent<HTMLDivElement>) => void;
   onDragStart: (e: React.DragEvent<HTMLDivElement>, lead: Lead) => void;
+  onMove: (lead: Lead) => void;
 }
 
 function FunnelColumn({
@@ -365,6 +381,7 @@ function FunnelColumn({
   onDragLeave,
   onDrop,
   onDragStart,
+  onMove,
 }: FunnelColumnProps) {
   return (
     <div
@@ -393,7 +410,7 @@ function FunnelColumn({
       {/* Cards */}
       <div className="flex flex-col gap-2 min-h-[46px]">
         {leads.map((lead) => (
-          <FunnelCard key={lead.id} lead={lead} onDragStart={onDragStart} />
+          <FunnelCard key={lead.id} lead={lead} onDragStart={onDragStart} onMove={onMove} />
         ))}
         {leads.length === 0 && (
           <div
@@ -414,6 +431,65 @@ function FunnelColumn({
 // Pagina principal
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Sheet "mover" (toque): lista os estagios validos. Essencial no mobile, onde o
+// arrastar (HTML5 drag) nao funciona.
+// ---------------------------------------------------------------------------
+function MoveSheet({
+  lead,
+  targets,
+  onPick,
+  onClose,
+}: {
+  lead: Lead;
+  targets: KanbanColumn[];
+  onPick: (col: KanbanColumn) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-end justify-center bg-[rgba(20,12,40,.45)] backdrop-blur-[2px] sm:items-center sm:p-6"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-[420px] overflow-hidden rounded-t-[22px] bg-card shadow-[var(--shadow-lg)] sm:rounded-[22px]"
+        style={{ animation: "fadeUp .2s both" }}
+      >
+        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+          <div className="min-w-0">
+            <div className="text-[12px] text-muted-foreground">Mover pra</div>
+            <div className="truncate text-[15px] font-bold">{lead.business_name ?? "Lead"}</div>
+          </div>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="flex flex-col gap-1.5 p-3">
+          {targets.length === 0 && (
+            <div className="px-3 py-4 text-center text-[13px] text-faint">
+              Nenhum estagio disponivel a partir daqui.
+            </div>
+          )}
+          {targets.map((col) => (
+            <button
+              key={col.id}
+              onClick={() => onPick(col)}
+              className="flex items-center justify-between rounded-[12px] border border-border-2 bg-surface-2 px-4 py-3 text-left text-sm font-semibold text-ink transition-colors hover:border-brand/50 hover:bg-brand-50"
+            >
+              <span className="flex items-center gap-2.5">
+                <span className="size-2.5 rounded-full" style={{ background: col.color }} />
+                {col.label}
+              </span>
+              <CaretRight size={16} className="text-faint" />
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 type ModalState =
   | { type: "none" }
   | { type: "meeting"; lead: Lead; targetColId: string }
@@ -424,6 +500,8 @@ export default function FunilPage() {
   const [dragLeadId, setDragLeadId] = useState<string | null>(null);
   const [dragOverColId, setDragOverColId] = useState<string | null>(null);
   const [modal, setModal] = useState<ModalState>({ type: "none" });
+  // Lead com o menu "mover" aberto (toque, pro mobile onde o arrastar nao rola).
+  const [moveLead, setMoveLead] = useState<Lead | null>(null);
 
   // Snapshot local dos leads para revert visual instantaneo. Sincroniza com o
   // repo durante o render (padrao "derived state"), sem effect, pra o lint de
@@ -537,37 +615,50 @@ export default function FunilPage() {
     [repo, refresh]
   );
 
-  const handleDrop = useCallback(
-    async (e: React.DragEvent<HTMLDivElement>, col: KanbanColumn) => {
-      e.preventDefault();
-      setDragOverColId(null);
-
-      const leadId = dragLeadId ?? e.dataTransfer.getData("text/plain");
-      if (!leadId) return;
-
-      const lead = localLeads.find((l) => l.id === leadId);
-      if (!lead) return;
-
-      // Ja esta na coluna correta, nada a fazer
+  // Pedido de movimento (vindo do drag OU do menu "mover" por toque). Reuniao e
+  // Fechou abrem modal; o resto transiciona direto.
+  const requestMove = useCallback(
+    (lead: Lead, col: KanbanColumn) => {
       const currentCol = getColumnForLead(lead);
       if (currentCol?.id === col.id) return;
-
-      // Coluna Reuniao: abrir modal de data/hora
       if (col.id === "reuniao") {
         setModal({ type: "meeting", lead, targetColId: col.id });
         return;
       }
-
-      // Coluna Fechou: abrir modal de deal
       if (col.id === "fechou") {
         setModal({ type: "deal", lead, targetColId: col.id });
         return;
       }
+      void executeTransition(lead, col);
+    },
+    [executeTransition],
+  );
 
-      await executeTransition(lead, col);
+  // Colunas validas pra onde ESTE lead pode ir (alimenta o menu mover).
+  const validTargets = useCallback((lead: Lead): KanbanColumn[] => {
+    const cur = getColumnForLead(lead);
+    return KANBAN_COLUMNS.filter((col) => {
+      if (cur?.id === col.id) return false;
+      if (cur?.isArchived) return col.id === "novo"; // arquivado: so reativar pra Novo
+      if (col.isArchived) return true; // sempre da pra arquivar
+      return col.targetStatus
+        ? canTransition(lead.status, col.targetStatus, lead.opt_out ?? false)
+        : false;
+    });
+  }, []);
+
+  const handleDrop = useCallback(
+    async (e: React.DragEvent<HTMLDivElement>, col: KanbanColumn) => {
+      e.preventDefault();
+      setDragOverColId(null);
+      const leadId = dragLeadId ?? e.dataTransfer.getData("text/plain");
+      if (!leadId) return;
+      const lead = localLeads.find((l) => l.id === leadId);
+      if (!lead) return;
+      requestMove(lead, col);
       setDragLeadId(null);
     },
-    [dragLeadId, localLeads, executeTransition]
+    [dragLeadId, localLeads, requestMove]
   );
 
   // -------------------------------------------------------------------------
@@ -655,25 +746,28 @@ export default function FunilPage() {
       {/* Instrucao */}
       <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
         <HandGrabbing size={17} className="text-brand" />
-        Arraste o card pra outra coluna pra mudar o estagio. Simples assim.
+        Arraste o card, ou toque nos 3 pontinhos pra mover. No celular, deslize as colunas de lado.
       </div>
 
-      {/* Grid de colunas */}
-      <div
-        className="grid gap-3.5"
-        style={{ gridTemplateColumns: `repeat(${KANBAN_COLUMNS.length}, minmax(0, 1fr))` }}
-      >
+      {/* Colunas. No mobile (estilo Trello): scroll horizontal com snap, uma
+          coluna por vez. No desktop: grade de 7. */}
+      <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-3 lg:grid lg:grid-cols-7 lg:gap-3.5 lg:overflow-x-visible lg:pb-0">
         {KANBAN_COLUMNS.map((col) => (
-          <FunnelColumn
+          <div
             key={col.id}
-            col={col}
-            leads={colLeads[col.id] ?? []}
-            isDragOver={dragOverColId === col.id}
-            onDragOver={(e) => handleDragOver(e, col.id)}
-            onDragLeave={handleDragLeave}
-            onDrop={(e) => void handleDrop(e, col)}
-            onDragStart={handleDragStart}
-          />
+            className="w-[82vw] shrink-0 snap-start sm:w-[55vw] lg:w-auto lg:shrink"
+          >
+            <FunnelColumn
+              col={col}
+              leads={colLeads[col.id] ?? []}
+              isDragOver={dragOverColId === col.id}
+              onDragOver={(e) => handleDragOver(e, col.id)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => void handleDrop(e, col)}
+              onDragStart={handleDragStart}
+              onMove={setMoveLead}
+            />
+          </div>
         ))}
       </div>
 
@@ -692,6 +786,20 @@ export default function FunilPage() {
           lead={modal.lead}
           onConfirm={handleDealConfirm}
           onClose={() => setModal({ type: "none" })}
+        />
+      )}
+
+      {/* Sheet mover (toque, essencial no mobile) */}
+      {moveLead && (
+        <MoveSheet
+          lead={moveLead}
+          targets={validTargets(moveLead)}
+          onPick={(col) => {
+            const l = moveLead;
+            setMoveLead(null);
+            requestMove(l, col);
+          }}
+          onClose={() => setMoveLead(null)}
         />
       )}
     </div>

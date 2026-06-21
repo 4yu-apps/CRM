@@ -63,7 +63,7 @@ const run = async () => {
   labels.length === 15 ? ok(`enum lead_status (15 estados)`) : bad(`enum lead_status = ${labels.length}/15`)
 
   const [{ n }] = await one('select count(*)::int n from public.lead_status_transitions')
-  n === 38 ? ok(`38 transicoes seedadas`) : bad(`transicoes = ${n}/38`)
+  n === 47 ? ok(`47 transicoes seedadas`) : bad(`transicoes = ${n}/47`)
 
   const react = await one(
     `select 1 from public.lead_status_transitions where from_status='descartado' and to_status='rascunho_pronto'`)
