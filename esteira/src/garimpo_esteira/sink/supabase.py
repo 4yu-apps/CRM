@@ -22,6 +22,7 @@ _LEAD_COLS = (
     "score", "score_reason", "service_target", "ads_active",
     "suggested_value", "suggested_value_reason",
     "draft_msg1", "draft_msg2", "draft_model", "draft_generated_at",
+    "backfilled_at",
 )
 
 
@@ -79,8 +80,10 @@ class SupabaseSink:
         params = {
             "website": "not.is.null",
             "opt_out": "eq.false",
-            "or": "(facebook.is.null,instagram.is.null,whatsapp.is.null,ads_active.is.null)",
-            "order": "created_at.asc",
+            "or": "(facebook.is.null,instagram.is.null,whatsapp.is.null)",
+            # rotacao: os menos recentemente carimbados primeiro (nulos antes).
+            # Sem isso, ordenar por created_at travaria nos antigos sem contato.
+            "order": "backfilled_at.asc.nullsfirst",
             "limit": str(limit),
         }
         # Backfill e manutencao: por padrao varre TODOS os donos (service_role

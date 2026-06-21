@@ -110,8 +110,22 @@ def test_fetch_backfill_pega_quem_tem_site_e_falta_dado(tmp_path):
                                  website="https://a.com", phone="44999990001"))
     # sem site: nao e alvo de backfill
     sink.insert_lead(Lead(id="", owner_id="o", status="rascunho_pronto", phone="44999990002"))
+    # com site mas ja completo (facebook+instagram+whatsapp): nao e alvo
+    sink.insert_lead(Lead(id="", owner_id="o", status="rascunho_pronto", website="https://b.com",
+                          facebook="b", instagram="@b", whatsapp="44999990009"))
     alvos = sink.fetch_backfill(10)
     assert [l.id for l in alvos] == [alvo]
+
+
+def test_fetch_backfill_rotaciona_pelo_carimbo(tmp_path):
+    sink = _sink(tmp_path)
+    velho = sink.insert_lead(Lead(id="", owner_id="o", website="https://a.com"))
+    novo = sink.insert_lead(Lead(id="", owner_id="o", website="https://b.com"))
+    # carimba o 'velho' como ja processado; o sem-carimbo (novo) vem primeiro
+    sink.update_lead_fields(velho, {"backfilled_at": "2026-06-21T10:00:00+00:00"})
+    alvos = sink.fetch_backfill(10)
+    assert alvos[0].id == novo  # nulo (nunca carimbado) primeiro
+    assert [l.id for l in alvos] == [novo, velho]
 
 
 def test_backfill_enrich_lead_preenche_sem_mudar_status(tmp_path):

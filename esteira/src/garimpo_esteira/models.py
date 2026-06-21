@@ -79,6 +79,10 @@ class Lead:
     draft_model: str | None = None
     draft_generated_at: str | None = None
 
+    # quando o backfill re-enriqueceu por ultimo (rotacao: processa os mais
+    # antigos primeiro, pra varrer todos os leads ao longo do tempo sem travar).
+    backfilled_at: str | None = None
+
     extra: dict[str, Any] = field(default_factory=dict)
 
     def get(self, name: str) -> Any:

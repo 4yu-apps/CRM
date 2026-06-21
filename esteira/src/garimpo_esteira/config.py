@@ -37,6 +37,10 @@ class Config:
     gemini_model: str = "gemini-flash-latest"
     groq_key: str | None = None
     groq_model: str = "llama-3.3-70b-versatile"
+    # extracao de contato por LLM no enriquecimento (reforca o regex). Usa o Groq
+    # (gratis); modelo rapido/barato basta. Liga sozinho quando ha GROQ_API_KEY.
+    llm_extract: bool = True
+    extract_model: str = "llama-3.1-8b-instant"
     maps_mode: str = "fixture"        # fixture | places
     maps_key: str | None = None
     maps_pages: int = 3               # paginas do Places por busca (~20 cada)
@@ -59,6 +63,8 @@ class Config:
             gemini_model=os.getenv("GEMINI_MODEL", "gemini-flash-latest"),
             groq_key=os.getenv("GROQ_API_KEY"),
             groq_model=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
+            llm_extract=os.getenv("GARIMPO_LLM_EXTRACT", "1") not in ("0", "false", ""),
+            extract_model=os.getenv("GARIMPO_EXTRACT_MODEL", "llama-3.1-8b-instant"),
             maps_mode=os.getenv("GARIMPO_MAPS", "fixture"),
             maps_key=os.getenv("GOOGLE_MAPS_API_KEY"),
             maps_pages=int(os.getenv("GARIMPO_MAPS_PAGES", "3")),
@@ -100,10 +106,20 @@ def build_sources(cfg: Config) -> list[Source]:
     from .sources.ad_library import meta_ads_probe
 
     ad = AdLibrarySource(probe=meta_ads_probe(cfg.ad_token)) if cfg.ad_token else AdLibrarySource()
+
+    # reforço de extracao por LLM (Groq, gratis) quando ha chave; senao so regex.
+    llm_extract = None
+    if cfg.llm_extract and cfg.groq_key:
+        from .sources.extract_llm import make_groq_extractor
+
+        llm_extract = make_groq_extractor(
+            cfg.groq_key, "https://api.groq.com/openai/v1", cfg.extract_model
+        )
+
     return [
         CnpjSource(),
         InstagramSource(),
-        WebsiteSource(),
+        WebsiteSource(llm_extract=llm_extract),
         ad,
     ]
 

@@ -70,4 +70,13 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           # "ja anuncia?" via Meta Ad Library. Sem o secret, a fonte fica inerte.
           META_AD_LIBRARY_TOKEN: ${{ secrets.META_AD_LIBRARY_TOKEN }}
-        run: python -m garimpo_esteira.run ${{ github.event.inputs.command || 'autopilot' }}
+        # No cron (sem input): autopilot (descobre + pipeline dos novos) E depois
+        # um backfill que re-enriquece uma fatia rotativa dos leads antigos
+        # incompletos. Tudo autonomo, sem PC ligado. Dispatch manual com
+        # command=backfill roda so o backfill.
+        run: |
+          CMD="${{ github.event.inputs.command || 'autopilot' }}"
+          python -m garimpo_esteira.run "$CMD"
+          if [ "$CMD" = "autopilot" ]; then
+            python -m garimpo_esteira.run backfill --batch 40
+          fi

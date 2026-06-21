@@ -132,10 +132,18 @@ def extract_phone(html: str) -> str | None:
 class WebsiteSource:
     name = "website"
 
-    def __init__(self, reachable: ReachFn | None = None, fetch_html: FetchHtmlFn | None = None):
+    def __init__(
+        self,
+        reachable: ReachFn | None = None,
+        fetch_html: FetchHtmlFn | None = None,
+        llm_extract=None,
+    ):
         self._reachable = reachable or http_reachable
         # None = busca real; injetar (ex.: lambda _u: None) deixa offline/deterministico
         self._fetch_html = fetch_html if fetch_html is not None else http_fetch_html
+        # extrator LLM opcional (Groq, gratis): reforça o regex quando ele nao
+        # acha contato. None = so regex.
+        self._llm_extract = llm_extract
 
     def enrich(self, lead: Lead) -> list[Finding]:
         site = clean("website", lead.website)
@@ -163,6 +171,20 @@ class WebsiteSource:
                 # so vira coluna se o lead ainda nao tem telefone (cascade decide);
                 # aqui a gente registra o achado pra proveniencia.
                 findings.append(Finding("phone", self.name, tel, 0.5))
+
+            # Reforço por LLM: so quando o regex nao achou nenhuma rede/whatsapp
+            # (lead pobre de contato), pra limitar chamadas. Preenche so o que
+            # falta; falha vira {} e segue so com o regex.
+            achou = {f.field_name for f in findings}
+            if self._llm_extract and not ({"instagram", "facebook", "whatsapp"} & achou):
+                try:
+                    extra = self._llm_extract(html, lead.business_name or "")
+                except Exception:
+                    extra = {}
+                for field_name, value in (extra or {}).items():
+                    if field_name not in achou and value:
+                        findings.append(Finding(field_name, self.name, value, 0.55))
+                        achou.add(field_name)
         elif self._reachable(site):
             findings.append(Finding("website", self.name, site, 0.9))
         return findings

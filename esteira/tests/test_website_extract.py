@@ -70,6 +70,28 @@ def test_website_source_sem_site_nao_faz_nada():
     assert src.enrich(Lead(id="1", owner_id="o", website=None)) == []
 
 
+def test_llm_reforca_so_quando_regex_nao_acha_rede():
+    # site sem nenhuma rede/whatsapp no HTML -> o LLM entra e preenche
+    html_pobre = "<html><p>Bem-vindo</p></html>"
+    src = WebsiteSource(
+        fetch_html=lambda _u: html_pobre,
+        llm_extract=lambda _h, _n: {"instagram": "@achado.pela.ia"},
+    )
+    findings = src.enrich(Lead(id="1", owner_id="o", website="https://x.com"))
+    campos = {f.field_name: f.value for f in findings}
+    assert campos.get("instagram") == "@achado.pela.ia"
+
+
+def test_llm_nao_e_chamado_quando_regex_ja_achou():
+    # _HTML ja tem instagram/whatsapp/facebook -> o LLM nem roda
+    def boom(_h, _n):
+        raise AssertionError("LLM nao deveria ser chamado")
+
+    src = WebsiteSource(fetch_html=lambda _u: _HTML, llm_extract=boom)
+    findings = src.enrich(Lead(id="1", owner_id="o", website="https://x.com"))
+    assert any(f.field_name == "instagram" for f in findings)
+
+
 def test_website_source_site_que_nao_responde_cai_no_reachable():
     # fetch falha (None) mas o site responde no HEAD -> ao menos confirma o site
     src = WebsiteSource(reachable=lambda _u: True, fetch_html=lambda _u: None)

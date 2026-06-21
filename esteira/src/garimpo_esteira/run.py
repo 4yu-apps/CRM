@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .autopilot import run_autopilot
@@ -172,6 +173,7 @@ def cmd_backfill(cfg: Config) -> int:
         print("  nada pra completar (leads com site ja tem facebook/insta/whatsapp/ads)")
         return 0
 
+    now_iso = datetime.now(timezone.utc).isoformat()
     filled = ads_yes = ads_no = 0
     for i, lead in enumerate(leads):
         try:
@@ -179,12 +181,15 @@ def cmd_backfill(cfg: Config) -> int:
             if res.fields_filled:
                 filled += 1
             # ads_active vai pra proveniencia (como no pipeline); aqui promovemos
-            # pra coluna do lead na hora, igual o estagio de score faz.
+            # pra coluna do lead na hora, igual o estagio de score faz. E carimba
+            # backfilled_at pra rotacao (proximo run pega outros leads).
             ads = _ads_from_prov(sink.fetch_provenance(lead.id))
+            updates: dict[str, object] = {"backfilled_at": now_iso}
             if ads is not None:
-                sink.update_lead_fields(lead.id, {"ads_active": ads})
+                updates["ads_active"] = ads
                 ads_yes += 1 if ads else 0
                 ads_no += 0 if ads else 1
+            sink.update_lead_fields(lead.id, updates)
             tag = "sim" if ads else "nao" if ads is False else "?"
             print(f"  {lead.id}: +{res.fields_filled or '—'} anuncia={tag}")
         except Exception as e:
