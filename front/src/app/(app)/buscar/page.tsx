@@ -13,6 +13,7 @@ import {
 } from "@phosphor-icons/react";
 import { getRepo } from "@/lib/repo";
 import { fetchEstados, fetchMunicipios, type Municipio, type UF } from "@/lib/ibge";
+import { geocodeCity, type GeoPoint } from "@/lib/geocode";
 import type { ScanCoverage, SearchProfile, ServiceTarget } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -150,6 +151,9 @@ export default function BuscarPage() {
   // Filtro de nicho no mapa
   const [mapNiche, setMapNiche] = useState<string | undefined>(undefined);
 
+  // Ponto geocodificado da cidade escolhida (pra dar zoom no mapa).
+  const [cityPoint, setCityPoint] = useState<GeoPoint | null>(null);
+
   const load = useCallback(async () => {
     try {
       const [p, cov] = await Promise.all([repo.getProfile(), repo.listCoverage()]);
@@ -214,6 +218,26 @@ export default function BuscarPage() {
     };
   }, [uf]);
 
+  // Geocodifica a cidade escolhida pra centralizar o mapa nela. Roda na carga
+  // (cidade salva) e sempre que a cidade muda. Sem cidade, volta pro centro do
+  // Brasil. Se o Nominatim falhar, mantemos o ultimo ponto conhecido.
+  useEffect(() => {
+    if (!city) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setCityPoint(null);
+      return;
+    }
+    let ativo = true;
+    geocodeCity(city, uf)
+      .then((ponto) => {
+        if (ativo && ponto) setCityPoint(ponto);
+      })
+      .catch(() => null);
+    return () => {
+      ativo = false;
+    };
+  }, [city, uf]);
+
   // Troca de estado: recarrega cidades (efeito acima) e limpa a cidade escolhida.
   const handleUfChange = useCallback((novaUf: string) => {
     setUf(novaUf);
@@ -235,6 +259,7 @@ export default function BuscarPage() {
     setSaving(true);
     setSaved(false);
     try {
+      // 1) Salva o alvo (como sempre fez).
       await repo.saveProfile({
         niches: niche ? [niche] : profile?.niches ?? [],
         city: city || null,
@@ -244,7 +269,29 @@ export default function BuscarPage() {
         autopilot,
       });
       setSaved(true);
-      setTimeout(() => setSaved(false), 4000);
+      setTimeout(() => setSaved(false), 6000);
+
+      // 2) Dispara o robo na hora. A busca real roda no servidor (GitHub Actions)
+      // e leva 1-2 min, por isso a copy fala "em alguns minutos". Nunca quebra:
+      // se o token nao estiver configurado ou der ruim, o robo busca no proximo
+      // ciclo e a gente avisa de leve.
+      try {
+        const res = await fetch("/api/search/run", { method: "POST" });
+        const data = (await res.json().catch(() => null)) as
+          | { ok: boolean; reason?: string }
+          | null;
+
+        if (data?.ok) {
+          toast.success(
+            "Busca iniciada! Os leads novos vao chegar na sua fila em alguns minutos.",
+          );
+        } else {
+          // sem_token, falha_rede, etc: o alvo ja foi salvo, robo pega no proximo ciclo.
+          toast.message("Alvo salvo. O robo vai buscar no proximo ciclo automatico.");
+        }
+      } catch {
+        toast.message("Alvo salvo. O robo vai buscar no proximo ciclo automatico.");
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao salvar alvo");
     } finally {
@@ -252,13 +299,18 @@ export default function BuscarPage() {
     }
   }, [saving, repo, niche, profile, city, uf, radius, service, autopilot]);
 
-  // Coordenadas para o mapa
+  // Coordenadas para o mapa. Prioridade: cidade geocodificada (zoom 12) ->
+  // primeira zona de cobertura com coordenada -> centro do Brasil.
   const mapCenter = (() => {
+    if (cityPoint) return { lat: cityPoint.lat, lng: cityPoint.lng, zoom: 12 };
     const first = coverage.find((c) => c.center_lat != null && c.center_lng != null);
     if (first) return { lat: first.center_lat!, lng: first.center_lng!, zoom: 12 };
-    if (profile?.city) return BRASIL_CENTER;
     return BRASIL_CENTER;
   })();
+
+  // O MapContainer do react-leaflet so usa center/zoom na montagem. Trocar a key
+  // quando o centro muda remonta o mapa ja na cidade escolhida (recentra de fato).
+  const mapKey = `${mapCenter.lat.toFixed(3)},${mapCenter.lng.toFixed(3)},${mapCenter.zoom}`;
 
   const covFiltered = coverage;
 
@@ -278,8 +330,8 @@ export default function BuscarPage() {
         <div className="fu rounded-[20px] border border-border bg-card p-7 shadow-[var(--shadow)]">
           <div className="mb-1 text-[17px] font-bold">Definir alvo de busca</div>
           <p className="mb-6 text-[13.5px] text-muted-foreground">
-            A captacao roda pela extensao no Google Maps e pelo piloto automatico. Aqui voce define o
-            alvo e acompanha a cobertura.
+            Defina o alvo e clique em buscar pra disparar o garimpo na hora. Ele roda no servidor e
+            os leads novos caem direto na sua fila em alguns minutos.
           </p>
 
           {/* Ramo */}
@@ -454,9 +506,9 @@ export default function BuscarPage() {
             >
               <Check size={18} className="mt-0.5 flex-none text-success" weight="bold" />
               <div className="text-[13.5px] text-ink-2">
-                <strong className="text-ink">Alvo salvo.</strong> A captacao roda pela extensao no
-                Google Maps e pelo piloto automatico quando ligado. Os leads novos chegam direto na
-                fila pra voce revisar.
+                <strong className="text-ink">Alvo salvo e busca disparada.</strong> O garimpo roda no
+                servidor e leva alguns minutos. Os leads novos chegam direto na fila pra voce
+                revisar, sem precisar ficar de olho aqui.
               </div>
             </div>
           )}
@@ -464,7 +516,8 @@ export default function BuscarPage() {
           {/* Nota informativa sempre visivel */}
           <div className="mt-4 flex items-center gap-2 text-[12.5px] text-faint">
             <Info size={14} />
-            A busca nao roda aqui no front. O front define o alvo e mostra a cobertura.
+            A busca roda no servidor e leva 1-2 minutos. Aqui voce define o alvo e acompanha a
+            cobertura.
           </div>
         </div>
 
@@ -505,6 +558,7 @@ export default function BuscarPage() {
             style={{ height: "290px" }}
           >
             <CoverageMap
+              key={mapKey}
               zones={covFiltered}
               centerLat={mapCenter.lat}
               centerLng={mapCenter.lng}
