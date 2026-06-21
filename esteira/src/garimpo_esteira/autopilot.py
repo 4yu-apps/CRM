@@ -51,17 +51,29 @@ def region_key(city: str | None, state: str | None) -> str:
     return slug(f"{city or ''} {state or ''}") or "sem-regiao"
 
 
-def search_term(niche: str, city: str | None, state: str | None) -> str:
-    """Monta a busca sem ambiguidade: 'nicho em Cidade, UF'."""
-    where = ", ".join(p for p in (city, state) if p)
+def search_term(
+    niche: str,
+    city: str | None,
+    state: str | None,
+    neighborhood: str | None = None,
+) -> str:
+    """Monta a busca sem ambiguidade: 'nicho em [Bairro,] Cidade, UF'.
+
+    Quando o dono escolhe um bairro, ele entra no termo pra focar a descoberta
+    naquela regiao; sem bairro, varre a cidade toda como antes.
+    """
+    where = ", ".join(p for p in (neighborhood, city, state) if p)
     return f"{niche} em {where}" if where else niche
 
 
 def generate_terms(
-    niches: Sequence[str], city: str | None, state: str | None
+    niches: Sequence[str],
+    city: str | None,
+    state: str | None,
+    neighborhood: str | None = None,
 ) -> list[tuple[str, str]]:
     """(niche, termo) por nicho do perfil."""
-    return [(n, search_term(n, city, state)) for n in niches if n]
+    return [(n, search_term(n, city, state, neighborhood)) for n in niches if n]
 
 
 def run_autopilot(
@@ -87,6 +99,7 @@ def run_autopilot(
         if not owner:
             continue
         city, state = prof.get("city"), prof.get("state")
+        neighborhood = prof.get("neighborhood")
         rkey = region_key(city, state)
         covered = (
             {(rk, slug(nn)) for rk, nn in sink.fetch_covered_keys(owner)}
@@ -106,36 +119,48 @@ def run_autopilot(
             niches = niches + pool[:extra_niches]
 
         discovered = 0
-        for niche, term in generate_terms(niches, city, state):
+        for niche, term in generate_terms(niches, city, state, neighborhood):
             if (rkey, slug(niche)) in covered:
                 continue  # zona+nicho ja varridos: nunca repete
 
-            inserted = 0
-            for raw in maps_source.search(term):
-                lead, findings = result_to_lead(raw, owner)
-                lead_id = sink.insert_lead(lead)
-                if not lead_id:  # dedup
-                    continue
-                inserted += 1
-                for f in findings:
-                    sink.record_provenance(lead_id, f.field_name, f.source, f.value, f.confidence)
+            try:
+                inserted = 0
+                for raw in maps_source.search(term):
+                    lead, findings = result_to_lead(raw, owner)
+                    lead_id = sink.insert_lead(lead)
+                    if not lead_id:  # dedup
+                        continue
+                    inserted += 1
+                    for f in findings:
+                        sink.record_provenance(lead_id, f.field_name, f.source, f.value, f.confidence)
+            except Exception:
+                # Maps/sink instavel num nicho nao aborta os outros nichos.
+                continue
 
             discovered += inserted
             sink.upsert_coverage(
-                owner, rkey, niche, region_name=(city or None), result_count=inserted
+                owner, rkey, niche, region_name=(neighborhood or city or None), result_count=inserted
             )
             if inserted:
                 sink.log_activity(
                     owner,
                     "busca",
-                    f"Varri {niche} em {city or 'sua regiao'} e achei {inserted} negocios novos",
+                    f"Varri {niche} em {neighborhood or city or 'sua regiao'} e achei {inserted} negocios novos",
                     ref_count=inserted,
                 )
 
-        # pipeline escopado a este dono (nao toca leads de outros usuarios)
-        enrich_batch(sink, sources, batch=batch, delay=delay, owner_id=owner)
-        score_batch(sink, batch=batch, owner_id=owner)
-        draft_batch(sink, provider, batch=batch, owner_id=owner)
+        # Pipeline escopado a este dono (nao toca leads de outros usuarios).
+        # Cada estagio isolado: uma falha no enrich nao impede score/draft, e o
+        # erro de um dono nao bloqueia os proximos donos.
+        for stage in (
+            lambda: enrich_batch(sink, sources, batch=batch, delay=delay, owner_id=owner),
+            lambda: score_batch(sink, batch=batch, owner_id=owner),
+            lambda: draft_batch(sink, provider, batch=batch, owner_id=owner),
+        ):
+            try:
+                stage()
+            except Exception:
+                pass
 
         summary.append({"owner_id": owner, "discovered": discovered})
 

@@ -8,13 +8,14 @@ name: esteira
 
 on:
   schedule:
-    - cron: "0 10 * * *" # 07:00 BRT (manha)
-    - cron: "0 20 * * *" # 17:00 BRT (tarde)
+    # De 2 em 2 horas: lotes pequenos e frequentes drenam a fila "de pouquinho
+    # em pouquinho", sem lote gigante 2x/dia que arrisca estourar a API e empacar.
+    - cron: "0 */2 * * *"
   workflow_dispatch:
     inputs:
       batch:
         description: "Tamanho do lote"
-        default: "20"
+        default: "60"
 
 concurrency:
   group: esteira
@@ -39,9 +40,11 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           OWNER_USER_ID: ${{ secrets.OWNER_USER_ID }}
-          # Lote grande pra o pipeline (enrich/score/draft) dar conta do que a
-          # descoberta traz, senao os leads ficam parados em 'bruto'.
-          GARIMPO_BATCH: ${{ github.event.inputs.batch || vars.GARIMPO_BATCH || '150' }}
+          # Lote enxuto: o pipeline (enrich/score/draft) processa de pouco em
+          # pouco a cada run, com retry/backoff e erro isolado por lead. Roda a
+          # cada 2h, entao a vazao (lote x runs) supera a descoberta e a fila
+          # drena sozinha — sem lote gigante que arrisca estourar a API.
+          GARIMPO_BATCH: ${{ github.event.inputs.batch || vars.GARIMPO_BATCH || '60' }}
           GARIMPO_DELAY: "0.4"
           # Descoberta oficial: Google Places (server-side, sem PC). Enquanto o
           # secret GOOGLE_MAPS_API_KEY nao existir, o autopilot pausa a descoberta
@@ -51,8 +54,10 @@ jobs:
           GARIMPO_MAPS: places
           GARIMPO_MAPS_PAGES: ${{ vars.GARIMPO_MAPS_PAGES || '1' }}
           GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
-          # Nichos extras aleatorios por run (variedade sem o dono pedir).
-          GARIMPO_EXTRA_NICHES: ${{ vars.GARIMPO_EXTRA_NICHES || '2' }}
+          # Nichos extras aleatorios por run (variedade sem o dono pedir). Como
+          # agora roda a cada 2h, 1 basta — descoberta gentil pra nao atropelar
+          # o processamento e deixar a fila drenar.
+          GARIMPO_EXTRA_NICHES: ${{ vars.GARIMPO_EXTRA_NICHES || '1' }}
           # Copy: mock (R$0) por padrao. Variavel de repo GARIMPO_LLM=groq|gemini
           # + o secret correspondente liga a IA de verdade (com fallback pro mock).
           GARIMPO_LLM: ${{ vars.GARIMPO_LLM || 'mock' }}

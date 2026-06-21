@@ -5,9 +5,15 @@ httpx — sem dependência extra. Inerte até existir env (SUPABASE_URL + key).
 """
 from __future__ import annotations
 
+import time
+
 import httpx
 
 from ..models import Lead, LeadStatus
+
+# Status que valem nova tentativa: rate limit (429) e instabilidade do servidor
+# (5xx). 4xx de validacao sobem na hora — retry nao ajudaria.
+_RETRY_STATUSES = {429, 500, 502, 503, 504}
 
 _LEAD_COLS = (
     "id", "owner_id", "status", "business_name", "cnpj", "phone", "email",
@@ -32,6 +38,28 @@ class SupabaseSink:
             },
         )
 
+    def _send(self, method: str, url: str, **kwargs) -> httpx.Response:
+        """Chama o PostgREST com ate 3 tentativas e backoff exponencial (1s, 2s)
+        em 429/5xx e erros de transporte. Mantem o lote vivo quando o Supabase
+        tropeca — um soluco de rede nao prende mais leads em 'bruto'."""
+        delay = 1.0
+        r: httpx.Response | None = None
+        for attempt in range(3):
+            try:
+                r = self._client.request(method, url, **kwargs)
+            except httpx.HTTPError:
+                if attempt == 2:
+                    raise
+                time.sleep(delay)
+                delay *= 2
+                continue
+            if r.status_code in _RETRY_STATUSES and attempt < 2:
+                time.sleep(delay)
+                delay *= 2
+                continue
+            return r
+        return r  # type: ignore[return-value]
+
     def _to_lead(self, row: dict) -> Lead:
         return Lead(**{k: row.get(k) for k in _LEAD_COLS if k in row})
 
@@ -41,17 +69,18 @@ class SupabaseSink:
         params = {"status": f"eq.{status}", "order": "created_at.asc", "limit": str(limit)}
         if owner_id:
             params["owner_id"] = f"eq.{owner_id}"
-        r = self._client.get(f"{self.base}/leads", params=params)
+        r = self._send("GET", f"{self.base}/leads", params=params)
         r.raise_for_status()
         return [self._to_lead(row) for row in r.json()]
 
     def fetch_autopilot_profiles(self) -> list[dict]:
         try:
-            r = self._client.get(
+            r = self._send(
+                "GET",
                 f"{self.base}/search_profile",
                 params={
                     "autopilot": "eq.true",
-                    "select": "owner_id,niches,city,state,radius,default_service_target",
+                    "select": "owner_id,niches,city,state,neighborhood,radius,default_service_target",
                 },
             )
             r.raise_for_status()
@@ -61,7 +90,8 @@ class SupabaseSink:
 
     def fetch_covered_keys(self, owner_id: str) -> list[tuple[str, str]]:
         try:
-            r = self._client.get(
+            r = self._send(
+                "GET",
                 f"{self.base}/scan_coverage",
                 params={"owner_id": f"eq.{owner_id}", "select": "region_key,niche"},
             )
@@ -71,7 +101,7 @@ class SupabaseSink:
             return []
 
     def get_lead(self, lead_id: str) -> Lead | None:
-        r = self._client.get(f"{self.base}/leads", params={"id": f"eq.{lead_id}", "limit": "1"})
+        r = self._send("GET", f"{self.base}/leads", params={"id": f"eq.{lead_id}", "limit": "1"})
         r.raise_for_status()
         rows = r.json()
         return self._to_lead(rows[0]) if rows else None
@@ -79,8 +109,8 @@ class SupabaseSink:
     def insert_lead(self, lead: Lead) -> str | None:
         payload = {k: getattr(lead, k) for k in _LEAD_COLS if k != "id" and getattr(lead, k) is not None}
         payload.setdefault("owner_id", self.owner_id)
-        r = self._client.post(
-            f"{self.base}/leads", json=payload, headers={"Prefer": "return=representation"}
+        r = self._send(
+            "POST", f"{self.base}/leads", json=payload, headers={"Prefer": "return=representation"}
         )
         if r.status_code == 409:  # viola dedup (unique index)
             return None
@@ -89,7 +119,8 @@ class SupabaseSink:
         return rows[0]["id"] if rows else None
 
     def record_provenance(self, lead_id, field_name, source, value, confidence) -> None:
-        r = self._client.post(
+        r = self._send(
+            "POST",
             f"{self.base}/lead_field_provenance",
             params={"on_conflict": "lead_id,field_name,source"},
             headers={"Prefer": "resolution=merge-duplicates"},
@@ -104,17 +135,18 @@ class SupabaseSink:
         clean = {k: v for k, v in fields_.items() if k in _LEAD_COLS}
         if not clean:
             return
-        r = self._client.patch(f"{self.base}/leads", params={"id": f"eq.{lead_id}"}, json=clean)
+        r = self._send("PATCH", f"{self.base}/leads", params={"id": f"eq.{lead_id}"}, json=clean)
         r.raise_for_status()
 
     def fetch_provenance(self, lead_id: str) -> list[dict]:
-        r = self._client.get(f"{self.base}/lead_field_provenance", params={"lead_id": f"eq.{lead_id}"})
+        r = self._send("GET", f"{self.base}/lead_field_provenance", params={"lead_id": f"eq.{lead_id}"})
         r.raise_for_status()
         return r.json()
 
     def set_status(self, lead_id, to_status, actor="system", note=None) -> None:
         # RPC do banco: valida transição + guarda LGPD + grava histórico.
-        r = self._client.post(
+        r = self._send(
+            "POST",
             f"{self.base}/rpc/transition_lead",
             json={"p_lead_id": lead_id, "p_new_status": to_status, "p_actor": actor, "p_note": note},
         )
@@ -127,7 +159,7 @@ class SupabaseSink:
             payload: dict = {"owner_id": owner_id, "tipo": tipo, "text": text}
             if ref_count is not None:
                 payload["ref_count"] = ref_count
-            r = self._client.post(f"{self.base}/activity_log", json=payload)
+            r = self._send("POST", f"{self.base}/activity_log", json=payload)
             r.raise_for_status()
         except Exception:
             pass  # log de atividade nao derruba o pipeline
@@ -158,7 +190,8 @@ class SupabaseSink:
                 payload["center_lat"] = center_lat
             if center_lng is not None:
                 payload["center_lng"] = center_lng
-            r = self._client.post(
+            r = self._send(
+                "POST",
                 f"{self.base}/scan_coverage",
                 params={"on_conflict": "owner_id,region_key,niche"},
                 headers={"Prefer": "resolution=merge-duplicates"},

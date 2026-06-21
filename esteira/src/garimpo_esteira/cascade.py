@@ -59,7 +59,13 @@ def enrich_batch(
     leads = sink.fetch_by_status(status, batch, owner_id)
     results: list[EnrichResult] = []
     for i, lead in enumerate(leads):
-        results.append(enrich_lead(lead, sources, sink))
+        try:
+            results.append(enrich_lead(lead, sources, sink))
+        except Exception:
+            # Um lead (ou um soluco do sink) que falha nao derruba mais o lote:
+            # pula este e segue. O lead fica em 'bruto' e o proximo run tenta de
+            # novo — mas o resto avanca, nunca empaca a fila inteira.
+            pass
         if delay and i < len(leads) - 1:
             time.sleep(delay)
     if results:
