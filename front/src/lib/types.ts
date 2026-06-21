@@ -52,8 +52,12 @@ export interface Lead {
   business_name: string | null;
   cnpj: string | null;
   phone: string | null;
+  // WhatsApp separado do telefone (o fone do Maps nem sempre e o zap).
+  whatsapp?: string | null;
   email: string | null;
   instagram: string | null;
+  // Pagina do Facebook (ponte pro page_id da Meta: "ja anuncia?").
+  facebook?: string | null;
   website: string | null;
 
   maps_place_id: string | null;
@@ -124,8 +128,10 @@ export type LeadEditable = Partial<
     | "business_name"
     | "cnpj"
     | "phone"
+    | "whatsapp"
     | "email"
     | "instagram"
+    | "facebook"
     | "website"
     | "category"
     | "address"

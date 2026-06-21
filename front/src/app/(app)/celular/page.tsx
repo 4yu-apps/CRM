@@ -188,7 +188,7 @@ function LeadCard({ lead, onSent, repo, refresh }: CardProps) {
           {/* botoes de acao */}
           <div className="flex flex-col gap-2.5 px-4 pb-4">
             <a
-              href={waLink(lead.phone, msg)}
+              href={waLink(lead.whatsapp ?? lead.phone, msg)}
               target="_blank"
               rel="noreferrer"
               onClick={handleSendClick}

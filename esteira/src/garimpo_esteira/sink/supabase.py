@@ -16,8 +16,8 @@ from ..models import Lead, LeadStatus
 _RETRY_STATUSES = {429, 500, 502, 503, 504}
 
 _LEAD_COLS = (
-    "id", "owner_id", "status", "business_name", "cnpj", "phone", "email",
-    "instagram", "website", "maps_place_id", "maps_url", "rating", "reviews_count",
+    "id", "owner_id", "status", "business_name", "cnpj", "phone", "whatsapp", "email",
+    "instagram", "facebook", "website", "maps_place_id", "maps_url", "rating", "reviews_count",
     "category", "address", "neighborhood", "city", "state", "owner_name", "opt_out",
     "score", "score_reason", "service_target", "ads_active",
     "suggested_value", "suggested_value_reason",

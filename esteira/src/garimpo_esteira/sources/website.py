@@ -29,6 +29,24 @@ _IG_BAD = re.compile(r"\.(php|js|html?|aspx?|png|jpe?g|gif|svg|css)$|rsrc", re.I
 # e-mails de plataforma/tracking que nao sao contato real
 _EMAIL_JUNK = ("sentry", "wixpress", "example.", "@2x", ".png", ".jpg", "@sentry")
 
+# WhatsApp: link wa.me/<num> ou .../send?phone=<num>. O numero costuma vir com
+# o 55 do Brasil; a normalizacao tira depois.
+_WA_RE = re.compile(
+    r"(?:wa\.me/|(?:api\.)?whatsapp\.com/send/?\?phone=|whatsapp://send\?phone=)(\d{8,15})",
+    re.IGNORECASE,
+)
+# Facebook: pagina do negocio. Captura facebook.com/<slug> e fb.com/<slug>.
+_FB_RE = re.compile(r"(?:facebook\.com|fb\.com)/([A-Za-z0-9_.\-]{2,60})", re.IGNORECASE)
+# caminhos do facebook que nao sao pagina de negocio
+_FB_SKIP = {
+    "sharer", "share", "sharer.php", "dialog", "plugins", "tr", "tr:", "login",
+    "l.php", "help", "policies", "privacy", "terms", "watch", "events", "groups",
+    "story.php", "photo.php", "permalink.php", "profile.php", "pages", "hashtag",
+    "people", "public", "p", "home.php", "recover", "legal",
+}
+# Telefone: pega de links tel: (mais confiavel que texto solto na pagina).
+_TEL_RE = re.compile(r"tel:\+?([\d\s().\-]{8,})", re.IGNORECASE)
+
 
 def _norm_url(url: str) -> str:
     return url if url.startswith(("http://", "https://")) else "https://" + url
@@ -86,6 +104,31 @@ def extract_email(html: str) -> str | None:
     return None
 
 
+def extract_whatsapp(html: str) -> str | None:
+    for num in _WA_RE.findall(html or ""):
+        zap = clean("whatsapp", num)
+        if zap:
+            return zap
+    return None
+
+
+def extract_facebook(html: str) -> str | None:
+    for slug in _FB_RE.findall(html or ""):
+        s = slug.strip("/.").lower()
+        if not s or s in _FB_SKIP or _IG_BAD.search(s):
+            continue
+        return clean("facebook", s)
+    return None
+
+
+def extract_phone(html: str) -> str | None:
+    for raw in _TEL_RE.findall(html or ""):
+        tel = clean("phone", raw)
+        if tel:
+            return tel
+    return None
+
+
 class WebsiteSource:
     name = "website"
 
@@ -109,6 +152,17 @@ class WebsiteSource:
             email = extract_email(html)
             if email:
                 findings.append(Finding("email", self.name, email, 0.5))
+            zap = extract_whatsapp(html)
+            if zap:
+                findings.append(Finding("whatsapp", self.name, zap, 0.7))
+            fb = extract_facebook(html)
+            if fb:
+                findings.append(Finding("facebook", self.name, fb, 0.6))
+            tel = extract_phone(html)
+            if tel:
+                # so vira coluna se o lead ainda nao tem telefone (cascade decide);
+                # aqui a gente registra o achado pra proveniencia.
+                findings.append(Finding("phone", self.name, tel, 0.5))
         elif self._reachable(site):
             findings.append(Finding("website", self.name, site, 0.9))
         return findings

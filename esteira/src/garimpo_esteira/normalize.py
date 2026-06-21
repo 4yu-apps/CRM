@@ -24,6 +24,25 @@ def normalize_phone(value: str | None) -> str | None:
     return d if len(d) in (10, 11) else None
 
 
+def normalize_whatsapp(value: str | None) -> str | None:
+    """WhatsApp BR só dígitos (com DDD). Aceita link wa.me/55..., texto livre ou
+    numero; reusa a regra do telefone (tira +55 quando vier 12/13 díg)."""
+    return normalize_phone(value)
+
+
+def normalize_facebook(value: str | None) -> str | None:
+    """Handle/slug da pagina do Facebook. Extrai de facebook.com/<slug> ou fb.com/
+    <slug>; remove query/barra. Devolve o slug puro (sem dominio) ou None."""
+    if not value:
+        return None
+    v = value.strip()
+    m = re.search(r"(?:facebook\.com|fb\.com|fb\.me)/([^/?#\s]+)", v, re.IGNORECASE)
+    if m:
+        v = m.group(1)
+    v = v.strip("/@").split("?")[0].strip()
+    return v or None
+
+
 def normalize_instagram(value: str | None) -> str | None:
     if not value:
         return None

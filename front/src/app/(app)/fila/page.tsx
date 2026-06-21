@@ -335,7 +335,7 @@ export default function FilaPage() {
             </div>
             <div className="flex flex-col gap-2.5 px-6 pb-6">
               <a
-                href={waLink(sendLead.phone, [sendLead.draft_msg1, sendLead.draft_msg2].filter(Boolean).join("\n\n"))}
+                href={waLink(sendLead.whatsapp ?? sendLead.phone, [sendLead.draft_msg1, sendLead.draft_msg2].filter(Boolean).join("\n\n"))}
                 target="_blank"
                 rel="noreferrer"
                 onClick={markSent}

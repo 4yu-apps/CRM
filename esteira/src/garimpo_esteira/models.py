@@ -21,7 +21,8 @@ ServiceTarget = Literal["trafego", "automacao", "ambos", "indefinido"]
 
 # Campos do lead que as fontes podem preencher (proveniência por campo).
 ENRICHABLE_FIELDS = (
-    "phone", "email", "instagram", "website", "owner_name", "cnpj",
+    "phone", "whatsapp", "email", "instagram", "facebook", "website",
+    "owner_name", "cnpj",
 )
 
 
@@ -43,8 +44,10 @@ class Lead:
     business_name: str | None = None
     cnpj: str | None = None
     phone: str | None = None
+    whatsapp: str | None = None       # WhatsApp separado: telefone nem sempre e o zap
     email: str | None = None
     instagram: str | None = None
+    facebook: str | None = None       # pagina do Facebook (ponte pro page_id da Meta)
     website: str | None = None
 
     maps_place_id: str | None = None

@@ -169,6 +169,11 @@ function waUrl(phone?: string | null): string | undefined {
   if (!d) return undefined;
   return `https://wa.me/${d.startsWith("55") ? d : "55" + d}`;
 }
+function fbUrl(handle?: string | null): string | undefined {
+  const h = (handle ?? "").trim().replace(/^@/, "").replace(/\/+$/, "");
+  if (!h) return undefined;
+  return /^https?:\/\//i.test(h) ? h : `https://facebook.com/${h}`;
+}
 
 // ---------------------------------------------------------------------------
 // Estado de loading / erro / nao encontrado
@@ -237,8 +242,10 @@ export default function FichaPage() {
     setForm({
       business_name: lead.business_name ?? "",
       phone: lead.phone ?? "",
+      whatsapp: lead.whatsapp ?? "",
       email: lead.email ?? "",
       instagram: lead.instagram ?? "",
+      facebook: lead.facebook ?? "",
       website: lead.website ?? "",
       category: lead.category ?? "",
       address: lead.address ?? "",
@@ -362,7 +369,7 @@ export default function FichaPage() {
   const toneClass = TONE_CLASSES[statusMeta.tone];
 
   const waLink = (text: string) => {
-    const d = (lead.phone ?? "").replace(/\D/g, "");
+    const d = (lead.whatsapp ?? lead.phone ?? "").replace(/\D/g, "");
     const num = d.length >= 12 ? d : `55${d}`;
     return `https://wa.me/${num}?text=${encodeURIComponent(text)}`;
   };
@@ -457,8 +464,10 @@ export default function FichaPage() {
                 <EditField label="Nome do negocio" value={form.business_name ?? ""} onChange={(v) => setForm((f) => ({ ...f, business_name: v }))} prov={provOf(provenance, "business_name")} />
                 <EditField label="Dono / responsavel" value={form.owner_name ?? ""} onChange={(v) => setForm((f) => ({ ...f, owner_name: v }))} prov={provOf(provenance, "owner_name")} />
                 <EditField label="Telefone" value={form.phone ?? ""} onChange={(v) => setForm((f) => ({ ...f, phone: v }))} placeholder="(11) 99999-9999" prov={provOf(provenance, "phone")} />
+                <EditField label="WhatsApp" value={form.whatsapp ?? ""} onChange={(v) => setForm((f) => ({ ...f, whatsapp: v }))} placeholder="(11) 99999-9999" prov={provOf(provenance, "whatsapp")} />
                 <EditField label="E-mail" value={form.email ?? ""} onChange={(v) => setForm((f) => ({ ...f, email: v }))} prov={provOf(provenance, "email")} />
                 <EditField label="Instagram" value={form.instagram ?? ""} onChange={(v) => setForm((f) => ({ ...f, instagram: v }))} placeholder="@handle" prov={provOf(provenance, "instagram")} />
+                <EditField label="Facebook" value={form.facebook ?? ""} onChange={(v) => setForm((f) => ({ ...f, facebook: v }))} placeholder="pagina ou link" prov={provOf(provenance, "facebook")} />
                 <EditField label="Website" value={form.website ?? ""} onChange={(v) => setForm((f) => ({ ...f, website: v }))} prov={provOf(provenance, "website")} />
                 <EditField label="Categoria" value={form.category ?? ""} onChange={(v) => setForm((f) => ({ ...f, category: v }))} prov={provOf(provenance, "category")} />
                 <EditField label="Endereco" value={form.address ?? ""} onChange={(v) => setForm((f) => ({ ...f, address: v }))} prov={provOf(provenance, "address")} />
@@ -485,9 +494,11 @@ export default function FichaPage() {
             ) : (
               <div className="rounded-[14px] border border-border">
                 <DataRow label="Dono / responsavel" value={lead.owner_name ?? "-"} prov={provOf(provenance, "owner_name")} />
-                <DataRow label="Telefone" value={fmtPhone(lead.phone)} href={waUrl(lead.phone)} prov={provOf(provenance, "phone")} />
+                <DataRow label="Telefone" value={fmtPhone(lead.phone)} href={waUrl(lead.whatsapp ?? lead.phone)} prov={provOf(provenance, "phone")} />
+                <DataRow label="WhatsApp" value={lead.whatsapp ? fmtPhone(lead.whatsapp) : "-"} href={waUrl(lead.whatsapp)} prov={provOf(provenance, "whatsapp")} />
                 <DataRow label="E-mail" value={lead.email ?? "-"} href={mailUrl(lead.email)} prov={provOf(provenance, "email")} />
                 <DataRow label="Instagram" value={lead.instagram ?? "-"} href={igUrl(lead.instagram)} prov={provOf(provenance, "instagram")} />
+                <DataRow label="Facebook" value={lead.facebook ?? "-"} href={fbUrl(lead.facebook)} prov={provOf(provenance, "facebook")} />
                 <DataRow label="CNPJ" value={fmtCnpj(lead.cnpj)} prov={provOf(provenance, "cnpj")} />
                 <DataRow label="Site" value={lead.website ? lead.website : "Nao tem"} href={siteUrl(lead.website)} prov={provOf(provenance, "website")} />
                 <DataRow label="Ja anuncia?" value={lead.ads_active == null ? "Nao sei" : lead.ads_active ? "Sim" : "Ainda nao"} />
