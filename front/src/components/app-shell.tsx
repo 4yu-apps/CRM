@@ -20,6 +20,8 @@ import {
   Bell,
   VideoCamera,
   MapPin,
+  CaretLeft,
+  CaretRight,
 } from "@phosphor-icons/react";
 import { useAuth } from "@/lib/auth";
 import { useLeads } from "@/hooks/use-leads";
@@ -235,7 +237,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   };
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+    try {
+      setCollapsed(localStorage.getItem("gp-sidebar-collapsed") === "1");
+    } catch {
+      /* sem localStorage: fica expandida */
+    }
+  }, []);
+  const toggleCollapsed = () =>
+    setCollapsed((c) => {
+      const next = !c;
+      try {
+        localStorage.setItem("gp-sidebar-collapsed", next ? "1" : "0");
+      } catch {
+        /* ignora */
+      }
+      return next;
+    });
 
   const queue = leads.filter((l) => l.status === "rascunho_pronto").length;
   const [title, sub] = titleFor(pathname);
@@ -245,20 +265,31 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <nav className={cn("flex flex-col gap-0.5", extra)}>
       {NAV.map(({ href, label, Icon }) => {
         const active = isActive(pathname, href);
+        const badge = href === "/fila" && queue > 0;
         return (
           <Link
             key={href}
             href={href}
+            title={collapsed ? label : undefined}
             className={cn(
-              "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+              "flex items-center gap-3 rounded-xl py-2.5 text-sm font-medium transition-colors",
+              collapsed ? "justify-center px-0" : "px-3",
               active
                 ? "bg-accent font-bold text-brand"
                 : "text-ink-2 hover:bg-accent/60",
             )}
           >
-            <Icon size={19} weight={active ? "fill" : "regular"} />
-            <span className="flex-1">{label}</span>
-            {href === "/fila" && queue > 0 && (
+            <span className="relative flex flex-none">
+              <Icon size={19} weight={active ? "fill" : "regular"} />
+              {badge && collapsed && (
+                <span
+                  className="absolute -right-1.5 -top-1.5 size-2.5 rounded-full ring-2 ring-card"
+                  style={{ background: "var(--grad)" }}
+                />
+              )}
+            </span>
+            {!collapsed && <span className="flex-1">{label}</span>}
+            {!collapsed && badge && (
               <span
                 className="flex h-[21px] min-w-[21px] items-center justify-center rounded-full px-1.5 text-[11.5px] font-bold text-white"
                 style={{ background: "var(--grad)" }}
@@ -274,54 +305,104 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
-      {/* sidebar desktop */}
-      <aside className="hidden w-[250px] flex-none flex-col border-r border-border bg-card px-3.5 py-5 lg:flex">
-        <div className="px-1 pb-5.5">
-          <span className="inline-flex items-center rounded-xl bg-zinc-950 px-3 py-2 shadow-sm">
-            <Image src="/logo.png" alt="4YUmkt" width={1080} height={419} priority className="h-7 w-auto" />
-          </span>
+      {/* sidebar desktop (retratil) */}
+      <aside
+        className={cn(
+          "hidden flex-none flex-col border-r border-border bg-card py-5 transition-[width] duration-200 ease-out lg:flex",
+          collapsed ? "w-[76px] px-2.5" : "w-[250px] px-3.5",
+        )}
+      >
+        <div className={cn("flex items-center pb-5.5", collapsed ? "flex-col gap-2.5" : "justify-between px-1")}>
+          {!collapsed && (
+            <span className="inline-flex items-center rounded-xl bg-zinc-950 px-3 py-2 shadow-sm">
+              <Image src="/logo.png" alt="4YUmkt" width={1080} height={419} priority className="h-7 w-auto" />
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={toggleCollapsed}
+            aria-label={collapsed ? "Expandir menu" : "Retrair menu"}
+            title={collapsed ? "Expandir menu" : "Retrair menu"}
+            className="flex size-9 flex-none items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            {collapsed ? <CaretRight size={16} weight="bold" /> : <CaretLeft size={16} weight="bold" />}
+          </button>
         </div>
 
         {nav()}
 
         <div className="mt-auto flex flex-col gap-3">
-          <div className="flex items-center justify-between rounded-xl bg-[var(--inset)] px-2.5 py-2">
-            <span className="text-[13px] font-semibold text-muted-foreground">
-              Tema {isDark ? "escuro" : "claro"}
-            </span>
+          {collapsed ? (
             <button
               type="button"
               aria-label="Alternar tema"
+              title={`Tema ${isDark ? "escuro" : "claro"}`}
               onClick={() => setTheme(isDark ? "light" : "dark")}
-              className="flex h-[26px] w-[46px] items-center rounded-full p-[3px]"
-              style={{ background: "var(--grad)", justifyContent: isDark ? "flex-end" : "flex-start" }}
+              className="flex size-10 items-center justify-center self-center rounded-xl bg-[var(--inset)] text-brand-600 transition-colors hover:bg-accent"
             >
-              <span className="flex size-5 items-center justify-center rounded-full bg-white text-brand-600">
-                {isDark ? <Moon size={12} weight="fill" /> : <Sun size={12} weight="fill" />}
+              {isDark ? <Moon size={16} weight="fill" /> : <Sun size={16} weight="fill" />}
+            </button>
+          ) : (
+            <div className="flex items-center justify-between rounded-xl bg-[var(--inset)] px-2.5 py-2">
+              <span className="text-[13px] font-semibold text-muted-foreground">
+                Tema {isDark ? "escuro" : "claro"}
               </span>
-            </button>
-          </div>
-          <div className="flex items-center gap-2 px-2.5 py-2">
-            <div
-              className="flex size-9 flex-none items-center justify-center rounded-full text-sm font-bold text-white"
-              style={{ background: "var(--grad)" }}
-            >
-              {(user?.email ?? "?").slice(0, 2).toUpperCase()}
+              <button
+                type="button"
+                aria-label="Alternar tema"
+                onClick={() => setTheme(isDark ? "light" : "dark")}
+                className="flex h-[26px] w-[46px] items-center rounded-full p-[3px]"
+                style={{ background: "var(--grad)", justifyContent: isDark ? "flex-end" : "flex-start" }}
+              >
+                <span className="flex size-5 items-center justify-center rounded-full bg-white text-brand-600">
+                  {isDark ? <Moon size={12} weight="fill" /> : <Sun size={12} weight="fill" />}
+                </span>
+              </button>
             </div>
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-bold">{user?.email ?? "demo"}</div>
-              <div className="text-xs text-faint">Conta ativa</div>
+          )}
+
+          {collapsed ? (
+            <div className="flex flex-col items-center gap-2">
+              <div
+                className="flex size-9 flex-none items-center justify-center rounded-full text-sm font-bold text-white"
+                style={{ background: "var(--grad)" }}
+                title={user?.email ?? "demo"}
+              >
+                {(user?.email ?? "?").slice(0, 2).toUpperCase()}
+              </div>
+              <button
+                type="button"
+                aria-label="Sair"
+                onClick={handleSignOut}
+                className="flex-none rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-accent/80 hover:text-foreground"
+                title="Sair"
+              >
+                <SignOut size={16} />
+              </button>
             </div>
-            <button
-              type="button"
-              aria-label="Sair"
-              onClick={handleSignOut}
-              className="flex-none rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-accent/80 hover:text-foreground"
-              title="Sair"
-            >
-              <SignOut size={16} />
-            </button>
-          </div>
+          ) : (
+            <div className="flex items-center gap-2 px-2.5 py-2">
+              <div
+                className="flex size-9 flex-none items-center justify-center rounded-full text-sm font-bold text-white"
+                style={{ background: "var(--grad)" }}
+              >
+                {(user?.email ?? "?").slice(0, 2).toUpperCase()}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-bold">{user?.email ?? "demo"}</div>
+                <div className="text-xs text-faint">Conta ativa</div>
+              </div>
+              <button
+                type="button"
+                aria-label="Sair"
+                onClick={handleSignOut}
+                className="flex-none rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-accent/80 hover:text-foreground"
+                title="Sair"
+              >
+                <SignOut size={16} />
+              </button>
+            </div>
+          )}
         </div>
       </aside>
 

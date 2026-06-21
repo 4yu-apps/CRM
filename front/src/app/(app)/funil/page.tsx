@@ -811,7 +811,7 @@ export default function FunilPage() {
 
   return (
     <div
-      className="mx-auto max-w-[1240px]"
+      className="mx-auto w-full max-w-[1760px]"
       onDragEnd={handleDragEnd}
     >
       {/* Instrucao */}
@@ -820,13 +820,14 @@ export default function FunilPage() {
         Arraste o card, ou toque nos 3 pontinhos pra mover. No celular, deslize as colunas de lado.
       </div>
 
-      {/* Colunas. No mobile (estilo Trello): scroll horizontal com snap, uma
-          coluna por vez. No desktop: grade de 7. */}
-      <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-3 lg:grid lg:grid-cols-7 lg:gap-3.5 lg:overflow-x-visible lg:pb-0">
+      {/* Colunas estilo Trello: largura fixa e scroll horizontal em qualquer
+          tamanho. As colunas da direita (arquivados etc.) ficam fora da tela e
+          aparecem ao rolar de lado — sem apertar os cards. */}
+      <div className="flex snap-x snap-mandatory gap-3.5 overflow-x-auto pb-3 lg:snap-none">
         {KANBAN_COLUMNS.map((col) => (
           <div
             key={col.id}
-            className="w-[82vw] shrink-0 snap-start sm:w-[55vw] lg:w-auto lg:shrink"
+            className="w-[82vw] shrink-0 snap-start sm:w-[300px]"
           >
             <FunnelColumn
               col={col}
