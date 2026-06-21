@@ -3,23 +3,25 @@
 import type { LeadStatus } from "./types";
 
 // Transicoes permitidas. Igual ao seed em supabase/migrations/...04_transitions.sql.
+// Inclui as transicoes "forward" do kanban (arrastar o card pra frente, pulando
+// estagios) e a reativacao pra Novo (rascunho_pronto), visivel no funil.
 export const TRANSITIONS: Record<LeadStatus, LeadStatus[]> = {
   bruto: ["enriquecido", "descartado"],
   enriquecido: ["qualificado", "descartado"],
   qualificado: ["rascunho_pronto", "descartado"],
   rascunho_pronto: ["aprovado", "descartado"],
-  aprovado: ["enviado"],
-  enviado: ["respondeu", "sem_resposta", "descartado"],
+  aprovado: ["enviado", "respondeu", "interessado", "reuniao", "fechado"],
+  enviado: ["respondeu", "sem_resposta", "descartado", "interessado", "reuniao", "fechado"],
   sem_resposta: ["enviado", "descartado"],
-  respondeu: ["interessado", "sem_interesse", "reuniao"],
-  interessado: ["reuniao", "proposta", "perdido"],
-  reuniao: ["proposta", "perdido"],
+  respondeu: ["interessado", "sem_interesse", "reuniao", "fechado"],
+  interessado: ["reuniao", "proposta", "perdido", "fechado"],
+  reuniao: ["proposta", "perdido", "fechado"],
   proposta: ["fechado", "perdido"],
-  // descartado pode ser reativado (volta pro funil). Os outros sao terminais.
-  descartado: ["enriquecido"],
-  sem_interesse: [],
+  // arquivados (descartado/sem_interesse/perdido) reativam pra Novo (visivel).
+  descartado: ["enriquecido", "rascunho_pronto"],
+  sem_interesse: ["rascunho_pronto"],
   fechado: [],
-  perdido: [],
+  perdido: ["rascunho_pronto"],
 };
 
 // Status que sao "contato": bloqueados pela guarda LGPD quando opt_out=true.
@@ -81,6 +83,9 @@ const TRANSITION_LABELS: Record<string, string> = {
   "aprovado->enviado": "Marcar enviado",
   "sem_resposta->enviado": "Reenviar (follow-up)",
   "descartado->enriquecido": "Reativar",
+  "descartado->rascunho_pronto": "Reativar",
+  "sem_interesse->rascunho_pronto": "Reativar",
+  "perdido->rascunho_pronto": "Reativar",
 };
 
 export function transitionLabel(from: LeadStatus, to: LeadStatus): string {

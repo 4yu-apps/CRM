@@ -500,16 +500,18 @@ export default function FunilPage() {
       const fromArchived = getColumnForLead(lead)?.isArchived;
 
       if (fromArchived) {
-        // Arrastar pra fora de arquivados
+        // Arrastar pra fora de arquivados: volta pra Novo (rascunho_pronto),
+        // VISIVEL no kanban. Antes ia pra 'enriquecido' (status interno) e o
+        // card sumia da tela.
         try {
           await repo.setArchived(lead.id, false);
-          if (lead.status === "descartado") {
-            // Reativar via transicao
-            await repo.transition(lead.id, "enriquecido", "human");
+          if (ARCHIVED_STATUSES.includes(lead.status)) {
+            await repo.transition(lead.id, "rascunho_pronto", "human");
           }
           await refresh();
-          toast.success("Lead reativado.");
+          toast.success("Lead reativado, voltou pra Novo.");
         } catch (e) {
+          await refresh(); // nunca deixa o card sumir: ressincroniza com o real
           toast.error(e instanceof Error ? e.message : "Erro ao reativar lead");
         }
         return;

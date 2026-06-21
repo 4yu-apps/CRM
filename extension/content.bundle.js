@@ -154,7 +154,10 @@
     interessado: ["reuniao", "proposta", "perdido"],
     reuniao: ["proposta", "perdido"],
     proposta: ["fechado", "perdido"],
-    descartado: ["enriquecido"],
+    // reativar volta pra Novo (visivel). O banco tambem aceita os pulos forward do
+    // kanban (front) e reativar sem_interesse/perdido; aqui os botoes seguem o
+    // fluxo passo a passo do WhatsApp, entao so o descartado tem reativar.
+    descartado: ["rascunho_pronto"],
     sem_interesse: [],
     fechado: [],
     perdido: []
@@ -201,7 +204,9 @@
     "aprovado->enviado": "Marquei enviado",
     "sem_resposta->enviado": "Reenviei (follow-up)",
     "sem_resposta->descartado": "Descartar",
-    "descartado->enriquecido": "Reativar"
+    "descartado->rascunho_pronto": "Reativar",
+    "sem_interesse->rascunho_pronto": "Reativar",
+    "perdido->rascunho_pronto": "Reativar"
   };
   var CONTACT_STATUSES = /* @__PURE__ */ new Set(["rascunho_pronto", "aprovado", "enviado"]);
   function transitionLabel(from, to) {

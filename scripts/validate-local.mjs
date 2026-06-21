@@ -63,11 +63,15 @@ const run = async () => {
   labels.length === 15 ? ok(`enum lead_status (15 estados)`) : bad(`enum lead_status = ${labels.length}/15`)
 
   const [{ n }] = await one('select count(*)::int n from public.lead_status_transitions')
-  n === 25 ? ok(`25 transicoes seedadas`) : bad(`transicoes = ${n}/25`)
+  n === 38 ? ok(`38 transicoes seedadas`) : bad(`transicoes = ${n}/38`)
 
   const react = await one(
-    `select 1 from public.lead_status_transitions where from_status='descartado' and to_status='enriquecido'`)
-  react.length ? ok('transicao reativar (descartado -> enriquecido)') : bad('transicao reativar AUSENTE')
+    `select 1 from public.lead_status_transitions where from_status='descartado' and to_status='rascunho_pronto'`)
+  react.length ? ok('reativar arquivado volta pra Novo (descartado -> rascunho_pronto)') : bad('transicao reativar AUSENTE')
+
+  const fwd = await one(
+    `select 1 from public.lead_status_transitions where from_status='aprovado' and to_status='reuniao'`)
+  fwd.length ? ok('transicao forward do kanban (aprovado -> reuniao)') : bad('transicao forward AUSENTE')
 
   const archivedCol = await one(
     `select 1 from information_schema.columns where table_name='leads' and column_name='archived'`)
@@ -115,6 +119,11 @@ const run = async () => {
     `select table_name from information_schema.tables where table_schema='public' and table_name = any($1)`,
     [newTables])).map(r => r.table_name)
   for (const t of newTables) newTablesGot.includes(t) ? ok(`tabela ${t}`) : bad(`tabela ${t} AUSENTE`)
+
+  // onboarding por profissao: search_profile.profession
+  const profCol = await one(
+    `select 1 from information_schema.columns where table_name='search_profile' and column_name='profession'`)
+  profCol.length ? ok('coluna search_profile.profession (onboarding)') : bad('coluna profession AUSENTE')
 
   // enum activity_type (5 labels)
   const atLabels = (await one(
