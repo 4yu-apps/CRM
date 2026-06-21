@@ -13,7 +13,7 @@ import {
   type Icon,
 } from "@phosphor-icons/react";
 
-import type { ServiceTarget } from "./types";
+import type { SearchProfile, ServiceTarget } from "./types";
 
 export interface Profession {
   /** Identificador estavel, guardado no perfil (search_profile.profession). */
@@ -102,4 +102,23 @@ export const PROFESSIONS: Profession[] = [
 export function getProfession(id: string | null | undefined): Profession | undefined {
   if (!id) return undefined;
   return PROFESSIONS.find((p) => p.id === id);
+}
+
+// Opcoes de servico-alvo que fazem sentido pra profissao do dono. Em vez de
+// mostrar sempre trafego/automacao/ambos, reflete o perfil configurado:
+//  - "ambos"     -> as 3 opcoes (toggle de verdade)
+//  - "trafego"   -> so trafego (servico fixo, sem escolha)
+//  - "automacao" -> so automacao (servico fixo, sem escolha)
+//  - "indefinido" (design/ux/marketing/branding/web) -> [] : sem servico-alvo,
+//    a busca capta so pelo nicho (o controle some na tela).
+export function serviceOptionsForProfile(
+  profile: Pick<SearchProfile, "profession" | "default_service_target"> | null,
+): ServiceTarget[] {
+  const base =
+    getProfession(profile?.profession)?.defaultService ??
+    profile?.default_service_target ??
+    "trafego";
+  if (base === "ambos") return ["trafego", "automacao", "ambos"];
+  if (base === "indefinido") return [];
+  return [base];
 }

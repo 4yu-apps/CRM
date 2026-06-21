@@ -111,6 +111,15 @@ async function saveProfile(input: SearchProfileInput): Promise<SearchProfile> {
   return data as SearchProfile;
 }
 
+async function countByStatus(status?: LeadStatus): Promise<number> {
+  // head:true + count:exact traz so a contagem (sem linhas). RLS escopa ao dono.
+  let q = getSupabase().from("leads").select("id", { count: "exact", head: true });
+  if (status) q = q.eq("status", status);
+  const { count, error } = await q;
+  if (error) throw new Error(error.message);
+  return count ?? 0;
+}
+
 async function listCoverage(niche?: string): Promise<ScanCoverage[]> {
   let q = getSupabase()
     .from("scan_coverage")
@@ -143,6 +152,7 @@ export const supabaseRepo: LeadsRepo = {
   remove,
   getProfile,
   saveProfile,
+  countByStatus,
   listCoverage,
   listActivity,
 };

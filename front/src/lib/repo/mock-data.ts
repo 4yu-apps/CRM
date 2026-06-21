@@ -476,6 +476,7 @@ export const DEMO_PROFILE: SearchProfile = {
   niches: ["Hamburgueria", "Barbearia", "Estetica", "Restaurante", "Petshop"],
   city: "Maringa",
   state: "PR",
+  neighborhood: null,
   radius: "10km",
   default_service_target: "trafego",
   autopilot: false,

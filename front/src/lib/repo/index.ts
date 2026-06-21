@@ -23,6 +23,9 @@ export interface LeadsRepo {
   getProfile(): Promise<SearchProfile | null>;
   /** Upsert do perfil de busca: cria se nao existe, atualiza se ja existe. */
   saveProfile(input: SearchProfileInput): Promise<SearchProfile>;
+  /** Conta leads do dono, opcionalmente por status. Leve (sem trazer linhas);
+   *  usado pelo acompanhamento ao vivo da busca. */
+  countByStatus(status?: LeadStatus): Promise<number>;
   /** Lista zonas de cobertura, filtrando por nicho se informado, mais recentes primeiro. */
   listCoverage(niche?: string): Promise<ScanCoverage[]>;
   /** Ultimos N eventos de atividade, mais recentes primeiro. Padrao: 20. */

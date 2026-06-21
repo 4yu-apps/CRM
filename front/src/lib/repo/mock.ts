@@ -168,6 +168,10 @@ async function saveProfile(input: SearchProfileInput): Promise<SearchProfile> {
   return clone(store.profile);
 }
 
+async function countByStatus(status?: LeadStatus): Promise<number> {
+  return status ? store.leads.filter((l) => l.status === status).length : store.leads.length;
+}
+
 async function listCoverage(niche?: string): Promise<ScanCoverage[]> {
   const items = niche
     ? store.coverage.filter((c) => c.niche === niche)
@@ -196,6 +200,7 @@ export const mockRepo: LeadsRepo = {
   remove,
   getProfile,
   saveProfile,
+  countByStatus,
   listCoverage,
   listActivity,
 };

@@ -157,6 +157,9 @@ export interface SearchProfile {
   niches: string[];
   city: string | null;
   state: string | null;
+  // Bairro/zona opcional pra focar a busca (ex: "Zona 7"). Em branco = cidade
+  // toda. Recentra o mapa e entra no termo de busca do robo.
+  neighborhood: string | null;
   radius: string;                 // "5km" | "10km" | "25km" | "50km" | "cidade"
   default_service_target: ServiceTarget;
   autopilot: boolean;
@@ -168,7 +171,7 @@ export interface SearchProfile {
   updated_at: string;
 }
 export type SearchProfileInput = Partial<Pick<SearchProfile,
-  "niches" | "city" | "state" | "radius" | "default_service_target" | "autopilot" | "profession">>;
+  "niches" | "city" | "state" | "neighborhood" | "radius" | "default_service_target" | "autopilot" | "profession">>;
 
 // Cobertura de varredura por regiao/nicho (scan_coverage).
 export interface ScanCoverage {

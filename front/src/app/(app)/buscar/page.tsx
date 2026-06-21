@@ -1,19 +1,21 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { toast } from "sonner";
 import {
-  Check,
+  ArrowRight,
   Info,
   MagnifyingGlass,
   MapTrifold,
-  Robot,
   Shuffle,
   Spinner,
 } from "@phosphor-icons/react";
 import { getRepo } from "@/lib/repo";
 import { fetchEstados, fetchMunicipios, type Municipio, type UF } from "@/lib/ibge";
-import { geocodeCity, type GeoPoint } from "@/lib/geocode";
+import { geocodeCity, geocodeNeighborhood, type GeoPoint } from "@/lib/geocode";
+import { serviceOptionsForProfile } from "@/lib/professions";
+import { SERVICE_META } from "@/lib/service";
 import type { ScanCoverage, SearchProfile, ServiceTarget } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -53,6 +55,22 @@ const RADIUS_OPTIONS = [
   { value: "cidade", label: "Cidade toda" },
 ];
 
+// Chave de regiao igual a do robo (autopilot.region_key): cidade + estado sem
+// acento. Usada pra filtrar a cobertura pela cidade escolhida na tela.
+function slugRegion(city: string | null, state: string | null): string {
+  const base = `${city ?? ""} ${state ?? ""}`
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return base || "sem-regiao";
+}
+
+function rnd<T>(arr: readonly T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
 function pctColor(pct: number): string {
   if (pct >= 70) return "#7C3AED";
   if (pct >= 30) return "#9B6BE8";
@@ -60,66 +78,37 @@ function pctColor(pct: number): string {
   return "#b9b2c4";
 }
 
+// Toggle de servico-alvo. As opcoes vem do perfil (serviceOptionsForProfile):
+// quem faz "ambos" ve as 3; perfis de servico unico nem chegam aqui (mostram
+// rotulo fixo); perfis "indefinido" escondem o controle.
 function ServiceToggle({
   value,
+  options,
   onChange,
 }: {
   value: ServiceTarget;
+  options: ServiceTarget[];
   onChange: (v: ServiceTarget) => void;
 }) {
-  const opts: { v: ServiceTarget; label: string }[] = [
-    { v: "trafego", label: "Trafego" },
-    { v: "automacao", label: "Automacao" },
-    { v: "ambos", label: "Ambos" },
-  ];
   return (
     <div className="flex overflow-hidden rounded-xl border border-border-2">
-      {opts.map((o) => (
+      {options.map((v) => (
         <button
-          key={o.v}
+          key={v}
           type="button"
-          onClick={() => onChange(o.v)}
+          onClick={() => onChange(v)}
           className={cn(
             "flex-1 py-2.5 text-sm font-semibold transition-colors",
-            value === o.v
+            value === v
               ? "text-white"
               : "bg-surface-2 text-muted-foreground hover:bg-brand-50 hover:text-brand",
           )}
-          style={value === o.v ? { background: "var(--grad)" } : undefined}
+          style={value === v ? { background: "var(--grad)" } : undefined}
         >
-          {o.label}
+          {SERVICE_META[v].short}
         </button>
       ))}
     </div>
-  );
-}
-
-function AutopilotToggle({
-  value,
-  onChange,
-}: {
-  value: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={value}
-      onClick={() => onChange(!value)}
-      className={cn(
-        "relative h-7 w-12 flex-none rounded-full border-none transition-all",
-        value ? "" : "bg-[var(--inset)]",
-      )}
-      style={value ? { background: "var(--grad)" } : undefined}
-    >
-      <span
-        className={cn(
-          "absolute top-[3px] h-[22px] w-[22px] rounded-full bg-white shadow transition-all",
-          value ? "left-[22px]" : "left-[3px]",
-        )}
-      />
-    </button>
   );
 }
 
@@ -137,22 +126,31 @@ export default function BuscarPage() {
   const [neighborhood, setNeighborhood] = useState("");
   const [radius, setRadius] = useState("10km");
   const [service, setService] = useState<ServiceTarget>("trafego");
-  const [autopilot, setAutopilot] = useState(false);
 
   // Listas vindas do IBGE para os selects em cascata
   const [estados, setEstados] = useState<UF[]>([]);
   const [municipios, setMunicipios] = useState<Municipio[]>([]);
   const [loadingCidades, setLoadingCidades] = useState(false);
 
-  // Estado de submit
+  // Estado de submit + acompanhamento ao vivo da busca
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [baseline, setBaseline] = useState<{ total: number; ready: number } | null>(null);
+  const [found, setFound] = useState<{ novos: number; prontos: number }>({ novos: 0, prontos: 0 });
 
   // Filtro de nicho no mapa
   const [mapNiche, setMapNiche] = useState<string | undefined>(undefined);
 
-  // Ponto geocodificado da cidade escolhida (pra dar zoom no mapa).
+  // Ponto geocodificado da regiao escolhida (cidade ou bairro) pra dar zoom.
   const [cityPoint, setCityPoint] = useState<GeoPoint | null>(null);
+
+  // Opcoes de servico-alvo conforme a profissao configurada no perfil.
+  const serviceOpts = useMemo(() => serviceOptionsForProfile(profile), [profile]);
+
+  // Nichos oferecidos: os do perfil primeiro, depois o catalogo geral (sem repetir).
+  const nicheOptions = useMemo(() => {
+    return Array.from(new Set([...(profile?.niches ?? []), ...NICHE_OPTIONS]));
+  }, [profile]);
 
   const load = useCallback(async () => {
     try {
@@ -162,9 +160,14 @@ export default function BuscarPage() {
         setNiche(p.niches[0] ?? "");
         setUf(p.state ?? "");
         setCity(p.city ?? "");
+        setNeighborhood(p.neighborhood ?? "");
         setRadius(p.radius ?? "10km");
-        setService(p.default_service_target ?? "trafego");
-        setAutopilot(p.autopilot ?? false);
+        // servico-alvo coerente com o perfil
+        const opts = serviceOptionsForProfile(p);
+        const saved = p.default_service_target ?? "trafego";
+        setService(
+          opts.length === 0 ? "indefinido" : opts.includes(saved) ? saved : opts[0],
+        );
       }
       setCoverage(cov);
     } catch (e) {
@@ -172,7 +175,7 @@ export default function BuscarPage() {
     } finally {
       setLoading(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -184,7 +187,7 @@ export default function BuscarPage() {
   useEffect(() => {
     if (loading) return;
     repo.listCoverage(mapNiche).then(setCoverage).catch(() => null);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapNiche]);
 
   // Carrega a lista de estados do IBGE uma vez, ao montar.
@@ -193,8 +196,6 @@ export default function BuscarPage() {
   }, []);
 
   // Carrega as cidades sempre que a UF muda. Se a UF ficar vazia, limpa a lista.
-  // O setState sincrono aqui so zera a lista quando nao ha estado, fluxo de
-  // sincronizacao com a selecao do usuario, por isso o disable abaixo.
   useEffect(() => {
     if (!uf) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -218,9 +219,9 @@ export default function BuscarPage() {
     };
   }, [uf]);
 
-  // Geocodifica a cidade escolhida pra centralizar o mapa nela. Roda na carga
-  // (cidade salva) e sempre que a cidade muda. Sem cidade, volta pro centro do
-  // Brasil. Se o Nominatim falhar, mantemos o ultimo ponto conhecido.
+  // Recentra o mapa em TEMPO REAL conforme estado, cidade ou bairro mudam — sem
+  // precisar clicar em buscar. Com bairro, geocodifica o bairro (zoom mais
+  // fino); sem bairro, a cidade. O bairro usa debounce porque e campo de texto.
   useEffect(() => {
     if (!city) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -228,15 +229,56 @@ export default function BuscarPage() {
       return;
     }
     let ativo = true;
-    geocodeCity(city, uf)
-      .then((ponto) => {
+    const bairro = neighborhood.trim();
+    const buscar = () => {
+      const p = bairro ? geocodeNeighborhood(bairro, city, uf) : geocodeCity(city, uf);
+      p.then((ponto) => {
         if (ativo && ponto) setCityPoint(ponto);
-      })
-      .catch(() => null);
+      }).catch(() => null);
+    };
+    // bairro: espera o usuario parar de digitar; cidade: na hora.
+    const t = setTimeout(buscar, bairro ? 600 : 0);
     return () => {
       ativo = false;
+      clearTimeout(t);
     };
-  }, [city, uf]);
+  }, [city, uf, neighborhood]);
+
+  // Acompanhamento ao vivo: enquanto a busca roda (no servidor), consulta o
+  // banco a cada poucos segundos e mostra quantos leads novos chegaram e quantos
+  // ja estao prontos pra revisar. Para sozinho depois de um teto de tempo.
+  useEffect(() => {
+    if (!searching || !baseline) return;
+    let stop = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const startedAt = Date.now();
+    const LIMITE_MS = 3 * 60 * 1000;
+    const tick = async () => {
+      try {
+        const [total, ready] = await Promise.all([
+          repo.countByStatus(),
+          repo.countByStatus("rascunho_pronto"),
+        ]);
+        if (!stop) {
+          setFound({
+            novos: Math.max(0, total - baseline.total),
+            prontos: Math.max(0, ready - baseline.ready),
+          });
+        }
+      } catch {
+        // soluco de rede: ignora e tenta de novo no proximo tick
+      }
+      if (!stop) {
+        if (Date.now() - startedAt < LIMITE_MS) timer = setTimeout(tick, 6000);
+        else setSearching(false);
+      }
+    };
+    timer = setTimeout(tick, 5000);
+    return () => {
+      stop = true;
+      clearTimeout(timer);
+    };
+  }, [searching, baseline, repo]);
 
   // Troca de estado: recarrega cidades (efeito acima) e limpa a cidade escolhida.
   const handleUfChange = useCallback((novaUf: string) => {
@@ -244,75 +286,110 @@ export default function BuscarPage() {
     setCity("");
   }, []);
 
-  // Surpreenda-me: escolhe um ramo aleatorio da lista sugerida, mantendo
-  // estado e cidade. Util quando a pessoa nao sabe o que procurar.
-  const handleSurpreendaMe = useCallback(() => {
-    if (NICHE_OPTIONS.length === 0) return;
-    const sorteado =
-      NICHE_OPTIONS[Math.floor(Math.random() * NICHE_OPTIONS.length)];
-    setNiche(sorteado);
-    toast.success(`Ramo sorteado: ${sorteado}`);
-  }, []);
+  // Surpreenda-me: randomiza TUDO menos o servico-alvo — estado, cidade, bairro
+  // e ramo. Util quando a pessoa quer garimpar uma regiao nova sem pensar.
+  const handleSurpreendaMe = useCallback(async () => {
+    const pool = profile?.niches?.length ? profile.niches : NICHE_OPTIONS;
+    const ramo = rnd(pool);
+    setNiche(ramo);
+    setNeighborhood(""); // bairro limpo no sorteio (cobre a cidade toda)
 
-  const handleSave = useCallback(async () => {
+    if (estados.length === 0) {
+      toast.success(`Ramo sorteado: ${ramo}`);
+      return;
+    }
+    const ufRnd = rnd(estados).sigla;
+    setUf(ufRnd);
+    setCity("");
+    try {
+      const lista = await fetchMunicipios(ufRnd);
+      if (lista.length) {
+        const cidadeRnd = rnd(lista).nome;
+        setCity(cidadeRnd);
+        toast.success(`Sorteado: ${ramo} em ${cidadeRnd} / ${ufRnd}`);
+        return;
+      }
+    } catch {
+      // sem cidades: fica so com estado + ramo
+    }
+    toast.success(`Sorteado: ${ramo} em ${ufRnd}`);
+  }, [profile, estados]);
+
+  const handleBuscar = useCallback(async () => {
     if (saving) return;
     setSaving(true);
-    setSaved(false);
     try {
-      // 1) Salva o alvo (como sempre fez).
+      // 1) Marca a linha de base pra medir o que a busca trouxe.
+      let base = { total: 0, ready: 0 };
+      try {
+        const [t, r] = await Promise.all([
+          repo.countByStatus(),
+          repo.countByStatus("rascunho_pronto"),
+        ]);
+        base = { total: t, ready: r };
+      } catch {
+        // sem baseline: o acompanhamento mostra a partir de 0
+      }
+      setBaseline(base);
+      setFound({ novos: 0, prontos: 0 });
+
+      // 2) Salva o alvo. Autopilot nao mora mais aqui (fica no Config); por isso
+      // nao mandamos esse campo — o upsert preserva o valor atual.
       await repo.saveProfile({
         niches: niche ? [niche] : profile?.niches ?? [],
         city: city || null,
         state: uf || null,
+        neighborhood: neighborhood.trim() || null,
         radius,
-        default_service_target: service,
-        autopilot,
+        default_service_target: serviceOpts.length === 0 ? "indefinido" : service,
       });
-      setSaved(true);
-      setTimeout(() => setSaved(false), 6000);
 
-      // 2) Dispara o robo na hora. A busca real roda no servidor (GitHub Actions)
-      // e leva 1-2 min, por isso a copy fala "em alguns minutos". Nunca quebra:
-      // se o token nao estiver configurado ou der ruim, o robo busca no proximo
-      // ciclo e a gente avisa de leve.
+      // 3) Dispara o robo. A busca real roda no servidor (GitHub Actions).
+      let ok = false;
       try {
         const res = await fetch("/api/search/run", { method: "POST" });
         const data = (await res.json().catch(() => null)) as
           | { ok: boolean; reason?: string }
           | null;
-
-        if (data?.ok) {
-          toast.success(
-            "Busca iniciada! Os leads novos vao chegar na sua fila em alguns minutos.",
-          );
-        } else {
-          // sem_token, falha_rede, etc: o alvo ja foi salvo, robo pega no proximo ciclo.
-          toast.message("Alvo salvo. O robo vai buscar no proximo ciclo automatico.");
-        }
+        ok = !!data?.ok;
       } catch {
-        toast.message("Alvo salvo. O robo vai buscar no proximo ciclo automatico.");
+        // rede/route indisponivel: cai no proximo ciclo automatico
+      }
+
+      // 4) Acompanha os leads chegando de qualquer forma.
+      setSearching(true);
+      if (ok) {
+        toast.success("Busca disparada! Acompanhe os leads chegando aqui embaixo.");
+      } else {
+        toast.message("Alvo salvo. O robo busca no proximo ciclo — deixei o acompanhamento ligado.");
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao salvar alvo");
     } finally {
       setSaving(false);
     }
-  }, [saving, repo, niche, profile, city, uf, radius, service, autopilot]);
+  }, [saving, repo, niche, profile, city, uf, neighborhood, radius, service, serviceOpts]);
 
-  // Coordenadas para o mapa. Prioridade: cidade geocodificada (zoom 12) ->
+  // Coordenadas para o mapa. Prioridade: regiao geocodificada (zoom 12) ->
   // primeira zona de cobertura com coordenada -> centro do Brasil.
   const mapCenter = (() => {
-    if (cityPoint) return { lat: cityPoint.lat, lng: cityPoint.lng, zoom: 12 };
+    if (cityPoint) return { lat: cityPoint.lat, lng: cityPoint.lng, zoom: neighborhood.trim() ? 14 : 12 };
     const first = coverage.find((c) => c.center_lat != null && c.center_lng != null);
     if (first) return { lat: first.center_lat!, lng: first.center_lng!, zoom: 12 };
     return BRASIL_CENTER;
   })();
 
   // O MapContainer do react-leaflet so usa center/zoom na montagem. Trocar a key
-  // quando o centro muda remonta o mapa ja na cidade escolhida (recentra de fato).
+  // quando o centro muda remonta o mapa ja na regiao escolhida (recentra de fato).
   const mapKey = `${mapCenter.lat.toFixed(3)},${mapCenter.lng.toFixed(3)},${mapCenter.zoom}`;
 
-  const covFiltered = coverage;
+  // Cobertura mostrada: filtrada pela cidade escolhida (mesma chave do robo).
+  // Sem cidade, mostra tudo.
+  const covFiltered = useMemo(() => {
+    if (!city) return coverage;
+    const key = slugRegion(city, uf);
+    return coverage.filter((z) => z.region_key === key);
+  }, [coverage, city, uf]);
 
   if (loading) {
     return (
@@ -330,8 +407,8 @@ export default function BuscarPage() {
         <div className="fu rounded-[20px] border border-border bg-card p-7 shadow-[var(--shadow)]">
           <div className="mb-1 text-[17px] font-bold">Definir alvo de busca</div>
           <p className="mb-6 text-[13.5px] text-muted-foreground">
-            Defina o alvo e clique em buscar pra disparar o garimpo na hora. Ele roda no servidor e
-            os leads novos caem direto na sua fila em alguns minutos.
+            Escolha onde e o que garimpar e clique em buscar pra disparar na hora. O robo roda no
+            servidor e os leads novos vao subindo na sua fila — voce acompanha aqui em tempo real.
           </p>
 
           {/* Ramo */}
@@ -345,9 +422,9 @@ export default function BuscarPage() {
               </label>
               <button
                 type="button"
-                onClick={handleSurpreendaMe}
-                title="Sorteia um ramo da lista pra voce comecar quando nao sabe o que procurar"
-                aria-label="Surpreenda-me: sortear um ramo aleatorio"
+                onClick={() => void handleSurpreendaMe()}
+                title="Sorteia estado, cidade e ramo pra voce garimpar uma regiao nova sem pensar"
+                aria-label="Surpreenda-me: sortear regiao e ramo aleatorios"
                 className="flex items-center gap-1.5 rounded-full border border-border-2 bg-surface-2 px-3 py-1 text-[12px] font-semibold text-ink-2 transition-colors hover:border-brand hover:bg-brand-50 hover:text-brand"
               >
                 <Shuffle size={14} weight="bold" />
@@ -361,7 +438,7 @@ export default function BuscarPage() {
               className="w-full rounded-xl border border-border-2 bg-surface-2 px-4 py-3.5 text-[14.5px] text-ink outline-none focus:border-brand"
             >
               <option value="">Qualquer ramo</option>
-              {NICHE_OPTIONS.map((n) => (
+              {nicheOptions.map((n) => (
                 <option key={n} value={n}>
                   {n}
                 </option>
@@ -422,7 +499,7 @@ export default function BuscarPage() {
             </div>
           </div>
 
-          {/* Bairro ou zona (texto livre, opcional) */}
+          {/* Bairro ou zona (texto livre, opcional, agora de verdade) */}
           <div className="mb-4">
             <label
               htmlFor="bairro-input"
@@ -434,11 +511,11 @@ export default function BuscarPage() {
               id="bairro-input"
               value={neighborhood}
               onChange={(e) => setNeighborhood(e.target.value)}
-              placeholder="Ex: Zona 7. Deixe em branco pra cobrir a cidade toda."
+              placeholder="Ex: Zona 7. Em branco = cidade toda."
               className="w-full rounded-xl border border-border-2 bg-surface-2 px-4 py-3.5 text-[14.5px] text-ink outline-none focus:border-brand"
             />
             <p className="mt-1.5 text-[12px] text-faint">
-              Nao existe uma lista oficial de bairros, entao esse campo e livre e opcional.
+              O mapa centra no bairro enquanto voce digita, e o robo foca a busca ali.
             </p>
           </div>
 
@@ -460,32 +537,27 @@ export default function BuscarPage() {
             </select>
           </div>
 
-          {/* Servico alvo */}
-          <div className="mb-6">
-            <label className="mb-1.5 block text-[12px] font-bold uppercase tracking-wider text-faint">
-              Servico alvo
-            </label>
-            <ServiceToggle value={service} onChange={setService} />
-          </div>
-
-          {/* Piloto automatico */}
-          <div className="mb-6 flex items-center justify-between gap-4 rounded-[14px] border border-border bg-surface-2 px-5 py-4">
-            <div>
-              <div className="flex items-center gap-2 text-[14.5px] font-bold text-ink">
-                <Robot size={17} className="text-brand" />
-                Piloto automatico
-              </div>
-              <div className="mt-0.5 text-[12.5px] text-muted-foreground">
-                Cobre o mapa em ordem e enche a fila sem voce precisar pedir.
-              </div>
+          {/* Servico alvo — reflete a profissao do perfil. */}
+          {serviceOpts.length > 0 && (
+            <div className="mb-6">
+              <label className="mb-1.5 block text-[12px] font-bold uppercase tracking-wider text-faint">
+                Servico alvo
+              </label>
+              {serviceOpts.length === 1 ? (
+                <div className="flex items-center gap-2 rounded-xl border border-border-2 bg-surface-2 px-4 py-3 text-[14px] font-semibold text-ink-2">
+                  {SERVICE_META[serviceOpts[0]].label}
+                  <span className="text-[12px] font-medium text-faint">(definido no seu perfil)</span>
+                </div>
+              ) : (
+                <ServiceToggle value={service} options={serviceOpts} onChange={setService} />
+              )}
             </div>
-            <AutopilotToggle value={autopilot} onChange={setAutopilot} />
-          </div>
+          )}
 
           {/* Botao */}
           <button
             type="button"
-            onClick={() => void handleSave()}
+            onClick={() => void handleBuscar()}
             disabled={saving}
             className="flex w-full items-center justify-center gap-2.5 rounded-[14px] p-4 text-[15px] font-bold text-white shadow-[0_6px_16px_var(--ring)] transition-transform hover:-translate-y-0.5 disabled:opacity-70"
             style={{ background: "var(--grad)" }}
@@ -495,30 +567,57 @@ export default function BuscarPage() {
             ) : (
               <MagnifyingGlass size={18} weight="bold" />
             )}
-            {saving ? "Salvando alvo..." : "Buscar agora"}
+            {saving ? "Disparando busca..." : "Buscar agora"}
           </button>
 
-          {/* Feedback honesto apos salvar */}
-          {saved && (
+          {/* Acompanhamento ao vivo da busca */}
+          {searching && (
             <div
-              className="mt-4 flex items-start gap-3 rounded-[13px] border border-success/30 bg-success-bg px-4 py-3.5"
+              className="mt-4 rounded-[13px] border border-brand/30 bg-brand-50 px-4 py-3.5"
               style={{ animation: "fadeUp .4s both" }}
             >
-              <Check size={18} className="mt-0.5 flex-none text-success" weight="bold" />
-              <div className="text-[13.5px] text-ink-2">
-                <strong className="text-ink">Alvo salvo e busca disparada.</strong> O garimpo roda no
-                servidor e leva alguns minutos. Os leads novos chegam direto na fila pra voce
-                revisar, sem precisar ficar de olho aqui.
+              <div className="flex items-center gap-2.5">
+                <Spinner size={18} className="animate-spin text-brand" />
+                <strong className="text-[14px] text-ink">Garimpando negocios...</strong>
+                <button
+                  type="button"
+                  onClick={() => setSearching(false)}
+                  className="ml-auto text-[12px] font-semibold text-faint transition-colors hover:text-ink"
+                >
+                  parar de acompanhar
+                </button>
               </div>
+              <div className="mt-3 flex gap-7 text-[13.5px] text-ink-2">
+                <span>
+                  <strong className="text-[18px] text-ink">{found.novos}</strong> negocios novos
+                </span>
+                <span>
+                  <strong className="text-[18px] text-ink">{found.prontos}</strong> prontos pra revisar
+                </span>
+              </div>
+              {found.prontos > 0 && (
+                <Link
+                  href="/fila"
+                  className="mt-3 inline-flex items-center gap-1.5 text-[13px] font-semibold text-brand hover:underline"
+                >
+                  Ver na fila <ArrowRight size={14} weight="bold" />
+                </Link>
+              )}
+              <p className="mt-2.5 text-[12px] text-faint">
+                A busca roda no servidor (1-2 min). Pode sair daqui: os leads continuam chegando na
+                sua fila.
+              </p>
             </div>
           )}
 
           {/* Nota informativa sempre visivel */}
-          <div className="mt-4 flex items-center gap-2 text-[12.5px] text-faint">
-            <Info size={14} />
-            A busca roda no servidor e leva 1-2 minutos. Aqui voce define o alvo e acompanha a
-            cobertura.
-          </div>
+          {!searching && (
+            <div className="mt-4 flex items-center gap-2 text-[12.5px] text-faint">
+              <Info size={14} />
+              A busca roda no servidor e leva 1-2 minutos. Aqui voce define o alvo e acompanha a
+              chegada dos leads.
+            </div>
+          )}
         </div>
 
         {/* Coluna direita: mapa de cobertura */}
@@ -527,13 +626,17 @@ export default function BuscarPage() {
             <div className="text-[17px] font-bold">Cobertura por regiao</div>
             {city && (
               <span className="text-[12px] font-semibold text-faint">
-                {uf ? `${city} / ${uf}` : city}
+                {neighborhood.trim()
+                  ? `${neighborhood.trim()} — ${city}${uf ? ` / ${uf}` : ""}`
+                  : uf
+                    ? `${city} / ${uf}`
+                    : city}
               </span>
             )}
           </div>
           <p className="mb-5 text-[13.5px] text-muted-foreground">
-            O garimpo cobre o mapa em ordem, sem pular pedaco. Veja o que ja foi varrido e o que
-            falta.
+            O garimpo cobre o mapa em ordem, sem pular pedaco. Veja o que ja foi varrido na cidade
+            escolhida e o que falta.
           </p>
 
           {/* Filtro de nicho no mapa */}
@@ -544,7 +647,7 @@ export default function BuscarPage() {
               className="w-full rounded-xl border border-border-2 bg-surface-2 px-3 py-2.5 text-[13.5px] text-ink outline-none focus:border-brand"
             >
               <option value="">Todos os ramos</option>
-              {NICHE_OPTIONS.map((n) => (
+              {nicheOptions.map((n) => (
                 <option key={n} value={n}>
                   {n}
                 </option>
@@ -590,10 +693,12 @@ export default function BuscarPage() {
           {covFiltered.length === 0 ? (
             <div className="flex flex-col items-center gap-3 rounded-[14px] border border-dashed border-border-2 py-10 text-center">
               <MapTrifold size={36} className="text-faint" />
-              <div className="text-[14px] font-semibold text-ink">Nenhuma zona varrida ainda</div>
+              <div className="text-[14px] font-semibold text-ink">
+                {city ? "Nenhuma zona varrida nessa cidade" : "Nenhuma zona varrida ainda"}
+              </div>
               <p className="max-w-[300px] text-[13px] text-muted-foreground">
-                Rode a captacao pela extensao ou ligue o piloto automatico pra comecar a cobrir o
-                mapa.
+                Clique em <strong>Buscar agora</strong> pra disparar o garimpo nessa regiao e
+                comecar a cobrir o mapa.
               </p>
             </div>
           ) : (

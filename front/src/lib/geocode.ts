@@ -54,3 +54,42 @@ export async function geocodeCity(
     return null;
   }
 }
+
+// Geocodifica um bairro/zona dentro da cidade pra dar um zoom mais fino no mapa.
+// Usa busca livre (q=) porque bairro nao tem campo proprio confiavel no
+// Nominatim. Se nao achar o bairro, cai pra cidade — o mapa sempre tem onde
+// centrar, nunca fica perdido.
+export async function geocodeNeighborhood(
+  neighborhood: string,
+  city: string,
+  uf?: string | null,
+): Promise<GeoPoint | null> {
+  const bairro = neighborhood.trim();
+  if (!bairro) return geocodeCity(city, uf);
+
+  const partes = [bairro, city.trim(), uf?.trim(), "Brazil"].filter(Boolean);
+  const params = new URLSearchParams({
+    q: partes.join(", "),
+    format: "json",
+    limit: "1",
+  });
+
+  try {
+    const res = await fetch(`${NOMINATIM}?${params.toString()}`, {
+      headers: { "User-Agent": "garimpo-crm", Accept: "application/json" },
+    });
+    if (!res.ok) return geocodeCity(city, uf);
+
+    const data: unknown = await res.json();
+    if (!Array.isArray(data) || data.length === 0) return geocodeCity(city, uf);
+
+    const first = data[0] as { lat?: unknown; lon?: unknown };
+    const lat = Number(first.lat);
+    const lng = Number(first.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return geocodeCity(city, uf);
+
+    return { lat, lng };
+  } catch {
+    return geocodeCity(city, uf);
+  }
+}
