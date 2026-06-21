@@ -202,6 +202,68 @@
     letter-spacing: 0;
     text-rendering: geometricPrecision;
   }
+
+  /* ===== Affordancia de clique: cursor + motion (sistema inteiro) =====
+     O Tailwind v4 deixa <button> com cursor:default. Estas regras garantem a
+     "maozinha" (pointer) em TUDO que e clicavel de verdade, o cursor de texto
+     nos campos de escrita, e um feedback suave — em todas as paginas, inclusive
+     componentes que vierem depois. */
+
+  /* Clicavel de verdade -> maozinha (pointer). */
+  button:not(:disabled),
+  a[href],
+  label[for],
+  summary,
+  select:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="switch"]:not([aria-disabled="true"]),
+  [role="tab"]:not([aria-disabled="true"]),
+  [role="option"],
+  [role="menuitem"],
+  [role="menuitemradio"],
+  [role="menuitemcheckbox"],
+  input:where([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="submit"], [type="button"], [type="reset"]):not(:disabled) {
+    cursor: pointer;
+  }
+
+  /* Desabilitado -> cursor de bloqueado (nunca maozinha). */
+  button:disabled,
+  select:disabled,
+  input:disabled,
+  [aria-disabled="true"],
+  [data-disabled] {
+    cursor: not-allowed;
+  }
+
+  /* Campo de escrita -> cursor de texto (a barrinha I). */
+  input:where(:not([type])),
+  input:where([type="text"], [type="search"], [type="email"], [type="url"], [type="tel"], [type="password"], [type="number"], [type="datetime-local"], [type="date"], [type="time"], [type="month"], [type="week"]),
+  textarea,
+  [contenteditable="true"] {
+    cursor: text;
+  }
+
+  /* Motion: transicao suave de fallback (utilitarios do Tailwind tem prioridade
+     e mantem o efeito proprio de cada elemento). */
+  button, a[href], select, summary,
+  [role="button"], [role="switch"], [role="tab"] {
+    transition: color .15s ease, background-color .15s ease, border-color .15s ease,
+                box-shadow .18s ease, transform .12s ease, opacity .15s ease;
+  }
+
+  /* Press: leve afundada ao apertar — sensacao de botao de verdade. */
+  button:not(:disabled):active,
+  [role="button"]:not([aria-disabled="true"]):active {
+    transform: scale(.97);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    button, a[href], select, summary,
+    [role="button"], [role="switch"], [role="tab"] {
+      transition: none;
+    }
+    button:active, [role="button"]:active { transform: none; }
+  }
 }
 
 /* animacoes do shell (do claude-design-ref) */
