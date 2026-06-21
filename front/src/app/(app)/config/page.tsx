@@ -3,11 +3,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
+  Briefcase,
   Calendar,
   Check,
   DownloadSimple,
   GearSix,
   GoogleLogo,
+  HandWaving,
   Info,
   MapPin,
   Plus,
@@ -15,12 +17,14 @@ import {
   Robot,
   Storefront,
   Tag,
+  Target,
   X,
 } from "@phosphor-icons/react";
 import { getRepo } from "@/lib/repo";
 import { SERVICE_META } from "@/lib/service";
 import { useAuth } from "@/lib/auth";
 import { fetchEstados, fetchMunicipios, type Municipio, type UF } from "@/lib/ibge";
+import { PROFESSIONS, getProfession, type Profession } from "@/lib/professions";
 import type { SearchProfile, SearchProfileInput, ServiceTarget } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -105,6 +109,50 @@ function Section({ title, sub, icon, children }: {
 }
 
 // ---------------------------------------------------------------------------
+// Card de profissao (vertical) para o seletor do onboarding
+// ---------------------------------------------------------------------------
+function ProfessionCard({ profession, selected, onSelect }: {
+  profession: Profession;
+  selected: boolean;
+  onSelect: (p: Profession) => void;
+}) {
+  const Icon = profession.icon;
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(profession)}
+      aria-pressed={selected}
+      className={cn(
+        "group relative flex h-full flex-col gap-2 rounded-[16px] border p-4 text-left transition-all",
+        selected
+          ? "border-brand bg-brand-50 shadow-[0_6px_16px_var(--ring)]"
+          : "border-border-2 bg-surface-2 hover:-translate-y-0.5 hover:border-brand/40 hover:bg-brand-50/50",
+      )}
+    >
+      {selected && (
+        <span className="absolute right-3 top-3 flex size-5 items-center justify-center rounded-full bg-brand text-white">
+          <Check size={11} weight="bold" />
+        </span>
+      )}
+      <div
+        className={cn(
+          "flex size-10 flex-none items-center justify-center rounded-[12px] transition-colors",
+          selected ? "bg-brand text-white" : "bg-brand-50 text-brand",
+        )}
+      >
+        <Icon size={20} weight="duotone" />
+      </div>
+      <div className={cn("text-[14px] font-bold leading-snug", selected ? "text-brand" : "text-ink")}>
+        {profession.label}
+      </div>
+      <div className="text-[12.5px] leading-relaxed text-muted-foreground">
+        {profession.descricao}
+      </div>
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Pagina principal
 // ---------------------------------------------------------------------------
 export default function ConfigPage() {
@@ -125,6 +173,7 @@ export default function ConfigPage() {
   const [radius, setRadius] = useState("cidade");
   const [serviceTarget, setServiceTarget] = useState<ServiceTarget>("indefinido");
   const [autopilot, setAutopilot] = useState(false);
+  const [profession, setProfession] = useState<string | null>(null);
 
   // Listas vindas do IBGE para os selects em cascata (estado -> cidade)
   const [estados, setEstados] = useState<UF[]>([]);
@@ -149,6 +198,7 @@ export default function ConfigPage() {
           setRadius(profile.radius ?? "cidade");
           setServiceTarget(profile.default_service_target ?? "indefinido");
           setAutopilot(profile.autopilot ?? false);
+          setProfession(profile.profession ?? null);
         }
       } catch {
         // Se falhar, trata como primeiro acesso
@@ -211,6 +261,21 @@ export default function ConfigPage() {
     setNiches((prev) => prev.filter((n) => n !== ramo));
   }, []);
 
+  // Escolher uma profissao: guarda o id, pre-seleciona o servico-alvo e sugere
+  // os nichos da area (preenchendo os chips, que o usuario ainda pode ajustar).
+  const chooseProfession = useCallback((p: Profession) => {
+    setProfession(p.id);
+    setServiceTarget(p.defaultService);
+    setNiches((prev) => {
+      const lower = prev.map((n) => n.toLowerCase());
+      const merged = [...prev];
+      for (const n of p.suggestedNiches) {
+        if (!lower.includes(n.toLowerCase())) merged.push(n);
+      }
+      return merged;
+    });
+  }, []);
+
   const handleNicheInputKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" || e.key === ",") {
       e.preventDefault();
@@ -230,6 +295,7 @@ export default function ConfigPage() {
         radius,
         default_service_target: serviceTarget,
         autopilot,
+        profession,
       };
       await repo.saveProfile(input);
       // Libera o gate de onboarding (fonte unica no contexto de auth).
@@ -244,7 +310,7 @@ export default function ConfigPage() {
     } finally {
       setSaving(false);
     }
-  }, [niches, city, state, radius, serviceTarget, autopilot, repo, refreshProfile, isOnboarding, router]);
+  }, [niches, city, state, radius, serviceTarget, autopilot, profession, repo, refreshProfile, isOnboarding, router]);
 
   // Ja conectou com o Google? (login via Google => agenda disponivel)
   const meta = session?.user?.app_metadata as { provider?: string; providers?: string[] } | undefined;
@@ -297,30 +363,101 @@ export default function ConfigPage() {
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
+  const selectedProfession = getProfession(profession);
+
   return (
     <div className="mx-auto max-w-[760px]">
-      {/* Cabecalho da pagina */}
-      <div className="mb-6">
-        <div className="flex items-center gap-3">
-          <div className="flex size-11 items-center justify-center rounded-[14px] bg-brand-50 text-brand">
-            <GearSix size={24} weight="duotone" />
+      {/* Boas-vindas calorosas no primeiro acesso */}
+      {isOnboarding ? (
+        <div className="mb-6 overflow-hidden rounded-[20px] border border-brand/25 bg-card shadow-[var(--shadow)]">
+          <div className="p-6" style={{ background: "var(--grad)" }}>
+            <div className="flex items-start gap-3">
+              <div className="flex size-11 flex-none items-center justify-center rounded-[14px] bg-white/15 text-white backdrop-blur">
+                <HandWaving size={24} weight="duotone" />
+              </div>
+              <div>
+                <h1 className="font-heading text-2xl font-bold tracking-tight text-white">
+                  Bem-vindo! Vamos deixar o sistema com a sua cara.
+                </h1>
+                <p className="mt-1 text-[14px] leading-relaxed text-white/85">
+                  Sao dois minutinhos. Voce me conta o que faz e onde atua, e eu ja saio
+                  garimpando os clientes certos pra voce. Pode ajustar tudo quando quiser.
+                </p>
+              </div>
+            </div>
           </div>
-          <div>
-            <h1 className="font-heading text-2xl font-bold tracking-tight">Configuracao</h1>
-            {isOnboarding ? (
-              <p className="mt-0.5 text-[14px] text-muted-foreground">
-                Primeira vez aqui. Escolhe os ramos, confirma a cidade e pronto. Pode ajustar a qualquer hora.
-              </p>
-            ) : (
+        </div>
+      ) : (
+        <div className="mb-6">
+          <div className="flex items-center gap-3">
+            <div className="flex size-11 items-center justify-center rounded-[14px] bg-brand-50 text-brand">
+              <GearSix size={24} weight="duotone" />
+            </div>
+            <div>
+              <h1 className="font-heading text-2xl font-bold tracking-tight">Configuracao</h1>
               <p className="mt-0.5 text-[14px] text-muted-foreground">
                 Voce ajusta isso uma vez. Depois eu trabalho sozinho no dia a dia.
               </p>
-            )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       <div className="flex flex-col gap-5">
+        {/* ------------------------------------------------------------------ */}
+        {/* 0. Profissao (vertical) */}
+        {/* ------------------------------------------------------------------ */}
+        {isOnboarding ? (
+          <Section
+            title="Pra que voce usa o sistema?"
+            sub="Escolha a sua area. Eu uso isso pra sugerir os nichos certos e mirar o servico que voce vende."
+            icon={<Briefcase size={20} />}
+          >
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {PROFESSIONS.map((p) => (
+                <ProfessionCard
+                  key={p.id}
+                  profession={p}
+                  selected={profession === p.id}
+                  onSelect={chooseProfession}
+                />
+              ))}
+            </div>
+            {selectedProfession && (
+              <div className="mt-4 flex items-start gap-2.5 rounded-[14px] border border-brand/20 bg-brand-50/70 px-4 py-3 text-[13px] leading-relaxed text-ink-2">
+                <Target size={16} className="mt-0.5 flex-none text-brand" />
+                <span>
+                  Boa. Voce mira em: <strong className="font-bold text-brand">{selectedProfession.mira}</strong>{" "}
+                  Ja deixei os nichos dessa area sugeridos abaixo, mas pode mexer a vontade.
+                </span>
+              </div>
+            )}
+          </Section>
+        ) : (
+          <Section
+            title="Sua area"
+            sub="A area define os nichos sugeridos e o servico-alvo. Pode trocar quando quiser."
+            icon={<Briefcase size={20} />}
+          >
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {PROFESSIONS.map((p) => (
+                <ProfessionCard
+                  key={p.id}
+                  profession={p}
+                  selected={profession === p.id}
+                  onSelect={chooseProfession}
+                />
+              ))}
+            </div>
+            {!selectedProfession && (
+              <div className="mt-4 flex items-center gap-2 text-[12.5px] text-faint">
+                <Info size={14} />
+                Voce ainda nao escolheu uma area. Escolha uma pra eu afinar as sugestoes.
+              </div>
+            )}
+          </Section>
+        )}
+
         {/* ------------------------------------------------------------------ */}
         {/* 1. Ramos */}
         {/* ------------------------------------------------------------------ */}

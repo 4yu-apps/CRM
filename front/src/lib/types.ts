@@ -160,11 +160,15 @@ export interface SearchProfile {
   radius: string;                 // "5km" | "10km" | "25km" | "50km" | "cidade"
   default_service_target: ServiceTarget;
   autopilot: boolean;
+  // Profissao/vertical do usuario (catalogo em lib/professions). Define os
+  // nichos sugeridos e o servico-alvo padrao no onboarding. Coluna criada por
+  // migracao em outro fluxo; opcional ate todo perfil ter escolhido.
+  profession?: string | null;
   created_at: string;
   updated_at: string;
 }
 export type SearchProfileInput = Partial<Pick<SearchProfile,
-  "niches" | "city" | "state" | "radius" | "default_service_target" | "autopilot">>;
+  "niches" | "city" | "state" | "radius" | "default_service_target" | "autopilot" | "profession">>;
 
 // Cobertura de varredura por regiao/nicho (scan_coverage).
 export interface ScanCoverage {
