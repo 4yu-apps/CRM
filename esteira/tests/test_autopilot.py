@@ -182,3 +182,24 @@ def test_fetch_by_status_filtra_por_dono(tmp_path):
     so_a = sink.fetch_by_status("bruto", 20, owner_id="owner-a")
     assert len(todos) == 2
     assert len(so_a) == 1 and so_a[0].owner_id == "owner-a"
+
+
+def test_autopilot_nichos_extras_aleatorios(tmp_path):
+    import random
+    sink = _sink(tmp_path)
+    sink.upsert_profile("o", niches=["estetica"], city="Maringa", state="PR", autopilot=True)
+    maps = FakeMaps(_two_results())
+    run_autopilot(sink, maps, MockDraftProvider(), [], batch=20,
+                  extra_niches=2, rng=random.Random(1))
+    # nicho do perfil + 2 extras = 3 buscas, todas diferentes
+    assert len(maps.terms) == 3
+    assert len(set(maps.terms)) == 3
+    assert any("estetica" in t.lower() for t in maps.terms)
+
+
+def test_autopilot_sem_extras_so_o_perfil(tmp_path):
+    sink = _sink(tmp_path)
+    sink.upsert_profile("o", niches=["estetica", "barbearia"], city="Maringa", state="PR", autopilot=True)
+    maps = FakeMaps(_two_results())
+    run_autopilot(sink, maps, MockDraftProvider(), [], batch=20, extra_niches=0)
+    assert len(maps.terms) == 2  # so os 2 do perfil

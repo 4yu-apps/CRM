@@ -40,6 +40,7 @@ class Config:
     maps_mode: str = "fixture"        # fixture | places
     maps_key: str | None = None
     maps_pages: int = 3               # paginas do Places por busca (~20 cada)
+    extra_niches: int = 0             # nichos aleatorios extras por run (variedade)
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -61,6 +62,7 @@ class Config:
             maps_mode=os.getenv("GARIMPO_MAPS", "fixture"),
             maps_key=os.getenv("GOOGLE_MAPS_API_KEY"),
             maps_pages=int(os.getenv("GARIMPO_MAPS_PAGES", "3")),
+            extra_niches=int(os.getenv("GARIMPO_EXTRA_NICHES", "0")),
         )
 
 

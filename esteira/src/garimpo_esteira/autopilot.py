@@ -11,9 +11,20 @@ Places aprofundam a cobertura sem o usuario precisar conhecer os bairros.
 """
 from __future__ import annotations
 
+import random
 import re
 import unicodedata
 from collections.abc import Sequence
+
+# Pool pra o modo aleatorio: quando o perfil pede nichos extras por run, a
+# esteira sorteia daqui os que ainda nao foram varridos. Da variedade sem o
+# dono precisar escolher.
+DEFAULT_NICHE_POOL = [
+    "estetica", "barbearia", "odontologia", "hamburgueria", "academia",
+    "petshop", "restaurante", "cafeteria", "pizzaria", "salao de beleza",
+    "clinica de estetica", "pilates", "lanchonete", "manicure", "tatuagem",
+    "loja de roupas", "otica", "farmacia", "auto center", "clinica veterinaria",
+]
 
 from .cascade import enrich_batch
 from .discovery import result_to_lead
@@ -62,6 +73,8 @@ def run_autopilot(
     batch: int = 20,
     delay: float = 0.0,
     skip_covered: bool = True,
+    extra_niches: int = 0,
+    rng: random.Random | None = None,
 ) -> list[dict]:
     """Itera os perfis com autopilot ligado. Por dono: descobre (pulando o ja
     varrido) e roda o pipeline so nos leads dele. Retorna um resumo por dono.
@@ -81,8 +94,19 @@ def run_autopilot(
             else set()
         )
 
+        niches = list(prof.get("niches") or [])
+        if extra_niches > 0:
+            r = rng or random
+            usados = {slug(n) for n in niches}
+            pool = [
+                n for n in DEFAULT_NICHE_POOL
+                if slug(n) not in usados and (rkey, slug(n)) not in covered
+            ]
+            r.shuffle(pool)
+            niches = niches + pool[:extra_niches]
+
         discovered = 0
-        for niche, term in generate_terms(prof.get("niches") or [], city, state):
+        for niche, term in generate_terms(niches, city, state):
             if (rkey, slug(niche)) in covered:
                 continue  # zona+nicho ja varridos: nunca repete
 

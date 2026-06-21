@@ -8,7 +8,8 @@ name: esteira
 
 on:
   schedule:
-    - cron: "0 9 * * *" # 09:00 UTC diario
+    - cron: "0 10 * * *" # 07:00 BRT (manha)
+    - cron: "0 20 * * *" # 17:00 BRT (tarde)
   workflow_dispatch:
     inputs:
       batch:
@@ -46,8 +47,11 @@ jobs:
           # Maps fica em standby, nao entra aqui.
           GARIMPO_MAPS: places
           GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
-          # llm=mock por padrao (R$0, sem chave). Defina a variavel de repo
-          # GARIMPO_LLM=gemini + o secret GEMINI_API_KEY para copy via Gemini.
+          # Nichos extras aleatorios por run (variedade sem o dono pedir).
+          GARIMPO_EXTRA_NICHES: ${{ vars.GARIMPO_EXTRA_NICHES || '2' }}
+          # Copy: mock (R$0) por padrao. Variavel de repo GARIMPO_LLM=groq|gemini
+          # + o secret correspondente liga a IA de verdade (com fallback pro mock).
           GARIMPO_LLM: ${{ vars.GARIMPO_LLM || 'mock' }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python -m garimpo_esteira.run autopilot

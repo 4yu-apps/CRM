@@ -139,7 +139,10 @@ def cmd_autopilot(cfg: Config) -> int:
     provider = build_provider(cfg)
     sources = build_sources(cfg)
     print(f"autopilot · sink={cfg.sink} maps={cfg.maps_mode} llm={cfg.llm}")
-    summary = run_autopilot(sink, maps, provider, sources, batch=cfg.batch, delay=cfg.delay)
+    summary = run_autopilot(
+        sink, maps, provider, sources,
+        batch=cfg.batch, delay=cfg.delay, extra_niches=cfg.extra_niches,
+    )
     if not summary:
         print("  nenhum perfil com autopilot ligado (nada a fazer)")
     for s in summary:
