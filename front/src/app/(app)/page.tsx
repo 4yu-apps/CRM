@@ -94,10 +94,9 @@ export default function InicioPage() {
   );
 
   const prontosPraRevisar = useMemo(
-    () =>
-      leads.filter(
-        (l) => l.status === "rascunho_pronto" || l.status === "enriquecido",
-      ).length,
+    // so os que tem a mensagem pronta (na fila). 'enriquecido' ainda esta sendo
+    // processado, nao conta como pronto.
+    () => leads.filter((l) => l.status === "rascunho_pronto").length,
     [leads],
   );
 

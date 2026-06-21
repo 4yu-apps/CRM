@@ -39,13 +39,17 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           OWNER_USER_ID: ${{ secrets.OWNER_USER_ID }}
-          GARIMPO_BATCH: ${{ github.event.inputs.batch || '20' }}
-          GARIMPO_DELAY: "1.5"
+          # Lote grande pra o pipeline (enrich/score/draft) dar conta do que a
+          # descoberta traz, senao os leads ficam parados em 'bruto'.
+          GARIMPO_BATCH: ${{ github.event.inputs.batch || vars.GARIMPO_BATCH || '150' }}
+          GARIMPO_DELAY: "0.4"
           # Descoberta oficial: Google Places (server-side, sem PC). Enquanto o
           # secret GOOGLE_MAPS_API_KEY nao existir, o autopilot pausa a descoberta
           # sem quebrar e sem injetar dado falso (guarda em run.py). A extensao do
-          # Maps fica em standby, nao entra aqui.
+          # Maps fica em standby, nao entra aqui. 1 pagina (~20/nicho) pra a
+          # descoberta nao passar a frente do processamento.
           GARIMPO_MAPS: places
+          GARIMPO_MAPS_PAGES: ${{ vars.GARIMPO_MAPS_PAGES || '1' }}
           GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
           # Nichos extras aleatorios por run (variedade sem o dono pedir).
           GARIMPO_EXTRA_NICHES: ${{ vars.GARIMPO_EXTRA_NICHES || '2' }}
