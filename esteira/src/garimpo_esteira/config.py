@@ -97,11 +97,14 @@ def build_sources(cfg: Config) -> list[Source]:
             AdLibrarySource(),
         ]
     # real: CNPJ via BrasilAPI (grátis), site via HTTP, Ad Library se houver token
+    from .sources.ad_library import meta_ads_probe
+
+    ad = AdLibrarySource(probe=meta_ads_probe(cfg.ad_token)) if cfg.ad_token else AdLibrarySource()
     return [
         CnpjSource(),
         InstagramSource(),
         WebsiteSource(),
-        AdLibrarySource(),
+        ad,
     ]
 
 

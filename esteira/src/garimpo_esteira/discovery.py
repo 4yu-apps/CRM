@@ -23,6 +23,41 @@ def _region_key(term: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", term.lower()).strip("-")
 
 
+_CEP = re.compile(r"\b\d{5}[-–]?\d{3}\b")
+_CITY_UF = re.compile(r"^(.+?)\s*[-–]\s*([A-Z]{2})$")
+
+
+def parse_address(formatted: str | None) -> tuple[str | None, str | None, str | None]:
+    """Extrai (bairro, cidade, UF) do endereco formatado do Maps.
+
+    Padrao BR: 'Rua X, 123 - Bairro, Cidade - UF, 01406-000, Brasil'. O Maps nao
+    devolve bairro/cidade/UF em campos separados, mas o endereco formatado segue
+    esse padrao, entao da pra puxar deles.
+    """
+    if not formatted:
+        return (None, None, None)
+    s = re.sub(r",?\s*(Brasil|Brazil)\s*$", "", formatted, flags=re.IGNORECASE)
+    s = _CEP.sub("", s)
+    parts = [p.strip() for p in s.split(",") if p.strip()]
+
+    city = state = neighborhood = None
+    city_idx = None
+    for i, p in enumerate(parts):
+        m = _CITY_UF.match(p)
+        if m:
+            city, state, city_idx = m.group(1).strip(), m.group(2), i
+            break
+
+    if city_idx is not None and city_idx >= 1:
+        prev = parts[city_idx - 1]
+        # 'Av. X, 123 - Jardim Paulista' -> 'Jardim Paulista'
+        m2 = re.search(r"[-–]\s*(.+)$", prev)
+        nb = (m2.group(1).strip() if m2 else prev).strip()
+        if nb and not nb.isdigit():
+            neighborhood = nb
+    return (neighborhood, city, state)
+
+
 @runtime_checkable
 class MapsSource(Protocol):
     name: str
@@ -35,6 +70,8 @@ def result_to_lead(raw: dict, owner_id: str) -> tuple[Lead, list[Finding]]:
     name = raw.get("name")
     phone = clean("phone", raw.get("formatted_phone_number") or raw.get("phone"))
     website = clean("website", raw.get("website"))
+    address = raw.get("formatted_address") or raw.get("address")
+    nb, ct, st = parse_address(address)
     lead = Lead(
         id="",
         owner_id=owner_id,
@@ -45,10 +82,10 @@ def result_to_lead(raw: dict, owner_id: str) -> tuple[Lead, list[Finding]]:
         rating=raw.get("rating"),
         reviews_count=raw.get("user_ratings_total") or raw.get("reviews_count"),
         category=raw.get("category"),
-        address=raw.get("formatted_address") or raw.get("address"),
-        neighborhood=raw.get("neighborhood"),
-        city=raw.get("city"),
-        state=raw.get("state"),
+        address=address,
+        neighborhood=raw.get("neighborhood") or nb,
+        city=raw.get("city") or ct,
+        state=raw.get("state") or st,
         maps_place_id=raw.get("place_id"),
         maps_url=raw.get("url"),
     )
@@ -59,6 +96,8 @@ def result_to_lead(raw: dict, owner_id: str) -> tuple[Lead, list[Finding]]:
         findings.append(Finding("phone", "google_maps", phone, 0.9))
     if website:
         findings.append(Finding("website", "google_maps", website, 0.95))
+    if nb:
+        findings.append(Finding("neighborhood", "google_maps", nb, 0.85))
     return lead, findings
 
 
