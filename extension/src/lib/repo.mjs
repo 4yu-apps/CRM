@@ -16,6 +16,12 @@ function mockRepo() {
       lead.status = to;
       return { ...lead };
     },
+    async updateLead(id, fields) {
+      const lead = leads.find((l) => l.id === id);
+      if (!lead) throw new Error("lead nao encontrado");
+      Object.assign(lead, fields);
+      return { ...lead };
+    },
     // Mock: simula insercao, detecta duplicata por maps_place_id.
     async insertLead(lead) {
       const dup = lead.maps_place_id &&
@@ -50,6 +56,18 @@ function supabaseRepo(cfg) {
         body: JSON.stringify({ p_lead_id: id, p_new_status: to, p_actor: "extension", p_note: null }),
       });
       if (!r.ok) throw new Error(`transition: ${r.status} ${await r.text()}`);
+      const data = await r.json();
+      return Array.isArray(data) ? data[0] : data;
+    },
+    // Edita campos do lead no NOSSO banco (dono, contato, anotacoes, orcamento).
+    // Continua read-only sobre o WhatsApp: so escreve no Garimpo.
+    async updateLead(id, fields) {
+      const r = await fetch(`${base}/leads?id=eq.${id}`, {
+        method: "PATCH",
+        headers: { ...headers, Prefer: "return=representation" },
+        body: JSON.stringify(fields),
+      });
+      if (!r.ok) throw new Error(`updateLead: ${r.status} ${await r.text()}`);
       const data = await r.json();
       return Array.isArray(data) ? data[0] : data;
     },

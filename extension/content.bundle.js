@@ -41,6 +41,12 @@
         lead.status = to;
         return { ...lead };
       },
+      async updateLead(id, fields) {
+        const lead = leads2.find((l) => l.id === id);
+        if (!lead) throw new Error("lead nao encontrado");
+        Object.assign(lead, fields);
+        return { ...lead };
+      },
       // Mock: simula insercao, detecta duplicata por maps_place_id.
       async insertLead(lead) {
         const dup = lead.maps_place_id && leads2.find((l) => l.maps_place_id === lead.maps_place_id);
@@ -72,6 +78,18 @@
           body: JSON.stringify({ p_lead_id: id, p_new_status: to, p_actor: "extension", p_note: null })
         });
         if (!r.ok) throw new Error(`transition: ${r.status} ${await r.text()}`);
+        const data = await r.json();
+        return Array.isArray(data) ? data[0] : data;
+      },
+      // Edita campos do lead no NOSSO banco (dono, contato, anotacoes, orcamento).
+      // Continua read-only sobre o WhatsApp: so escreve no Garimpo.
+      async updateLead(id, fields) {
+        const r = await fetch(`${base}/leads?id=eq.${id}`, {
+          method: "PATCH",
+          headers: { ...headers, Prefer: "return=representation" },
+          body: JSON.stringify(fields)
+        });
+        if (!r.ok) throw new Error(`updateLead: ${r.status} ${await r.text()}`);
         const data = await r.json();
         return Array.isArray(data) ? data[0] : data;
       },
@@ -259,6 +277,14 @@
     lastKey = key;
     renderBody(parsed, matchLead(parsed, leads));
   }
+  var EDIT_FIELDS = [
+    { key: "owner_name", label: "Dono / responsavel", type: "text" },
+    { key: "phone", label: "Telefone", type: "text" },
+    { key: "whatsapp", label: "WhatsApp", type: "text" },
+    { key: "email", label: "E-mail", type: "text" },
+    { key: "instagram", label: "Instagram", type: "text" },
+    { key: "deal_value", label: "Orcamento (R$)", type: "number" }
+  ];
   async function doTransition(id, to, label) {
     try {
       const updated = await repo.transition(id, to);
@@ -286,7 +312,7 @@
       <button class="gp-min" title="Minimizar painel" aria-label="Minimizar painel">\u2212</button>
     </div>
     <div class="gp-body"></div>
-    <div class="gp-foot">Somente leitura. Quem envia e voce.</div>`;
+    <div class="gp-foot">So le seu WhatsApp. Status e edicoes vao pro Garimpo.</div>`;
     document.body.append(panel);
     panel.querySelector(".gp-min").addEventListener("click", () => panel.classList.toggle("gp-collapsed"));
   }
@@ -338,7 +364,73 @@
       }
       card.append(row);
     }
+    let form = null;
+    const editToggle = el("button", { className: "gp-edit-toggle", textContent: "\u270E Editar / anotar" });
+    editToggle.addEventListener("click", () => {
+      if (form) {
+        form.remove();
+        form = null;
+        editToggle.textContent = "\u270E Editar / anotar";
+        return;
+      }
+      form = editForm(lead);
+      card.append(form);
+      editToggle.textContent = "Fechar edicao";
+    });
+    card.append(editToggle);
     return card;
+  }
+  function editForm(lead) {
+    const form = el("div", { className: "gp-edit" });
+    const inputs = {};
+    for (const f of EDIT_FIELDS) {
+      const wrap = el("label", { className: "gp-field" });
+      wrap.append(el("span", { className: "gp-flabel", textContent: f.label }));
+      const inp = el("input", {
+        className: "gp-input",
+        type: f.type,
+        value: lead[f.key] != null ? String(lead[f.key]) : ""
+      });
+      inputs[f.key] = inp;
+      wrap.append(inp);
+      form.append(wrap);
+    }
+    const notesWrap = el("label", { className: "gp-field" });
+    notesWrap.append(el("span", { className: "gp-flabel", textContent: "Anotacoes" }));
+    const notes = el("textarea", { className: "gp-input gp-textarea", rows: 3 });
+    notes.value = lead.notes || "";
+    inputs.notes = notes;
+    notesWrap.append(notes);
+    form.append(notesWrap);
+    const save = el("button", { className: "gp-save", textContent: "Salvar no lead" });
+    save.addEventListener("click", async () => {
+      const patch = {};
+      for (const f of EDIT_FIELDS) {
+        const raw = inputs[f.key].value.trim();
+        const cur = lead[f.key] != null ? String(lead[f.key]) : "";
+        if (raw === cur) continue;
+        if (f.type === "number") patch[f.key] = raw === "" ? null : Number(raw);
+        else patch[f.key] = raw === "" ? null : raw;
+      }
+      const notesVal = inputs.notes.value;
+      if (notesVal !== (lead.notes || "")) patch.notes = notesVal === "" ? null : notesVal;
+      if (Object.keys(patch).length === 0) {
+        toast("Nada mudou");
+        return;
+      }
+      save.disabled = true;
+      try {
+        const updated = await repo.updateLead(lead.id, patch);
+        leads = leads.map((l) => l.id === lead.id ? { ...l, ...patch, ...updated || {} } : l);
+        toast("Salvo no lead");
+        evaluate(true);
+      } catch (e) {
+        toast(`Erro: ${e.message}`, true);
+        save.disabled = false;
+      }
+    });
+    form.append(save);
+    return form;
   }
   function manualBox() {
     const box = el("div", { className: "gp-manual" });

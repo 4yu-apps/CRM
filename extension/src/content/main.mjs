@@ -52,6 +52,18 @@ function evaluate(force = false) {
   renderBody(parsed, matchLead(parsed, leads));
 }
 
+// Campos que dá pra editar/preencher pela extensão (no nosso banco). É por aqui
+// que entra o que a pessoa descobre na conversa: nome do dono, contato que
+// faltava, orçamento sugerido.
+const EDIT_FIELDS = [
+  { key: "owner_name", label: "Dono / responsavel", type: "text" },
+  { key: "phone", label: "Telefone", type: "text" },
+  { key: "whatsapp", label: "WhatsApp", type: "text" },
+  { key: "email", label: "E-mail", type: "text" },
+  { key: "instagram", label: "Instagram", type: "text" },
+  { key: "deal_value", label: "Orcamento (R$)", type: "number" },
+];
+
 async function doTransition(id, to, label) {
   try {
     const updated = await repo.transition(id, to);
@@ -82,7 +94,7 @@ function mountPanel(source) {
       <button class="gp-min" title="Minimizar painel" aria-label="Minimizar painel">−</button>
     </div>
     <div class="gp-body"></div>
-    <div class="gp-foot">Somente leitura. Quem envia e voce.</div>`;
+    <div class="gp-foot">So le seu WhatsApp. Status e edicoes vao pro Garimpo.</div>`;
   document.body.append(panel);
   panel.querySelector(".gp-min").addEventListener("click", () => panel.classList.toggle("gp-collapsed"));
 }
@@ -139,7 +151,81 @@ function leadCard(lead, method) {
     }
     card.append(row);
   }
+
+  // Editar/anotar: expande um mini formulario pra preencher o que a conversa
+  // revela (nome do dono, contato, orcamento) e anotacoes. Escreve so no banco.
+  let form = null;
+  const editToggle = el("button", { className: "gp-edit-toggle", textContent: "✎ Editar / anotar" });
+  editToggle.addEventListener("click", () => {
+    if (form) {
+      form.remove();
+      form = null;
+      editToggle.textContent = "✎ Editar / anotar";
+      return;
+    }
+    form = editForm(lead);
+    card.append(form);
+    editToggle.textContent = "Fechar edicao";
+  });
+  card.append(editToggle);
   return card;
+}
+
+function editForm(lead) {
+  const form = el("div", { className: "gp-edit" });
+  const inputs = {};
+
+  for (const f of EDIT_FIELDS) {
+    const wrap = el("label", { className: "gp-field" });
+    wrap.append(el("span", { className: "gp-flabel", textContent: f.label }));
+    const inp = el("input", {
+      className: "gp-input",
+      type: f.type,
+      value: lead[f.key] != null ? String(lead[f.key]) : "",
+    });
+    inputs[f.key] = inp;
+    wrap.append(inp);
+    form.append(wrap);
+  }
+
+  const notesWrap = el("label", { className: "gp-field" });
+  notesWrap.append(el("span", { className: "gp-flabel", textContent: "Anotacoes" }));
+  const notes = el("textarea", { className: "gp-input gp-textarea", rows: 3 });
+  notes.value = lead.notes || "";
+  inputs.notes = notes;
+  notesWrap.append(notes);
+  form.append(notesWrap);
+
+  const save = el("button", { className: "gp-save", textContent: "Salvar no lead" });
+  save.addEventListener("click", async () => {
+    const patch = {};
+    for (const f of EDIT_FIELDS) {
+      const raw = inputs[f.key].value.trim();
+      const cur = lead[f.key] != null ? String(lead[f.key]) : "";
+      if (raw === cur) continue;
+      if (f.type === "number") patch[f.key] = raw === "" ? null : Number(raw);
+      else patch[f.key] = raw === "" ? null : raw;
+    }
+    const notesVal = inputs.notes.value;
+    if (notesVal !== (lead.notes || "")) patch.notes = notesVal === "" ? null : notesVal;
+
+    if (Object.keys(patch).length === 0) {
+      toast("Nada mudou");
+      return;
+    }
+    save.disabled = true;
+    try {
+      const updated = await repo.updateLead(lead.id, patch);
+      leads = leads.map((l) => (l.id === lead.id ? { ...l, ...patch, ...(updated || {}) } : l));
+      toast("Salvo no lead");
+      evaluate(true); // re-renderiza (fecha o form) ja com os dados novos
+    } catch (e) {
+      toast(`Erro: ${e.message}`, true);
+      save.disabled = false;
+    }
+  });
+  form.append(save);
+  return form;
 }
 
 function manualBox() {
