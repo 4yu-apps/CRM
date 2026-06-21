@@ -83,9 +83,12 @@ class SupabaseSink:
             "order": "created_at.asc",
             "limit": str(limit),
         }
-        oid = owner_id or self.owner_id
-        if oid:
-            params["owner_id"] = f"eq.{oid}"
+        # Backfill e manutencao: por padrao varre TODOS os donos (service_role
+        # ignora RLS). So escopa se o caller pedir explicitamente um owner_id —
+        # senao ficaria preso ao OWNER_USER_ID do secret, que pode ser um dono
+        # pequeno (foi o caso: o bulk dos leads e de outro dono).
+        if owner_id:
+            params["owner_id"] = f"eq.{owner_id}"
         r = self._send("GET", f"{self.base}/leads", params=params)
         r.raise_for_status()
         return [self._to_lead(row) for row in r.json()]
