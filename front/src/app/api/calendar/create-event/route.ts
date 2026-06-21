@@ -19,6 +19,7 @@ interface LeadPayload {
   business_name?: string | null;
   phone?: string | null;
   service_label?: string | null;
+  location?: string | null;
 }
 
 interface CreateEventBody {
@@ -81,14 +82,18 @@ export async function POST(request: NextRequest): Promise<Response> {
   const descLines: string[] = ["Reuniao agendada pelo Garimpo CRM."];
   if (lead.phone?.trim()) descLines.push(`Telefone: ${lead.phone.trim()}`);
   if (lead.service_label?.trim()) descLines.push(`Servico: ${lead.service_label.trim()}`);
+  const place = lead.location?.trim();
+  if (place) descLines.push(`Local: ${place}`);
 
-  const event = {
+  const event: Record<string, unknown> = {
     summary: `Reuniao com ${business}`,
     description: descLines.join("\n"),
     start: { dateTime: start.toISOString() },
     end: { dateTime: end.toISOString() },
     reminders: { useDefault: true },
   };
+  // Local do evento: endereco (presencial) ou link (online) vira o "location".
+  if (place) event.location = place;
 
   let res: Response;
   try {

@@ -174,6 +174,14 @@ function fbUrl(handle?: string | null): string | undefined {
   if (!h) return undefined;
   return /^https?:\/\//i.test(h) ? h : `https://facebook.com/${h}`;
 }
+// ISO -> valor do <input type="datetime-local"> (local, sem timezone).
+function toLocalInput(iso?: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
 
 // ---------------------------------------------------------------------------
 // Estado de loading / erro / nao encontrado
@@ -253,6 +261,9 @@ export default function FichaPage() {
       city: lead.city ?? "",
       state: lead.state ?? "",
       owner_name: lead.owner_name ?? "",
+      meeting_at: lead.meeting_at ?? null,
+      meeting_link: lead.meeting_link ?? "",
+      meeting_location: lead.meeting_location ?? "",
     });
     setEditing(true);
   }, []);
@@ -474,6 +485,29 @@ export default function FichaPage() {
                 <EditField label="Bairro" value={form.neighborhood ?? ""} onChange={(v) => setForm((f) => ({ ...f, neighborhood: v }))} prov={provOf(provenance, "neighborhood")} />
                 <EditField label="Cidade" value={form.city ?? ""} onChange={(v) => setForm((f) => ({ ...f, city: v }))} prov={provOf(provenance, "city")} />
                 <EditField label="UF" value={form.state ?? ""} onChange={(v) => setForm((f) => ({ ...f, state: v }))} placeholder="SP" prov={provOf(provenance, "state")} />
+
+                <div className="mt-1 border-t border-border pt-3 text-[11px] font-bold uppercase tracking-wider text-faint">
+                  Reuniao
+                </div>
+                <div>
+                  <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-faint">
+                    Data e hora
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={toLocalInput(form.meeting_at)}
+                    onChange={(e) =>
+                      setForm((f) => ({
+                        ...f,
+                        meeting_at: e.target.value ? new Date(e.target.value).toISOString() : null,
+                      }))
+                    }
+                    className="w-full rounded-xl border border-border-2 bg-surface-2 px-3 py-2.5 text-sm text-ink outline-none focus:border-brand"
+                  />
+                </div>
+                <EditField label="Link da reuniao (online)" value={form.meeting_link ?? ""} onChange={(v) => setForm((f) => ({ ...f, meeting_link: v }))} placeholder="Meet, Zoom, Teams..." />
+                <EditField label="Local (presencial)" value={form.meeting_location ?? ""} onChange={(v) => setForm((f) => ({ ...f, meeting_location: v }))} placeholder="Endereco do encontro" />
+
                 <div className="mt-1 flex gap-2.5">
                   <button
                     onClick={saveEdit}
@@ -505,6 +539,15 @@ export default function FichaPage() {
                 <DataRow label="Endereco" value={lead.address ?? "-"} prov={provOf(provenance, "address")} />
                 <DataRow label="Bairro" value={lead.neighborhood ?? "-"} prov={provOf(provenance, "neighborhood")} />
                 <DataRow label="Cidade / UF" value={[lead.city, lead.state].filter(Boolean).join(" / ") || "-"} />
+                {lead.meeting_at && (
+                  <DataRow label="Reuniao" value={fmtDateTime(lead.meeting_at)} />
+                )}
+                {lead.meeting_link && (
+                  <DataRow label="Link da reuniao" value={lead.meeting_link} href={lead.meeting_link} />
+                )}
+                {lead.meeting_location && (
+                  <DataRow label="Local da reuniao" value={lead.meeting_location} />
+                )}
               </div>
             )}
           </div>

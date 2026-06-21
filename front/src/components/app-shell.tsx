@@ -9,6 +9,7 @@ import {
   Tray,
   Funnel,
   AddressBook,
+  CalendarBlank,
   ChartLineUp,
   MagnifyingGlass,
   DeviceMobile,
@@ -16,10 +17,14 @@ import {
   Sun,
   Moon,
   SignOut,
+  Bell,
+  VideoCamera,
+  MapPin,
 } from "@phosphor-icons/react";
 import { useAuth } from "@/lib/auth";
 import { useLeads } from "@/hooks/use-leads";
 import { STATUS_META } from "@/lib/state-machine";
+import { meetingsWithin, meetingModality, fmtMeetingWhen } from "@/lib/meetings";
 import type { Lead } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -30,6 +35,7 @@ const NAV: NavItem[] = [
   { href: "/fila", label: "Fila de leads", Icon: Tray },
   { href: "/funil", label: "Funil", Icon: Funnel },
   { href: "/contatos", label: "Contatos", Icon: AddressBook },
+  { href: "/agenda", label: "Agenda", Icon: CalendarBlank },
   { href: "/resultados", label: "Resultados", Icon: ChartLineUp },
   { href: "/buscar", label: "Buscar", Icon: MagnifyingGlass },
   { href: "/celular", label: "No celular", Icon: DeviceMobile },
@@ -41,6 +47,7 @@ const TITLES: Record<string, [string, string]> = {
   "/fila": ["Fila de leads", "Revise, ajuste e aprove"],
   "/funil": ["Funil", "Onde cada lead está agora"],
   "/contatos": ["Contatos", "Sua base inteira, num lugar só"],
+  "/agenda": ["Agenda", "Suas próximas reuniões"],
   "/resultados": ["Resultados", "Tá valendo a pena?"],
   "/buscar": ["Buscar leads", "Sob comando, quando você quiser"],
   "/celular": ["No celular", "Acompanhe e envie pelo WhatsApp"],
@@ -135,6 +142,81 @@ function HeaderSearch({ leads }: { leads: Lead[] }) {
               </button>
             ))
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Sininho: as reunioes das proximas 48h. Mostra contagem, e clicar abre a ficha.
+// "amanha voce tem reuniao com X" sem voce ir caçar na agenda.
+function NotificationBell({ leads }: { leads: Lead[] }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const items = meetingsWithin(leads, 48);
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        aria-label="Notificacoes"
+        onClick={() => setOpen((o) => !o)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        className="relative flex size-9 items-center justify-center rounded-full border border-border bg-accent text-ink-2 transition-colors hover:text-brand"
+      >
+        <Bell size={17} weight={items.length ? "fill" : "regular"} />
+        {items.length > 0 && (
+          <span
+            className="absolute -right-0.5 -top-0.5 flex h-[17px] min-w-[17px] items-center justify-center rounded-full px-1 text-[10px] font-bold text-white"
+            style={{ background: "var(--grad)" }}
+          >
+            {items.length}
+          </span>
+        )}
+      </button>
+      {open && (
+        <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-[300px] overflow-hidden rounded-[14px] border border-border bg-card shadow-xl">
+          <div className="border-b border-border px-4 py-2.5 text-[12px] font-bold uppercase tracking-wider text-faint">
+            Proximas reunioes
+          </div>
+          {items.length === 0 ? (
+            <div className="px-4 py-4 text-[13px] text-muted-foreground">
+              Nada nas proximas 48h.
+            </div>
+          ) : (
+            items.map(({ lead, at }) => {
+              const modality = meetingModality(lead);
+              return (
+                <button
+                  key={lead.id}
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    setOpen(false);
+                    router.push(`/ficha/${lead.id}`);
+                  }}
+                  className="flex w-full flex-col items-start gap-0.5 border-b border-border px-4 py-2.5 text-left transition-colors last:border-0 hover:bg-accent/60"
+                >
+                  <span className="truncate text-[13.5px] font-semibold text-ink">
+                    {lead.business_name ?? "(sem nome)"}
+                  </span>
+                  <span className="flex items-center gap-1.5 text-[12px] text-brand-700">
+                    {fmtMeetingWhen(at)}
+                    {modality === "online" && <VideoCamera size={12} weight="fill" />}
+                    {modality === "presencial" && <MapPin size={12} weight="fill" />}
+                  </span>
+                </button>
+              );
+            })
+          )}
+          <Link
+            href="/agenda"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => setOpen(false)}
+            className="block bg-surface-2 px-4 py-2.5 text-center text-[12.5px] font-semibold text-brand hover:underline"
+          >
+            Ver agenda completa
+          </Link>
         </div>
       )}
     </div>
@@ -251,7 +333,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
           <div className="flex items-center gap-3.5">
             <HeaderSearch leads={leads} />
-            <div className="flex items-center gap-2.5 rounded-full border border-border bg-accent px-3.5 py-2">
+            <NotificationBell leads={leads} />
+            <div className="hidden items-center gap-2.5 rounded-full border border-border bg-accent px-3.5 py-2 sm:flex">
               <span
                 className="size-2.5 flex-none rounded-full"
                 style={{ background: "var(--brand)", animation: "pulseDot 1.8s ease-in-out infinite" }}

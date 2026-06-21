@@ -15,6 +15,8 @@ export interface CalendarLeadInput {
   business_name?: string | null;
   phone?: string | null;
   service_label?: string | null;
+  // endereco (presencial) ou link (online): vira o "local" do evento no Google.
+  location?: string | null;
 }
 
 export type CreateEventResult =

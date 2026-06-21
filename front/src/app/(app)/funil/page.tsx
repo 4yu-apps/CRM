@@ -93,14 +93,23 @@ function getColumnForLead(lead: Lead): KanbanColumn | undefined {
 // Modal: agendamento de reuniao
 // ---------------------------------------------------------------------------
 
+interface MeetingData {
+  dateTime: string;
+  link: string;
+  location: string;
+}
+
 interface MeetingModalProps {
   lead: Lead;
-  onConfirm: (dateTime: string) => void;
+  onConfirm: (data: MeetingData) => void;
   onClose: () => void;
 }
 
 function FunnelMeetingModal({ lead, onConfirm, onClose }: MeetingModalProps) {
   const [dateTime, setDateTime] = useState("");
+  const [modality, setModality] = useState<"online" | "presencial">("online");
+  const [link, setLink] = useState("");
+  const [location, setLocation] = useState("");
 
   return (
     <div
@@ -136,9 +145,48 @@ function FunnelMeetingModal({ lead, onConfirm, onClose }: MeetingModalProps) {
             onChange={(e) => setDateTime(e.target.value)}
             className="w-full rounded-xl border border-border-2 bg-surface-2 px-3.5 py-3 text-sm outline-none focus:border-brand"
           />
+
+          <div className="mt-4 mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-faint">
+            Como vai ser
+          </div>
+          <div className="flex overflow-hidden rounded-xl border border-border-2">
+            {(["online", "presencial"] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setModality(m)}
+                className={cn(
+                  "flex-1 py-2.5 text-sm font-semibold capitalize transition-colors",
+                  modality === m ? "text-white" : "bg-surface-2 text-muted-foreground hover:text-brand",
+                )}
+                style={modality === m ? { background: "var(--grad)" } : undefined}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+
+          {modality === "online" ? (
+            <input
+              type="url"
+              value={link}
+              onChange={(e) => setLink(e.target.value)}
+              placeholder="Link da reuniao (Meet, Zoom, Teams...) — opcional"
+              className="mt-3 w-full rounded-xl border border-border-2 bg-surface-2 px-3.5 py-3 text-sm outline-none focus:border-brand"
+            />
+          ) : (
+            <input
+              type="text"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="Endereco do encontro — opcional"
+              className="mt-3 w-full rounded-xl border border-border-2 bg-surface-2 px-3.5 py-3 text-sm outline-none focus:border-brand"
+            />
+          )}
+
           <p className="mt-3 text-[12px] text-muted-foreground">
-            A data fica salva na nota do lead. Quando a agenda do Google Calendar estiver conectada,
-            o evento sera criado automaticamente.
+            Fica salvo no lead e aparece na Agenda. Com o Google Calendar conectado, o evento e
+            criado automaticamente.
           </p>
         </div>
         <div className="flex gap-3 px-6 pb-6">
@@ -154,7 +202,11 @@ function FunnelMeetingModal({ lead, onConfirm, onClose }: MeetingModalProps) {
                 toast.warning("Escolha uma data e hora antes de confirmar.");
                 return;
               }
-              onConfirm(dateTime);
+              onConfirm({
+                dateTime,
+                link: modality === "online" ? link.trim() : "",
+                location: modality === "presencial" ? location.trim() : "",
+              });
             }}
             className="flex-1 rounded-[14px] p-3.5 text-sm font-bold text-white"
             style={{ background: "var(--grad)" }}
@@ -666,18 +718,36 @@ export default function FunilPage() {
   // -------------------------------------------------------------------------
 
   const handleMeetingConfirm = useCallback(
-    async (dateTime: string) => {
+    async (data: MeetingData) => {
       if (modal.type !== "meeting") return;
       const { lead } = modal;
       const col = KANBAN_COLUMNS.find((c) => c.id === "reuniao")!;
-      const note = `Reuniao agendada para ${new Date(dateTime).toLocaleString("pt-BR")}`;
+      const iso = new Date(data.dateTime).toISOString();
+      const quando = new Date(data.dateTime).toLocaleString("pt-BR");
+      const note = data.link
+        ? `Reuniao online · ${quando}`
+        : data.location
+          ? `Reuniao presencial (${data.location}) · ${quando}`
+          : `Reuniao · ${quando}`;
       setModal({ type: "none" });
 
-      // 1) Transicao + nota: o que o funil ja fazia. E o caminho principal e
+      // 1) Salva os campos de reuniao no lead (Agenda e sininho leem daqui).
+      // Best-effort: nao bloqueia a transicao.
+      try {
+        await repo.update(lead.id, {
+          meeting_at: iso,
+          meeting_link: data.link || null,
+          meeting_location: data.location || null,
+        });
+      } catch {
+        // segue mesmo assim; a transicao + nota garantem o registro
+      }
+
+      // 2) Transicao + nota: o que o funil ja fazia. E o caminho principal e
       // nunca e bloqueado pelo calendar.
       await executeTransition(lead, col, note);
 
-      // 2) Best-effort: criar o evento no Google Calendar. Qualquer falha aqui
+      // 3) Best-effort: criar o evento no Google Calendar. Qualquer falha aqui
       // (sem token, token expirado, rede) so vira um aviso amigavel; jamais
       // desfaz a transicao nem joga erro vermelho.
       const service = SERVICE_META[lead.service_target] ?? SERVICE_META.indefinido;
@@ -686,8 +756,9 @@ export default function FunilPage() {
           business_name: lead.business_name,
           phone: lead.phone,
           service_label: service.label,
+          location: data.location || data.link || null,
         },
-        new Date(dateTime).toISOString()
+        iso
       );
 
       if (result.ok) {
@@ -698,15 +769,15 @@ export default function FunilPage() {
         );
       } else if (result.reason === "sem_token") {
         toast.message(
-          "Reuniao salva na nota. Conecte o Google Calendar na Configuracao pra criar o evento automaticamente."
+          "Reuniao salva na Agenda. Conecte o Google Calendar na Configuracao pra criar o evento automaticamente."
         );
       } else {
         toast.message(
-          "Reuniao salva na nota. Nao consegui criar o evento no Google Calendar agora; tente de novo mais tarde."
+          "Reuniao salva na Agenda. Nao consegui criar o evento no Google Calendar agora; tente de novo mais tarde."
         );
       }
     },
-    [modal, executeTransition]
+    [modal, repo, executeTransition]
   );
 
   const handleDealConfirm = useCallback(

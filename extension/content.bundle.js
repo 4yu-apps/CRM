@@ -283,8 +283,17 @@
     { key: "whatsapp", label: "WhatsApp", type: "text" },
     { key: "email", label: "E-mail", type: "text" },
     { key: "instagram", label: "Instagram", type: "text" },
-    { key: "deal_value", label: "Orcamento (R$)", type: "number" }
+    { key: "deal_value", label: "Orcamento (R$)", type: "number" },
+    { key: "meeting_link", label: "Link da reuniao", type: "text" },
+    { key: "meeting_location", label: "Local (presencial)", type: "text" }
   ];
+  function toLocalInput(iso) {
+    if (!iso) return "";
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "";
+    const p = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+  }
   async function doTransition(id, to, label) {
     try {
       const updated = await repo.transition(id, to);
@@ -395,6 +404,12 @@
       wrap.append(inp);
       form.append(wrap);
     }
+    const mWrap = el("label", { className: "gp-field" });
+    mWrap.append(el("span", { className: "gp-flabel", textContent: "Reuniao (data/hora)" }));
+    const mAt = el("input", { className: "gp-input", type: "datetime-local", value: toLocalInput(lead.meeting_at) });
+    inputs.meeting_at = mAt;
+    mWrap.append(mAt);
+    form.append(mWrap);
     const notesWrap = el("label", { className: "gp-field" });
     notesWrap.append(el("span", { className: "gp-flabel", textContent: "Anotacoes" }));
     const notes = el("textarea", { className: "gp-input gp-textarea", rows: 3 });
@@ -412,6 +427,8 @@
         if (f.type === "number") patch[f.key] = raw === "" ? null : Number(raw);
         else patch[f.key] = raw === "" ? null : raw;
       }
+      const mIso = inputs.meeting_at.value ? new Date(inputs.meeting_at.value).toISOString() : null;
+      if (mIso !== (lead.meeting_at || null)) patch.meeting_at = mIso;
       const notesVal = inputs.notes.value;
       if (notesVal !== (lead.notes || "")) patch.notes = notesVal === "" ? null : notesVal;
       if (Object.keys(patch).length === 0) {

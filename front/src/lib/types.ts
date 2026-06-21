@@ -91,6 +91,13 @@ export interface Lead {
   deal_term_months?: number | null;
   deal_closed_at?: string | null;
 
+  // Reuniao (Slice E): quando, e onde acontece. meeting_link = online
+  // (Meet/Zoom/Teams); meeting_location = presencial (endereco). A Agenda e o
+  // sininho de notificacoes leem o meeting_at.
+  meeting_at?: string | null;
+  meeting_link?: string | null;
+  meeting_location?: string | null;
+
   created_at: string;
   updated_at: string;
 
@@ -148,6 +155,9 @@ export type LeadEditable = Partial<
     | "deal_billing"
     | "deal_term_months"
     | "deal_closed_at"
+    | "meeting_at"
+    | "meeting_link"
+    | "meeting_location"
   >
 >;
 
