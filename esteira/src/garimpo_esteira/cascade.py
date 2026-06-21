@@ -18,7 +18,12 @@ from .sink.base import LeadSink
 from .sources.base import Source
 
 
-def enrich_lead(lead: Lead, sources: Sequence[Source], sink: LeadSink) -> EnrichResult:
+def enrich_lead(
+    lead: Lead, sources: Sequence[Source], sink: LeadSink, *, advance_status: bool = True
+) -> EnrichResult:
+    """Roda as fontes, grava proveniencia + campos vazios. Com advance_status,
+    avanca bruto->enriquecido (pipeline normal); sem, so preenche campos sem
+    mexer no status (usado pelo backfill de leads ja avancados)."""
     all_findings = []
     column_updates: dict[str, object] = {}
 
@@ -40,9 +45,11 @@ def enrich_lead(lead: Lead, sources: Sequence[Source], sink: LeadSink) -> Enrich
         sink.update_lead_fields(lead.id, column_updates)
 
     rate = match_rate(lead)
-    new_status: LeadStatus = "enriquecido"
-    if lead.status != new_status:
-        sink.set_status(lead.id, new_status, actor="system", note=f"match {int(rate * 100)}%")
+    new_status: LeadStatus = lead.status
+    if advance_status:
+        new_status = "enriquecido"
+        if lead.status != new_status:
+            sink.set_status(lead.id, new_status, actor="system", note=f"match {int(rate * 100)}%")
 
     return EnrichResult(lead.id, all_findings, list(column_updates), rate, new_status)
 

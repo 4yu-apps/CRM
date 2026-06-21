@@ -8,10 +8,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import time
 from pathlib import Path
 
 from .autopilot import run_autopilot
-from .cascade import enrich_batch
+from .cascade import enrich_batch, enrich_lead
 from .config import FIXTURES_DIR, Config, build_maps_source, build_provider, build_sink, build_sources
 from .discovery import discover
 from .draft_stage import draft_batch
@@ -151,6 +152,52 @@ def cmd_autopilot(cfg: Config) -> int:
     return 0
 
 
+def _ads_from_prov(prov: list[dict]) -> bool | None:
+    for p in prov:
+        if p.get("field_name") == "ads_active":
+            return p.get("value") == "sim"
+    return None
+
+
+def cmd_backfill(cfg: Config) -> int:
+    """Completa leads JA avancados (rascunho_pronto etc.) que tem site mas
+    ficaram sem facebook/instagram/whatsapp/ads_active — eles passaram pela
+    esteira antes do enriquecimento+ existir. Re-raspa o site e checa a Meta SEM
+    mexer no status. So preenche campo vazio; idempotente."""
+    sink = build_sink(cfg)
+    sources = build_sources(cfg)
+    leads = sink.fetch_backfill(cfg.batch)
+    print(f"backfill · sink={cfg.sink} sources={cfg.sources_mode} batch={cfg.batch} alvo={len(leads)}")
+    if not leads:
+        print("  nada pra completar (leads com site ja tem facebook/insta/whatsapp/ads)")
+        return 0
+
+    filled = ads_yes = ads_no = 0
+    for i, lead in enumerate(leads):
+        try:
+            res = enrich_lead(lead, sources, sink, advance_status=False)
+            if res.fields_filled:
+                filled += 1
+            # ads_active vai pra proveniencia (como no pipeline); aqui promovemos
+            # pra coluna do lead na hora, igual o estagio de score faz.
+            ads = _ads_from_prov(sink.fetch_provenance(lead.id))
+            if ads is not None:
+                sink.update_lead_fields(lead.id, {"ads_active": ads})
+                ads_yes += 1 if ads else 0
+                ads_no += 0 if ads else 1
+            tag = "sim" if ads else "nao" if ads is False else "?"
+            print(f"  {lead.id}: +{res.fields_filled or '—'} anuncia={tag}")
+        except Exception as e:
+            print(f"  {lead.id}: erro {e}")
+        if cfg.delay and i < len(leads) - 1:
+            time.sleep(cfg.delay)
+
+    print(f"resumo: {len(leads)} processados · {filled} ganharam campo · "
+          f"ja anuncia: {ads_yes} sim / {ads_no} nao / {len(leads) - ads_yes - ads_no} desconhecido")
+    _print_counts(sink)
+    return 0
+
+
 def cmd_counts(cfg: Config) -> int:
     _print_counts(build_sink(cfg))
     return 0
@@ -164,7 +211,7 @@ def _print_counts(sink) -> None:
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="garimpo-esteira")
     sub = p.add_subparsers(dest="cmd", required=True)
-    for name in ("seed-demo", "discover", "enrich", "score", "draft", "pipeline", "autopilot", "counts"):
+    for name in ("seed-demo", "discover", "enrich", "score", "draft", "pipeline", "autopilot", "backfill", "counts"):
         sp = sub.add_parser(name)
         sp.add_argument("--sink", choices=["jsonfile", "supabase"])
         sp.add_argument("--json")
@@ -189,6 +236,7 @@ def main(argv: list[str] | None = None) -> int:
         "draft": cmd_draft,
         "pipeline": cmd_pipeline,
         "autopilot": cmd_autopilot,
+        "backfill": cmd_backfill,
         "counts": cmd_counts,
     }
     return dispatch[args.cmd](cfg)

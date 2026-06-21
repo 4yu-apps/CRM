@@ -1,6 +1,6 @@
 import json
 
-from garimpo_esteira.cascade import enrich_batch
+from garimpo_esteira.cascade import enrich_batch, enrich_lead
 from garimpo_esteira.models import Lead
 from garimpo_esteira.sink import JsonFileSink
 from garimpo_esteira.sources import AdLibrarySource, CnpjSource, InstagramSource, WebsiteSource
@@ -92,6 +92,44 @@ def test_ad_library_signal_is_provenance_not_set_by_enrichment(tmp_path):
     # ads_active virou coluna (B1), mas o enriquecimento NAO a preenche:
     # quem promove o sinal pra coluna do lead e o estagio de score.
     assert db["leads"][lid].get("ads_active") is None
+
+
+def _sources_offline(html=None, ad_probe=None):
+    # WebsiteSource com fetch injetado pra nao tocar a rede nos testes.
+    return [
+        CnpjSource(fetch=lambda c: FAKE_CNPJ.get(c)),
+        InstagramSource(),
+        WebsiteSource(reachable=lambda _u: True, fetch_html=lambda _u: html),
+        AdLibrarySource(probe=ad_probe),
+    ]
+
+
+def test_fetch_backfill_pega_quem_tem_site_e_falta_dado(tmp_path):
+    sink = _sink(tmp_path)
+    alvo = sink.insert_lead(Lead(id="", owner_id="o", status="rascunho_pronto",
+                                 website="https://a.com", phone="44999990001"))
+    # sem site: nao e alvo de backfill
+    sink.insert_lead(Lead(id="", owner_id="o", status="rascunho_pronto", phone="44999990002"))
+    alvos = sink.fetch_backfill(10)
+    assert [l.id for l in alvos] == [alvo]
+
+
+def test_backfill_enrich_lead_preenche_sem_mudar_status(tmp_path):
+    sink = _sink(tmp_path)
+    html = '<a href="https://facebook.com/negocioA">fb</a> <a href="https://wa.me/5544999990003">wa</a>'
+    lid = sink.insert_lead(Lead(id="", owner_id="o", status="rascunho_pronto", website="https://a.com"))
+    lead = sink.get_lead(lid)
+
+    res = enrich_lead(lead, _sources_offline(html=html, ad_probe=lambda _l: True), sink, advance_status=False)
+    assert res.new_status == "rascunho_pronto"  # NAO mexe no status
+
+    out = sink.get_lead(lid)
+    assert out.status == "rascunho_pronto"
+    assert out.facebook == "negocioa"
+    assert out.whatsapp == "44999990003"
+    # ads_active foi pra proveniencia (o backfill promove pra coluna no cmd)
+    prov = sink.fetch_provenance(lid)
+    assert any(p["field_name"] == "ads_active" and p["value"] == "sim" for p in prov)
 
 
 def test_failing_source_does_not_break_cascade(tmp_path):

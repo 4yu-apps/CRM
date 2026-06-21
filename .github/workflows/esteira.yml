@@ -13,6 +13,11 @@ on:
     - cron: "0 */2 * * *"
   workflow_dispatch:
     inputs:
+      command:
+        description: "Comando da esteira"
+        default: "autopilot"
+        type: choice
+        options: ["autopilot", "backfill"]
       batch:
         description: "Tamanho do lote"
         default: "60"
@@ -65,4 +70,4 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           # "ja anuncia?" via Meta Ad Library. Sem o secret, a fonte fica inerte.
           META_AD_LIBRARY_TOKEN: ${{ secrets.META_AD_LIBRARY_TOKEN }}
-        run: python -m garimpo_esteira.run autopilot
+        run: python -m garimpo_esteira.run ${{ github.event.inputs.command || 'autopilot' }}

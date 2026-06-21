@@ -73,6 +73,23 @@ class SupabaseSink:
         r.raise_for_status()
         return [self._to_lead(row) for row in r.json()]
 
+    def fetch_backfill(self, limit: int, owner_id: str | None = None) -> list[Lead]:
+        # Tem site, nao e opt-out, e falta algum dado que o site costuma ter
+        # (facebook/instagram/whatsapp) ou ainda nao checamos anuncio (ads_active).
+        params = {
+            "website": "not.is.null",
+            "opt_out": "eq.false",
+            "or": "(facebook.is.null,instagram.is.null,whatsapp.is.null,ads_active.is.null)",
+            "order": "created_at.asc",
+            "limit": str(limit),
+        }
+        oid = owner_id or self.owner_id
+        if oid:
+            params["owner_id"] = f"eq.{oid}"
+        r = self._send("GET", f"{self.base}/leads", params=params)
+        r.raise_for_status()
+        return [self._to_lead(row) for row in r.json()]
+
     def fetch_autopilot_profiles(self) -> list[dict]:
         try:
             r = self._send(

@@ -53,6 +53,18 @@ class JsonFileSink:
         rows.sort(key=lambda r: r.get("created_at", ""))
         return [self._to_lead(r) for r in rows[:limit]]
 
+    def fetch_backfill(self, limit: int, owner_id: str | None = None) -> list[Lead]:
+        def falta(r: dict) -> bool:
+            return any(r.get(f) in (None, "") for f in ("facebook", "instagram", "whatsapp", "ads_active"))
+
+        rows = [
+            r for r in self._db["leads"].values()
+            if r.get("website") and not r.get("opt_out") and falta(r)
+            and (owner_id is None or r.get("owner_id") == owner_id)
+        ]
+        rows.sort(key=lambda r: r.get("created_at", ""))
+        return [self._to_lead(r) for r in rows[:limit]]
+
     def fetch_autopilot_profiles(self) -> list[dict]:
         return [p for p in self._db.get("profiles", []) if p.get("autopilot")]
 

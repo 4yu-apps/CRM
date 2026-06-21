@@ -17,6 +17,11 @@ class LeadSink(Protocol):
         """Leads num status (mais antigos primeiro). Se owner_id, so os do dono."""
         ...
 
+    def fetch_backfill(self, limit: int, owner_id: str | None = None) -> list[Lead]:
+        """Leads que tem site mas ainda faltam dados (facebook/instagram/whatsapp/
+        ads_active), em qualquer status — alvo do backfill de re-enriquecimento."""
+        ...
+
     def fetch_autopilot_profiles(self) -> list[dict]:
         """Perfis de busca com autopilot ligado (owner_id, niches, city, state...)."""
         ...
