@@ -118,10 +118,10 @@ function HeaderSearch({ leads }: { leads: Lead[] }) {
           if (e.key === "Escape") setOpen(false);
         }}
         placeholder="Buscar contato..."
-        className="w-[200px] rounded-full border border-border bg-accent py-2 pl-9 pr-3 text-[13px] text-ink outline-none transition-all focus:w-[260px] focus:border-brand"
+        className="w-[240px] rounded-full border border-border bg-accent py-2 pl-9 pr-3 text-[13px] text-ink outline-none transition-all focus:w-[300px] focus:border-brand"
       />
       {open && q.trim().length >= 2 && (
-        <div className="absolute right-0 top-[calc(100%+6px)] z-50 w-[300px] overflow-hidden rounded-[14px] border border-border bg-card shadow-xl">
+        <div className="absolute right-0 top-[calc(100%+6px)] z-50 w-[420px] max-w-[80vw] overflow-hidden rounded-[14px] border border-border bg-card shadow-xl">
           {matches.length === 0 ? (
             <div className="px-4 py-3 text-[13px] text-muted-foreground">Nada encontrado</div>
           ) : (
@@ -133,7 +133,7 @@ function HeaderSearch({ leads }: { leads: Lead[] }) {
                 onClick={() => go(l.id)}
                 className="flex w-full flex-col items-start gap-0.5 border-b border-border px-4 py-2.5 text-left transition-colors last:border-0 hover:bg-accent/60"
               >
-                <span className="truncate text-[13.5px] font-semibold text-ink">
+                <span className="line-clamp-2 text-[13.5px] font-semibold text-ink">
                   {l.business_name ?? "(sem nome)"}
                 </span>
                 <span className="truncate text-[12px] text-faint">
@@ -175,7 +175,7 @@ function NotificationBell({ leads }: { leads: Lead[] }) {
         )}
       </button>
       {open && (
-        <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-[300px] overflow-hidden rounded-[14px] border border-border bg-card shadow-xl">
+        <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-[360px] max-w-[80vw] overflow-hidden rounded-[14px] border border-border bg-card shadow-xl">
           <div className="border-b border-border px-4 py-2.5 text-[12px] font-bold uppercase tracking-wider text-faint">
             Proximas reunioes
           </div>
@@ -197,7 +197,7 @@ function NotificationBell({ leads }: { leads: Lead[] }) {
                   }}
                   className="flex w-full flex-col items-start gap-0.5 border-b border-border px-4 py-2.5 text-left transition-colors last:border-0 hover:bg-accent/60"
                 >
-                  <span className="truncate text-[13.5px] font-semibold text-ink">
+                  <span className="line-clamp-2 text-[13.5px] font-semibold text-ink">
                     {lead.business_name ?? "(sem nome)"}
                   </span>
                   <span className="flex items-center gap-1.5 text-[12px] text-brand-700">
