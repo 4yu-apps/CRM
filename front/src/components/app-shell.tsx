@@ -8,6 +8,7 @@ import {
   House,
   Tray,
   Funnel,
+  AddressBook,
   ChartLineUp,
   MagnifyingGlass,
   DeviceMobile,
@@ -18,6 +19,8 @@ import {
 } from "@phosphor-icons/react";
 import { useAuth } from "@/lib/auth";
 import { useLeads } from "@/hooks/use-leads";
+import { STATUS_META } from "@/lib/state-machine";
+import type { Lead } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type NavItem = { href: string; label: string; Icon: typeof House };
@@ -26,6 +29,7 @@ const NAV: NavItem[] = [
   { href: "/", label: "Início", Icon: House },
   { href: "/fila", label: "Fila de leads", Icon: Tray },
   { href: "/funil", label: "Funil", Icon: Funnel },
+  { href: "/contatos", label: "Contatos", Icon: AddressBook },
   { href: "/resultados", label: "Resultados", Icon: ChartLineUp },
   { href: "/buscar", label: "Buscar", Icon: MagnifyingGlass },
   { href: "/celular", label: "No celular", Icon: DeviceMobile },
@@ -36,6 +40,7 @@ const TITLES: Record<string, [string, string]> = {
   "/": ["Visão geral", "Seu ponto de partida do dia"],
   "/fila": ["Fila de leads", "Revise, ajuste e aprove"],
   "/funil": ["Funil", "Onde cada lead está agora"],
+  "/contatos": ["Contatos", "Sua base inteira, num lugar só"],
   "/resultados": ["Resultados", "Tá valendo a pena?"],
   "/buscar": ["Buscar leads", "Sob comando, quando você quiser"],
   "/celular": ["No celular", "Acompanhe e envie pelo WhatsApp"],
@@ -52,6 +57,88 @@ function isActive(pathname: string, href: string): boolean {
 function titleFor(pathname: string): [string, string] {
   if (pathname.startsWith("/ficha")) return TITLES["/ficha"];
   return TITLES[pathname] ?? ["", ""];
+}
+
+// Busca rapida no cabecalho: acha um contato por nome/cidade/telefone e abre a
+// ficha na hora. Atalho pra quando voce so quer pular pra um lead especifico.
+function HeaderSearch({ leads }: { leads: Lead[] }) {
+  const router = useRouter();
+  const [q, setQ] = useState("");
+  const [open, setOpen] = useState(false);
+
+  const matches =
+    q.trim().length < 2
+      ? []
+      : (() => {
+          const needle = q.trim().toLowerCase();
+          const num = needle.replace(/\D/g, "");
+          return leads
+            .filter((l) => {
+              const hay = [l.business_name, l.city, l.state, l.owner_name]
+                .filter(Boolean)
+                .join(" ")
+                .toLowerCase();
+              if (hay.includes(needle)) return true;
+              if (num) {
+                const p = (l.phone ?? "").replace(/\D/g, "");
+                const w = (l.whatsapp ?? "").replace(/\D/g, "");
+                if (p.includes(num) || w.includes(num)) return true;
+              }
+              return false;
+            })
+            .slice(0, 7);
+        })();
+
+  const go = (id: string) => {
+    setQ("");
+    setOpen(false);
+    router.push(`/ficha/${id}`);
+  };
+
+  return (
+    <div className="relative hidden md:block">
+      <MagnifyingGlass size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-faint" />
+      <input
+        value={q}
+        onChange={(e) => {
+          setQ(e.target.value);
+          setOpen(true);
+        }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && matches[0]) go(matches[0].id);
+          if (e.key === "Escape") setOpen(false);
+        }}
+        placeholder="Buscar contato..."
+        className="w-[200px] rounded-full border border-border bg-accent py-2 pl-9 pr-3 text-[13px] text-ink outline-none transition-all focus:w-[260px] focus:border-brand"
+      />
+      {open && q.trim().length >= 2 && (
+        <div className="absolute right-0 top-[calc(100%+6px)] z-50 w-[300px] overflow-hidden rounded-[14px] border border-border bg-card shadow-xl">
+          {matches.length === 0 ? (
+            <div className="px-4 py-3 text-[13px] text-muted-foreground">Nada encontrado</div>
+          ) : (
+            matches.map((l) => (
+              <button
+                key={l.id}
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => go(l.id)}
+                className="flex w-full flex-col items-start gap-0.5 border-b border-border px-4 py-2.5 text-left transition-colors last:border-0 hover:bg-accent/60"
+              >
+                <span className="truncate text-[13.5px] font-semibold text-ink">
+                  {l.business_name ?? "(sem nome)"}
+                </span>
+                <span className="truncate text-[12px] text-faint">
+                  {[l.city, l.state].filter(Boolean).join(" / ") || STATUS_META[l.status].label}
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -163,6 +250,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div className="truncate text-[12.5px] text-muted-foreground">{sub}</div>
           </div>
           <div className="flex items-center gap-3.5">
+            <HeaderSearch leads={leads} />
             <div className="flex items-center gap-2.5 rounded-full border border-border bg-accent px-3.5 py-2">
               <span
                 className="size-2.5 flex-none rounded-full"

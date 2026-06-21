@@ -1,0 +1,393 @@
+"use client";
+import { useMemo, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import {
+  MagnifyingGlass,
+  Spinner,
+  Archive,
+  ArrowCounterClockwise,
+  Trash,
+  AddressBook,
+  InstagramLogo,
+  WhatsappLogo,
+  Globe,
+  X,
+} from "@phosphor-icons/react";
+import { useLeads } from "@/hooks/use-leads";
+import { STATUS_META, STATUS_ORDER, TONE_CLASSES } from "@/lib/state-machine";
+import { SERVICE_META } from "@/lib/service";
+import { fmtRelative } from "@/lib/format";
+import type { Lead, LeadStatus } from "@/lib/types";
+import { cn } from "@/lib/utils";
+
+type SortKey = "recent" | "name" | "score";
+
+const SORTS: { value: SortKey; label: string }[] = [
+  { value: "recent", label: "Mais recentes" },
+  { value: "name", label: "Nome (A-Z)" },
+  { value: "score", label: "Maior score" },
+];
+
+function digits(s: string | null | undefined): string {
+  return (s ?? "").replace(/\D/g, "");
+}
+
+// Casa a busca por nome, cidade, telefone/whatsapp, dono ou categoria.
+function matchesQuery(lead: Lead, q: string): boolean {
+  if (!q) return true;
+  const needle = q.trim().toLowerCase();
+  const num = needle.replace(/\D/g, "");
+  const haystack = [
+    lead.business_name,
+    lead.city,
+    lead.state,
+    lead.owner_name,
+    lead.category,
+    lead.instagram,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  if (haystack.includes(needle)) return true;
+  if (num && (digits(lead.phone).includes(num) || digits(lead.whatsapp).includes(num))) return true;
+  return false;
+}
+
+function waUrl(phone?: string | null): string | undefined {
+  const d = digits(phone);
+  if (!d) return undefined;
+  return `https://wa.me/${d.startsWith("55") ? d : "55" + d}`;
+}
+function igUrl(handle?: string | null): string | undefined {
+  const h = (handle ?? "").trim().replace(/^@/, "");
+  return h ? `https://instagram.com/${h}` : undefined;
+}
+function siteUrl(site?: string | null): string | undefined {
+  const s = (site ?? "").trim();
+  if (!s) return undefined;
+  return /^https?:\/\//i.test(s) ? s : `https://${s}`;
+}
+
+function StatusBadge({ status }: { status: LeadStatus }) {
+  const meta = STATUS_META[status];
+  return (
+    <span className={cn("inline-flex rounded-full px-2.5 py-0.5 text-[11.5px] font-semibold", TONE_CLASSES[meta.tone])}>
+      {meta.label}
+    </span>
+  );
+}
+
+// Icone-link de contato; para a propagacao pra nao abrir a ficha ao clicar.
+function ContactIcon({ href, title, children }: { href?: string; title: string; children: React.ReactNode }) {
+  if (!href) return null;
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      title={title}
+      onClick={(e) => e.stopPropagation()}
+      className="flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-brand"
+    >
+      {children}
+    </a>
+  );
+}
+
+export default function ContatosPage() {
+  const router = useRouter();
+  const { leads, loading, refresh, repo } = useLeads();
+
+  const [q, setQ] = useState("");
+  const [statusFilter, setStatusFilter] = useState<LeadStatus | "">("");
+  const [showArchived, setShowArchived] = useState(false);
+  const [sort, setSort] = useState<SortKey>("recent");
+
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<Lead | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const filtered = useMemo(() => {
+    const out = leads
+      .filter((l) => (showArchived ? true : !l.archived))
+      .filter((l) => (statusFilter ? l.status === statusFilter : true))
+      .filter((l) => matchesQuery(l, q));
+    out.sort((a, b) => {
+      if (sort === "name") return (a.business_name ?? "").localeCompare(b.business_name ?? "");
+      if (sort === "score") return (b.score ?? -1) - (a.score ?? -1);
+      return +new Date(b.updated_at) - +new Date(a.updated_at);
+    });
+    return out;
+  }, [leads, q, statusFilter, showArchived, sort]);
+
+  // Contagem por status (entre os nao-arquivados) pro select mostrar so o que existe.
+  const statusCounts = useMemo(() => {
+    const m = new Map<LeadStatus, number>();
+    for (const l of leads) {
+      if (!showArchived && l.archived) continue;
+      m.set(l.status, (m.get(l.status) ?? 0) + 1);
+    }
+    return m;
+  }, [leads, showArchived]);
+
+  const toggleArchive = useCallback(
+    async (lead: Lead) => {
+      setBusyId(lead.id);
+      try {
+        await repo.setArchived(lead.id, !lead.archived);
+        await refresh();
+        toast.success(lead.archived ? "Contato reativado" : "Contato arquivado");
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Erro ao arquivar");
+      } finally {
+        setBusyId(null);
+      }
+    },
+    [repo, refresh],
+  );
+
+  const doDelete = useCallback(async () => {
+    if (!confirmDelete) return;
+    setDeleting(true);
+    try {
+      await repo.remove(confirmDelete.id);
+      await refresh();
+      toast.success("Contato excluido");
+      setConfirmDelete(null);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao excluir");
+    } finally {
+      setDeleting(false);
+    }
+  }, [confirmDelete, repo, refresh]);
+
+  if (loading) {
+    return (
+      <div className="mx-auto flex max-w-[1180px] items-center justify-center py-24">
+        <Spinner size={28} className="animate-spin text-brand" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto max-w-[1180px]">
+      {/* Barra de ferramentas */}
+      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center">
+        <div className="relative flex-1">
+          <MagnifyingGlass size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-faint" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Buscar por nome, cidade, telefone..."
+            className="w-full rounded-xl border border-border-2 bg-surface-2 py-3 pl-10 pr-4 text-[14px] text-ink outline-none focus:border-brand"
+          />
+        </div>
+        <div className="flex gap-2.5">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter((e.target.value as LeadStatus) || "")}
+            className="rounded-xl border border-border-2 bg-surface-2 px-3 py-3 text-[13.5px] text-ink outline-none focus:border-brand"
+          >
+            <option value="">Todos os status</option>
+            {STATUS_ORDER.map((s) => {
+              const n = statusCounts.get(s) ?? 0;
+              return (
+                <option key={s} value={s}>
+                  {STATUS_META[s].label}
+                  {n ? ` (${n})` : ""}
+                </option>
+              );
+            })}
+          </select>
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value as SortKey)}
+            className="rounded-xl border border-border-2 bg-surface-2 px-3 py-3 text-[13.5px] text-ink outline-none focus:border-brand"
+          >
+            {SORTS.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => setShowArchived((v) => !v)}
+            className={cn(
+              "flex items-center gap-1.5 rounded-xl border px-3 py-3 text-[13px] font-semibold transition-colors",
+              showArchived
+                ? "border-brand bg-brand-50 text-brand"
+                : "border-border-2 bg-surface-2 text-muted-foreground hover:text-ink",
+            )}
+            title="Mostrar/ocultar arquivados"
+          >
+            <Archive size={15} weight={showArchived ? "fill" : "regular"} />
+            <span className="hidden sm:inline">Arquivados</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="mb-3 text-[13px] text-muted-foreground">
+        {filtered.length} {filtered.length === 1 ? "contato" : "contatos"}
+        {statusFilter ? ` em ${STATUS_META[statusFilter].label}` : ""}
+        {q ? ` para "${q}"` : ""}
+      </div>
+
+      {/* Lista / tabela */}
+      <div className="overflow-hidden rounded-[16px] border border-border bg-card shadow-[var(--shadow)]">
+        {/* Cabecalho (desktop) */}
+        <div className="hidden grid-cols-[2.4fr_1fr_1.1fr_1fr_0.6fr_0.9fr_auto] gap-3 border-b border-border bg-surface-2 px-5 py-3 text-[11.5px] font-bold uppercase tracking-wider text-faint lg:grid">
+          <span>Negocio</span>
+          <span>Status</span>
+          <span>Local</span>
+          <span>Contato</span>
+          <span>Score</span>
+          <span>Atualizado</span>
+          <span className="text-right">Acoes</span>
+        </div>
+
+        {filtered.length === 0 ? (
+          <div className="flex flex-col items-center gap-3 py-16 text-center">
+            <AddressBook size={38} className="text-faint" />
+            <div className="text-[15px] font-semibold text-ink">Nenhum contato encontrado</div>
+            <p className="max-w-[320px] text-[13px] text-muted-foreground">
+              Ajuste a busca ou o filtro. Novos contatos chegam pela esteira e pela tela Buscar.
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y divide-border">
+            {filtered.map((lead) => (
+              <div
+                key={lead.id}
+                onClick={() => router.push(`/ficha/${lead.id}`)}
+                className="grid cursor-pointer grid-cols-1 gap-2 px-5 py-3.5 transition-colors hover:bg-accent/40 lg:grid-cols-[2.4fr_1fr_1.1fr_1fr_0.6fr_0.9fr_auto] lg:items-center lg:gap-3"
+              >
+                {/* Negocio */}
+                <div className="min-w-0">
+                  <div className="truncate text-[14.5px] font-semibold text-ink">
+                    {lead.business_name ?? "(sem nome)"}
+                  </div>
+                  {(lead.category || lead.owner_name) && (
+                    <div className="truncate text-[12px] text-faint">
+                      {[lead.category, lead.owner_name].filter(Boolean).join(" · ")}
+                    </div>
+                  )}
+                </div>
+
+                {/* Status (mobile: inline) */}
+                <div className="lg:block">
+                  <StatusBadge status={lead.status} />
+                  {lead.archived && (
+                    <span className="ml-2 text-[11px] font-semibold text-faint">arquivado</span>
+                  )}
+                </div>
+
+                {/* Local */}
+                <div className="truncate text-[13px] text-ink-2">
+                  {[lead.city, lead.state].filter(Boolean).join(" / ") || "-"}
+                </div>
+
+                {/* Contato */}
+                <div className="flex items-center gap-1">
+                  <ContactIcon href={waUrl(lead.whatsapp ?? lead.phone)} title="WhatsApp">
+                    <WhatsappLogo size={16} weight="fill" />
+                  </ContactIcon>
+                  <ContactIcon href={igUrl(lead.instagram)} title="Instagram">
+                    <InstagramLogo size={16} />
+                  </ContactIcon>
+                  <ContactIcon href={siteUrl(lead.website)} title="Site">
+                    <Globe size={16} />
+                  </ContactIcon>
+                  {!lead.whatsapp && !lead.phone && !lead.instagram && !lead.website && (
+                    <span className="text-[12px] text-faint">-</span>
+                  )}
+                </div>
+
+                {/* Score */}
+                <div className="text-[13px] font-semibold text-ink-2">
+                  {lead.score ?? "-"}
+                  <span className="ml-1.5 hidden text-[10.5px] font-medium lg:inline">
+                    <span className={cn("rounded px-1 py-0.5", SERVICE_META[lead.service_target].badge)}>
+                      {SERVICE_META[lead.service_target].short}
+                    </span>
+                  </span>
+                </div>
+
+                {/* Atualizado */}
+                <div className="text-[12.5px] text-faint">{fmtRelative(lead.updated_at)}</div>
+
+                {/* Acoes */}
+                <div className="flex items-center justify-end gap-1">
+                  <button
+                    type="button"
+                    disabled={busyId === lead.id}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void toggleArchive(lead);
+                    }}
+                    title={lead.archived ? "Reativar" : "Arquivar"}
+                    className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-ink disabled:opacity-50"
+                  >
+                    {lead.archived ? <ArrowCounterClockwise size={16} /> : <Archive size={16} />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setConfirmDelete(lead);
+                    }}
+                    title="Excluir"
+                    className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-rose-500/10 hover:text-rose-600"
+                  >
+                    <Trash size={16} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Modal de confirmacao de exclusao */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setConfirmDelete(null)}>
+          <div
+            className="w-full max-w-[400px] rounded-[18px] border border-border bg-card p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-1 flex items-center justify-between">
+              <div className="text-[16px] font-bold">Excluir contato?</div>
+              <button type="button" onClick={() => setConfirmDelete(null)} className="text-faint hover:text-ink">
+                <X size={18} />
+              </button>
+            </div>
+            <p className="mb-5 text-[13.5px] text-muted-foreground">
+              <strong className="text-ink">{confirmDelete.business_name ?? "Este contato"}</strong> e todo o
+              historico/proveniencia serao apagados de vez. Se quiser so tirar da lista, prefira{" "}
+              <strong>arquivar</strong>.
+            </p>
+            <div className="flex gap-2.5">
+              <button
+                type="button"
+                onClick={() => void doDelete()}
+                disabled={deleting}
+                className="flex flex-1 items-center justify-center gap-2 rounded-[13px] bg-rose-600 p-3 text-sm font-bold text-white disabled:opacity-60"
+              >
+                {deleting ? <Spinner size={16} className="animate-spin" /> : <Trash size={16} />}
+                {deleting ? "Excluindo..." : "Excluir de vez"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(null)}
+                className="rounded-[13px] border border-border-2 bg-card px-5 py-3 text-sm font-semibold text-ink-2"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
