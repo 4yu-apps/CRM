@@ -278,3 +278,21 @@
 .fu {
   animation: fadeUp .5s cubic-bezier(.22, 1, .36, 1) both;
 }
+
+/* Board do funil: barra de scroll horizontal SEMPRE visivel, pra deixar obvio
+   que ha mais colunas a direita (senao, com scrollbar overlay, ninguem percebe). */
+.kanban-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--brand-100) var(--inset);
+}
+.kanban-scroll::-webkit-scrollbar { height: 11px; }
+.kanban-scroll::-webkit-scrollbar-track {
+  background: var(--inset);
+  border-radius: 999px;
+}
+.kanban-scroll::-webkit-scrollbar-thumb {
+  background: var(--brand-100);
+  border-radius: 999px;
+  border: 2px solid var(--inset);
+}
+.kanban-scroll::-webkit-scrollbar-thumb:hover { background: var(--brand); }

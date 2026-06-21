@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { HandGrabbing, CalendarBlank, CurrencyDollar, X, DotsThreeVertical, CaretRight } from "@phosphor-icons/react";
@@ -581,6 +581,34 @@ export default function FunilPage() {
   // Drag handlers
   // -------------------------------------------------------------------------
 
+  // Auto-scroll do board enquanto arrasta perto da borda (estilo Trello): da pra
+  // levar um card pra uma coluna que esta fora da tela. dirRef = -1..1 (esq/dir),
+  // atualizado pelo onDragOver; o loop roda so durante o arraste (dragLeadId).
+  const boardRef = useRef<HTMLDivElement>(null);
+  const dirRef = useRef(0);
+
+  useEffect(() => {
+    if (!dragLeadId) return;
+    let raf = requestAnimationFrame(function tick() {
+      const el = boardRef.current;
+      if (el && dirRef.current !== 0) el.scrollLeft += dirRef.current * 22;
+      raf = requestAnimationFrame(tick);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [dragLeadId]);
+
+  // Le a posicao do ponteiro sobre o board e decide se rola pra esquerda/direita.
+  const handleBoardDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    const el = boardRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const EDGE = 90; // zona quente perto de cada borda
+    const x = e.clientX;
+    if (x < rect.left + EDGE) dirRef.current = -Math.min(1, (rect.left + EDGE - x) / EDGE);
+    else if (x > rect.right - EDGE) dirRef.current = Math.min(1, (x - (rect.right - EDGE)) / EDGE);
+    else dirRef.current = 0;
+  }, []);
+
   const handleDragStart = useCallback(
     (e: React.DragEvent<HTMLDivElement>, lead: Lead) => {
       setDragLeadId(lead.id);
@@ -593,6 +621,7 @@ export default function FunilPage() {
   const handleDragEnd = useCallback(() => {
     setDragLeadId(null);
     setDragOverColId(null);
+    dirRef.current = 0;
   }, []);
 
   const handleDragOver = useCallback(
@@ -823,7 +852,11 @@ export default function FunilPage() {
       {/* Colunas estilo Trello: largura fixa e scroll horizontal em qualquer
           tamanho. As colunas da direita (arquivados etc.) ficam fora da tela e
           aparecem ao rolar de lado — sem apertar os cards. */}
-      <div className="flex snap-x snap-mandatory gap-3.5 overflow-x-auto pb-3 lg:snap-none">
+      <div
+        ref={boardRef}
+        onDragOver={handleBoardDragOver}
+        className="kanban-scroll flex snap-x snap-mandatory gap-3.5 overflow-x-auto pb-3 lg:snap-none"
+      >
         {KANBAN_COLUMNS.map((col) => (
           <div
             key={col.id}
