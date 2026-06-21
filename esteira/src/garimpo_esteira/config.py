@@ -32,9 +32,11 @@ class Config:
     batch: int = 20
     delay: float = 1.0
     ad_token: str | None = None
-    llm: str = "mock"                 # mock | gemini
+    llm: str = "mock"                 # mock | gemini | groq
     gemini_key: str | None = None
     gemini_model: str = "gemini-flash-latest"
+    groq_key: str | None = None
+    groq_model: str = "llama-3.3-70b-versatile"
     maps_mode: str = "fixture"        # fixture | places
     maps_key: str | None = None
     maps_pages: int = 3               # paginas do Places por busca (~20 cada)
@@ -54,6 +56,8 @@ class Config:
             llm=os.getenv("GARIMPO_LLM", "mock"),
             gemini_key=os.getenv("GEMINI_API_KEY"),
             gemini_model=os.getenv("GEMINI_MODEL", "gemini-flash-latest"),
+            groq_key=os.getenv("GROQ_API_KEY"),
+            groq_model=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
             maps_mode=os.getenv("GARIMPO_MAPS", "fixture"),
             maps_key=os.getenv("GOOGLE_MAPS_API_KEY"),
             maps_pages=int(os.getenv("GARIMPO_MAPS_PAGES", "3")),
@@ -100,13 +104,23 @@ def build_sources(cfg: Config) -> list[Source]:
 
 
 def build_provider(cfg: Config) -> DraftProvider:
+    mock = MockDraftProvider()
     if cfg.llm == "gemini":
         if not cfg.gemini_key:
             raise SystemExit("GARIMPO_LLM=gemini exige GEMINI_API_KEY")
+        from .draft.fallback import FallbackDraftProvider
         from .draft.gemini import GeminiDraftProvider
 
-        return GeminiDraftProvider(cfg.gemini_key, cfg.gemini_model)
-    return MockDraftProvider()
+        return FallbackDraftProvider(GeminiDraftProvider(cfg.gemini_key, cfg.gemini_model), mock)
+    if cfg.llm == "groq":
+        if not cfg.groq_key:
+            raise SystemExit("GARIMPO_LLM=groq exige GROQ_API_KEY (gratis em console.groq.com)")
+        from .draft.fallback import FallbackDraftProvider
+        from .draft.openai_compat import OpenAICompatDraftProvider
+
+        prov = OpenAICompatDraftProvider(cfg.groq_key, "https://api.groq.com/openai/v1", cfg.groq_model)
+        return FallbackDraftProvider(prov, mock)
+    return mock
 
 
 def build_maps_source(cfg: Config) -> MapsSource:
