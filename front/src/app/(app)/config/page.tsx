@@ -109,7 +109,7 @@ function Section({ title, sub, icon, children }: {
 // ---------------------------------------------------------------------------
 export default function ConfigPage() {
   const repo = getRepo();
-  const { signInWithGoogle, mode, refreshProfile } = useAuth();
+  const { signInWithGoogle, mode, refreshProfile, session } = useAuth();
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
@@ -245,6 +245,15 @@ export default function ConfigPage() {
       setSaving(false);
     }
   }, [niches, city, state, radius, serviceTarget, autopilot, repo, refreshProfile, isOnboarding, router]);
+
+  // Ja conectou com o Google? (login via Google => agenda disponivel)
+  const meta = session?.user?.app_metadata as { provider?: string; providers?: string[] } | undefined;
+  const googleConnected =
+    mode === "supabase" &&
+    !!session &&
+    (meta?.provider === "google" ||
+      (meta?.providers ?? []).includes("google") ||
+      !!session.provider_token);
 
   // Conectar Google Calendar
   const connectGoogle = useCallback(async () => {
@@ -608,15 +617,22 @@ export default function ConfigPage() {
               </div>
             )}
 
-            <button
-              type="button"
-              onClick={connectGoogle}
-              disabled={connectingGoogle}
-              className="flex items-center gap-2.5 rounded-[13px] border border-border-2 bg-card px-4 py-2.5 text-sm font-bold text-ink transition-colors hover:bg-surface-2 disabled:opacity-60"
-            >
-              <GoogleLogo size={18} weight="bold" />
-              {connectingGoogle ? "Abrindo login..." : mode === "mock" ? "Conectar (modo demo)" : "Conectar com Google"}
-            </button>
+            {googleConnected ? (
+              <div className="flex items-center gap-2.5 rounded-[13px] border border-success/40 bg-surface-2 px-4 py-2.5 text-sm font-bold text-success">
+                <Check size={18} weight="bold" />
+                Google Calendar conectado
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={connectGoogle}
+                disabled={connectingGoogle}
+                className="flex items-center gap-2.5 rounded-[13px] border border-border-2 bg-card px-4 py-2.5 text-sm font-bold text-ink transition-colors hover:bg-surface-2 disabled:opacity-60"
+              >
+                <GoogleLogo size={18} weight="bold" />
+                {connectingGoogle ? "Abrindo login..." : mode === "mock" ? "Conectar (modo demo)" : "Conectar com Google"}
+              </button>
+            )}
 
             {mode === "mock" && (
               <div className="mt-2.5 flex items-center gap-2 text-[12px] text-faint">
