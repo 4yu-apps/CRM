@@ -22,6 +22,7 @@ import {
   MapPin,
   CaretLeft,
   CaretRight,
+  ShieldStar,
 } from "@phosphor-icons/react";
 import { useAuth } from "@/lib/auth";
 import { useLeads } from "@/hooks/use-leads";
@@ -55,6 +56,7 @@ const TITLES: Record<string, [string, string]> = {
   "/celular": ["No celular", "Acompanhe e envie pelo WhatsApp"],
   "/config": ["Configuração", "Ajuste uma vez, eu cuido do resto"],
   "/ficha": ["Ficha do lead", "Tudo que eu juntei sobre o negócio"],
+  "/admin": ["Admin", "Gerencie todos os perfis do sistema"],
 };
 
 function isActive(pathname: string, href: string): boolean {
@@ -227,9 +229,13 @@ function NotificationBell({ leads }: { leads: Lead[] }) {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { user, signOut } = useAuth();
+  const { user, signOut, isAdmin } = useAuth();
   const router = useRouter();
   const { leads } = useLeads();
+
+  const navItems: NavItem[] = isAdmin
+    ? [...NAV, { href: "/admin", label: "Admin", Icon: ShieldStar }]
+    : NAV;
 
   const handleSignOut = async () => {
     await signOut();
@@ -263,7 +269,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const nav = (extra?: string) => (
     <nav className={cn("flex flex-col gap-0.5", extra)}>
-      {NAV.map(({ href, label, Icon }) => {
+      {navItems.map(({ href, label, Icon }) => {
         const active = isActive(pathname, href);
         const badge = href === "/fila" && queue > 0;
         return (
@@ -431,7 +437,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* nav mobile (bottom) */}
         <div className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t border-border bg-card px-2 py-1.5 lg:hidden">
-          {NAV.map(({ href, label, Icon }) => {
+          {navItems.map(({ href, label, Icon }) => {
             const active = isActive(pathname, href);
             return (
               <Link
