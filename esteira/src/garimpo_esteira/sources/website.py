@@ -23,8 +23,14 @@ FetchHtmlFn = Callable[[str], str | None]
 
 _IG_RE = re.compile(r"instagram\.com/([A-Za-z0-9_.]{2,40})", re.IGNORECASE)
 _EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
-# caminhos do instagram que nao sao perfil de negocio
-_IG_SKIP = {"p", "reel", "reels", "explore", "accounts", "about", "developer", "legal", "tv", "static"}
+# caminhos do instagram que nao sao perfil de negocio (inclui os paths INTERNOS
+# do proprio Instagram tipo /_n/ /_u/ /graphql/ que apareciam como handle "_n").
+_IG_SKIP = {
+    "p", "reel", "reels", "explore", "accounts", "about", "developer", "legal",
+    "tv", "static", "graphql", "web", "api", "ajax", "embed", "embeds", "oauth",
+    "directory", "emails", "challenge", "session", "direct", "stories", "privacy",
+    "terms", "_n", "_u", "_e", "_a", "_i", "_o", "_imp", "_nc",
+}
 # lixo de widget/CDN (ex.: instagram.com/static/rsrc.php do Facebook embed)
 _IG_BAD = re.compile(r"\.(php|js|html?|aspx?|png|jpe?g|gif|svg|css)$|rsrc", re.IGNORECASE)
 # e-mails de plataforma/tracking que nao sao contato real
@@ -87,13 +93,28 @@ def http_fetch_html(url: str, *, client: httpx.Client | None = None, timeout: fl
             client.close()
 
 
+def _ig_ok(h: str) -> bool:
+    # handle valido: >=3 chars, nao e path interno/reservado, sem extensao de
+    # arquivo. Pega o lixo "_n" (path interno do Instagram) e afins.
+    return len(h) >= 3 and h not in _IG_SKIP and not _IG_BAD.search(h)
+
+
 def extract_instagram(html: str) -> str | None:
     for handle in _IG_RE.findall(html or ""):
         h = handle.strip("/.").lower()
-        if not h or h in _IG_SKIP or _IG_BAD.search(h):
-            continue
-        return clean("instagram", h)
+        if _ig_ok(h):
+            return clean("instagram", h)
     return None
+
+
+def ig_handle_from_url(url: str) -> str | None:
+    """Extrai o @ de um link de perfil do Instagram (quando o 'site' do Maps e,
+    na verdade, o Instagram do negocio)."""
+    m = _IG_RE.search(url or "")
+    if not m:
+        return None
+    h = m.group(1).strip("/.").lower()
+    return clean("instagram", h) if _ig_ok(h) else None
 
 
 def extract_email(html: str) -> str | None:
@@ -214,6 +235,17 @@ class WebsiteSource:
         site = clean("website", lead.website)
         if not site:
             return []  # sem site: sinal tratado no score, nao aqui
+
+        # O "site" do Maps as vezes e, na verdade, o Instagram/Facebook do
+        # negocio. Nao da pra raspar (IG/FB bloqueiam e o HTML vira lixo, era
+        # dai que saia o handle "_n"). Extrai o @ certo da propria URL e para.
+        low = site.lower()
+        if "instagram.com/" in low:
+            h = ig_handle_from_url(site)
+            return [Finding("instagram", self.name, h, 0.8)] if h else []
+        if "facebook.com/" in low or "fb.com/" in low:
+            fb = extract_facebook(site)
+            return [Finding("facebook", self.name, fb, 0.7)] if fb else []
 
         findings: list[Finding] = []
         html = self._fetch_html(site)
