@@ -95,14 +95,42 @@ export default function PrivacidadePage() {
       </p>
 
       <h2 id="compartilha">5. Com quem a gente compartilha</h2>
-      <p>A gente não vende seus dados. Compartilhamos apenas com:</p>
+      <p>
+        A gente não vende seus dados nem os usa para publicidade. Compartilhamos o mínimo necessário, e
+        apenas com autoridades quando exigido por lei ou ordem judicial, e com os subprocessadores abaixo.
+      </p>
+      <h3>Subprocessadores</h3>
+      <p>
+        Para operar a plataforma, contamos com prestadores de serviço (subprocessadores) que tratam dados
+        em nosso nome, cada um sob contrato e dever de confidencialidade, com a finalidade indicada:
+      </p>
       <ul>
         <li>
-          Prestadores de serviço que nos ajudam a operar (como hospedagem em nuvem), sempre sob contrato e
-          dever de sigilo.
+          <strong>Vercel Inc.</strong> hospedagem e entrega do aplicativo (Estados Unidos).
         </li>
-        <li>Autoridades, quando exigido por lei ou ordem judicial.</li>
+        <li>
+          <strong>Supabase</strong> banco de dados e autenticação: guarda sua conta, suas configurações e os
+          leads da sua base (Estados Unidos).
+        </li>
+        <li>
+          <strong>Google</strong> login com a Conta Google, Google Calendar (eventos das reuniões que você
+          agenda) e Google Maps / Places (coleta de dados públicos de negócios para montar os leads).
+        </li>
+        <li>
+          <strong>GitHub (GitHub Actions)</strong> execução automatizada da esteira que busca, completa e
+          pontua os leads no servidor.
+        </li>
+        <li>
+          <strong>Provedores de IA (Groq e Google Gemini)</strong> geração dos rascunhos de mensagem a partir
+          dos dados públicos do lead. Não enviamos a esses provedores seus dados de conta nem dados pessoais
+          sensíveis.
+        </li>
       </ul>
+      <p>
+        Alguns desses provedores ficam fora do Brasil. Quando há transferência internacional de dados, ela
+        é feita com as garantias previstas na LGPD. A lista de subprocessadores pode mudar conforme a
+        plataforma evolui, e mudanças relevantes são refletidas aqui.
+      </p>
 
       <h2 id="lgpd">6. Seus direitos (LGPD)</h2>
       <p>De acordo com a Lei Geral de Proteção de Dados, você pode, a qualquer momento:</p>

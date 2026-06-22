@@ -47,54 +47,82 @@ export default function TermosPage() {
         contata cada negócio.
       </p>
 
-      <h2 id="pagamento">4. Planos e pagamento</h2>
+      <h2 id="terceiros">4. Serviços de terceiros e integrações</h2>
+      <p>
+        O 4YUmkt se integra a serviços de terceiros para funcionar. Ao usar essas integrações, você também
+        concorda com os termos e as políticas do respectivo serviço:
+      </p>
+      <ul>
+        <li>
+          <strong>Login e Google Calendar:</strong> se você entra com a Conta Google e conecta a agenda,
+          autoriza o 4YUmkt a criar, atualizar e remover os eventos das reuniões que você agenda no app. Esse
+          acesso é opcional, usado apenas a seu pedido, e pode ser revogado a qualquer momento na sua Conta
+          Google. O tratamento desses dados segue a nossa{" "}
+          <a href="/privacidade">Política de Privacidade</a>.
+        </li>
+        <li>
+          <strong>Dados públicos de negócios:</strong> os leads são montados a partir de fontes públicas, como
+          mapas e sites. A conferência das informações e o contato com cada negócio são de sua
+          responsabilidade.
+        </li>
+      </ul>
+
+      <h2 id="pagamento">5. Planos e pagamento</h2>
       <ul>
         <li>Os planos e valores ficam descritos na página de planos do site.</li>
         <li>A cobrança é mensal e recorrente, conforme o plano escolhido.</li>
         <li>Não há fidelidade: você pode cancelar quando quiser, pelo painel ou pelo suporte.</li>
         <li>Ao cancelar, o acesso continua até o fim do período já pago.</li>
+        <li>
+          Os valores podem mudar. Quando isso acontecer, avisamos com antecedência e a alteração só vale para
+          o próximo ciclo de cobrança.
+        </li>
       </ul>
 
-      <h2 id="propriedade">5. Propriedade intelectual</h2>
+      <h2 id="propriedade">6. Propriedade intelectual</h2>
       <p>
         A marca, o software, o design e os textos do 4YUmkt são nossos. Você recebe o direito de usar a
         plataforma enquanto for assinante, mas não pode copiar, revender ou redistribuir a ferramenta sem
         nossa autorização.
       </p>
 
-      <h2 id="disponibilidade">6. Disponibilidade</h2>
+      <h2 id="disponibilidade">7. Disponibilidade</h2>
       <p>
         A gente trabalha para manter o 4YUmkt no ar e funcionando bem, mas pode haver manutenções e
         instabilidades pontuais. Não garantimos funcionamento ininterrupto e não nos responsabilizamos por
         perdas decorrentes de indisponibilidade temporária.
       </p>
 
-      <h2 id="limite">7. Limite de responsabilidade</h2>
+      <h2 id="limite">8. Limite de responsabilidade</h2>
       <p>
         O 4YUmkt entrega informações e sugestões, mas não garante que cada lead vire cliente. O resultado
         depende do seu trabalho de prospecção e venda. A gente não se responsabiliza pelo uso que você faz
         dos dados nem pelo conteúdo das mensagens que você envia.
       </p>
+      <p>
+        Você concorda em manter o 4YUmkt isento de reclamações de terceiros que decorram do uso indevido da
+        plataforma por você, em especial quanto à forma como aborda e contata os leads.
+      </p>
 
-      <h2 id="encerramento">8. Encerramento</h2>
+      <h2 id="encerramento">9. Encerramento</h2>
       <p>
         Você pode encerrar sua conta quando quiser. A gente também pode suspender ou encerrar contas que
         violem estes termos, especialmente em casos de uso abusivo ou ilegal da plataforma.
       </p>
 
-      <h2 id="alteracoes">9. Alterações nos termos</h2>
+      <h2 id="alteracoes">10. Alterações nos termos</h2>
       <p>
         Estes termos podem ser atualizados. Quando isso acontecer, avisamos pelo site ou por email.
         Continuar usando a plataforma depois das mudanças significa que você concorda com a nova versão.
       </p>
 
-      <h2 id="foro">10. Lei e foro</h2>
+      <h2 id="foro">11. Lei e foro</h2>
       <p>
         Estes termos seguem as leis brasileiras. Qualquer questão será resolvida no foro da comarca do
         domicílio do consumidor, conforme o Código de Defesa do Consumidor.
       </p>
 
-      <h2 id="contato">11. Fale com a gente</h2>
+      <h2 id="contato">12. Fale com a gente</h2>
       <p>
         Dúvidas sobre estes termos? Escreva para <a href="mailto:4yumkt@gmail.com">4yumkt@gmail.com</a> ou
         chame no WhatsApp <a href="https://wa.me/5511911001414">(11) 91100-1414</a>.
