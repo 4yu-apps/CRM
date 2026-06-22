@@ -6,18 +6,13 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(request: NextRequest): Promise<Response> {
-  let callerId: string;
   try {
-    const { userId } = await requireAdmin(request);
-    callerId = userId;
+    await requireAdmin(request);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "nao_autorizado";
     const status = msg === "sem_token" || msg === "token_invalido" ? 401 : 403;
     return Response.json({ error: msg }, { status });
   }
-
-  // Silencia o aviso de variavel nao usada; callerId pode ser util pra log.
-  void callerId;
 
   const sb = adminClient();
 

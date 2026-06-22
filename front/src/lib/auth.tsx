@@ -80,7 +80,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let alive = true;
     void (async () => {
       if (!user) {
-        if (alive) setHasProfile(null);
+        if (alive) {
+          setHasProfile(null);
+          setIsAdmin(false);
+        }
         return;
       }
       await refreshProfile();
