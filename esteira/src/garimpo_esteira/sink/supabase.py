@@ -97,6 +97,24 @@ class SupabaseSink:
         r.raise_for_status()
         return [self._to_lead(row) for row in r.json()]
 
+    def fetch_profile(self, owner_id: str) -> dict | None:
+        """Perfil de um dono (pra busca direcionada saber a profissao/lente)."""
+        try:
+            r = self._send(
+                "GET",
+                f"{self.base}/search_profile",
+                params={
+                    "owner_id": f"eq.{owner_id}",
+                    "select": "owner_id,niches,city,state,neighborhood,default_service_target,profession",
+                    "limit": "1",
+                },
+            )
+            r.raise_for_status()
+            rows = r.json()
+            return rows[0] if rows else None
+        except Exception:
+            return None
+
     def fetch_autopilot_profiles(self) -> list[dict]:
         try:
             r = self._send(

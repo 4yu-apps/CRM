@@ -14,7 +14,9 @@ interface AuthContextValue {
   session: Session | null;
   loading: boolean;
   mode: "mock" | "supabase";
-  // null = ainda verificando; true = tem perfil de busca; false = precisa de onboarding
+  // null = ainda verificando; true = perfil pronto (com profissao); false = precisa
+  // de onboarding. Perfil sem profissao tambem conta como false: a profissao
+  // dirige score e copy, entao o onboarding so libera o app depois de escolhida.
   hasProfile: boolean | null;
   isAdmin: boolean;
   // Reavalia o perfil (chamar depois de salvar a Configuracao pra liberar o gate)
@@ -63,7 +65,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     try {
       const profile = await getRepo().getProfile();
-      setHasProfile(!!profile);
+      // So libera o app quando ha perfil COM profissao escolhida. Perfil sem
+      // profissao (profession null/vazio) cai no onboarding de primeiro acesso.
+      setHasProfile(!!profile && !!profile.profession);
       setIsAdmin(profile?.is_admin === true);
     } catch {
       // erro de leitura do perfil nao bloqueia o app

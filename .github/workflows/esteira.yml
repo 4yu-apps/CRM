@@ -17,10 +17,26 @@ on:
         description: "Comando da esteira"
         default: "autopilot"
         type: choice
-        options: ["autopilot", "backfill"]
+        options: ["autopilot", "backfill", "search"]
       batch:
         description: "Tamanho do lote"
         default: "60"
+      # Busca direcionada (tela Buscar): o dono que pediu e o endereco digitado.
+      owner:
+        description: "owner_id (command=search)"
+        default: ""
+      niche:
+        description: "ramo/nicho (command=search)"
+        default: ""
+      city:
+        description: "cidade (command=search)"
+        default: ""
+      state:
+        description: "estado/UF (command=search)"
+        default: ""
+      neighborhood:
+        description: "bairro/zona (command=search)"
+        default: ""
 
 concurrency:
   group: esteira
@@ -76,7 +92,17 @@ jobs:
         # command=backfill roda so o backfill.
         run: |
           CMD="${{ github.event.inputs.command || 'autopilot' }}"
-          python -m garimpo_esteira.run "$CMD"
-          if [ "$CMD" = "autopilot" ]; then
-            python -m garimpo_esteira.run backfill --batch 40
+          if [ "$CMD" = "search" ]; then
+            # Busca direcionada da tela Buscar: escopada ao dono + endereco.
+            python -m garimpo_esteira.run search \
+              --owner "${{ github.event.inputs.owner }}" \
+              --niche "${{ github.event.inputs.niche }}" \
+              --city "${{ github.event.inputs.city }}" \
+              --state "${{ github.event.inputs.state }}" \
+              --neighborhood "${{ github.event.inputs.neighborhood }}"
+          else
+            python -m garimpo_esteira.run "$CMD"
+            if [ "$CMD" = "autopilot" ]; then
+              python -m garimpo_esteira.run backfill --batch 40
+            fi
           fi

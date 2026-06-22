@@ -32,12 +32,38 @@ function fail(reason: string): Response {
   return Response.json({ ok: false, reason } satisfies FailResult);
 }
 
-export async function POST(): Promise<Response> {
+export async function POST(req: Request): Promise<Response> {
   const token = process.env.GITHUB_DISPATCH_TOKEN?.trim();
   if (!token) {
     // Token sera configurado na Vercel por outro fluxo. Sem ele, nao quebra:
     // o robo ainda busca no proximo ciclo do cron.
     return fail("sem_token");
+  }
+
+  // Le o alvo da busca (dono + endereco digitado na tela Buscar). Com owner +
+  // niche, dispara uma busca DIRECIONADA (command=search) so pra esse dono,
+  // independente do flag autopilot. Sem corpo, cai no autopilot (compat).
+  let inputs: Record<string, string> = { command: "autopilot" };
+  try {
+    const body = (await req.json()) as {
+      owner_id?: string;
+      niche?: string;
+      city?: string;
+      state?: string;
+      neighborhood?: string;
+    } | null;
+    if (body?.owner_id && body?.niche) {
+      inputs = {
+        command: "search",
+        owner: body.owner_id,
+        niche: body.niche,
+        city: body.city ?? "",
+        state: body.state ?? "",
+        neighborhood: body.neighborhood ?? "",
+      };
+    }
+  } catch {
+    // sem corpo valido: segue com autopilot
   }
 
   let res: Response;
@@ -50,7 +76,7 @@ export async function POST(): Promise<Response> {
         "User-Agent": "garimpo",
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ ref: "main" }),
+      body: JSON.stringify({ ref: "main", inputs }),
     });
   } catch {
     // Rede caiu ao falar com o GitHub: o alvo ja foi salvo, robo pega depois.

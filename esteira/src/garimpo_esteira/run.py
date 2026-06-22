@@ -12,7 +12,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .autopilot import run_autopilot
+from .autopilot import region_key, run_autopilot, search_term
 from .cascade import enrich_batch, enrich_lead
 from .config import FIXTURES_DIR, Config, build_maps_source, build_provider, build_sink, build_sources
 from .discovery import discover
@@ -153,6 +153,66 @@ def cmd_autopilot(cfg: Config) -> int:
     return 0
 
 
+def cmd_search(
+    cfg: Config, owner_id: str, niche: str, city: str | None,
+    state: str | None, neighborhood: str | None,
+) -> int:
+    """Busca DIRECIONADA na hora, escopada a UM dono e ao endereco que ele
+    digitou na tela Buscar (independe do flag autopilot). Descobre no Maps,
+    enriquece, pontua (na lente da profissao do dono) e rascunha, tudo so pros
+    leads desse dono. E o que faz o botao 'Buscar agora' funcionar de verdade."""
+    if cfg.maps_mode == "places" and not cfg.maps_key:
+        print("search: GARIMPO_MAPS=places sem GOOGLE_MAPS_API_KEY; descoberta pausada.")
+        return 0
+    if not owner_id or not niche:
+        print("search: faltou owner ou niche (nada a fazer).")
+        return 0
+
+    sink = build_sink(cfg)
+    maps = build_maps_source(cfg)
+    provider = build_provider(cfg)
+    sources = build_sources(cfg)
+    term = search_term(niche, city, state, neighborhood)
+
+    profession = None
+    if hasattr(sink, "fetch_profile"):
+        try:
+            profession = (sink.fetch_profile(owner_id) or {}).get("profession")
+        except Exception:
+            profession = None
+
+    print(f"search · owner={owner_id[:8]} term={term!r} prof={profession or '-'}")
+    res = discover(sink, maps, [term], owner_id)
+    inserted = int(res.get("inserted", 0))
+    print(f"  descobertos {inserted} (dedup {res.get('skipped', 0)})")
+
+    # pipeline so deste dono (enrich -> score na lente da profissao -> draft)
+    enrich_batch(sink, sources, batch=cfg.batch, delay=cfg.delay, owner_id=owner_id)
+    score_batch(sink, batch=cfg.batch, owner_id=owner_id, profession=profession)
+    draft_batch(sink, provider, batch=cfg.batch, owner_id=owner_id, profession=profession)
+
+    # memoria de cobertura + feed de atividade do dono
+    if hasattr(sink, "upsert_coverage"):
+        try:
+            sink.upsert_coverage(
+                owner_id, region_key(city, state), niche,
+                region_name=(neighborhood or city or None),
+                result_count=inserted, pct=min(100.0, inserted * 5.0) if inserted else 0.0,
+            )
+        except Exception:
+            pass
+    try:
+        sink.log_activity(
+            owner_id, "busca",
+            f"Varri {niche} em {neighborhood or city or 'sua regiao'} e achei {inserted} negocios novos",
+            ref_count=inserted,
+        )
+    except Exception:
+        pass
+    _print_counts(sink)
+    return 0
+
+
 def _ads_from_prov(prov: list[dict]) -> bool | None:
     for p in prov:
         if p.get("field_name") == "ads_active":
@@ -216,7 +276,7 @@ def _print_counts(sink) -> None:
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="garimpo-esteira")
     sub = p.add_subparsers(dest="cmd", required=True)
-    for name in ("seed-demo", "discover", "enrich", "score", "draft", "pipeline", "autopilot", "backfill", "counts"):
+    for name in ("seed-demo", "discover", "enrich", "score", "draft", "pipeline", "autopilot", "backfill", "counts", "search"):
         sp = sub.add_parser(name)
         sp.add_argument("--sink", choices=["jsonfile", "supabase"])
         sp.add_argument("--json")
@@ -226,6 +286,13 @@ def main(argv: list[str] | None = None) -> int:
         sp.add_argument("--terms", help="termos de busca separados por virgula (discover)")
         sp.add_argument("--batch", type=int)
         sp.add_argument("--delay", type=float)
+    # busca direcionada (tela Buscar): escopada a um dono + endereco digitado
+    sp_search = sub.choices["search"]
+    sp_search.add_argument("--owner", help="owner_id do dono que pediu a busca")
+    sp_search.add_argument("--niche", help="ramo/nicho a buscar")
+    sp_search.add_argument("--city")
+    sp_search.add_argument("--state")
+    sp_search.add_argument("--neighborhood")
 
     args = p.parse_args(argv)
     cfg = _apply_overrides(Config.from_env(), args)
@@ -233,6 +300,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "discover":
         terms = [t.strip() for t in (args.terms or "pizzaria").split(",") if t.strip()]
         return cmd_discover(cfg, terms)
+
+    if args.cmd == "search":
+        return cmd_search(cfg, args.owner, args.niche, args.city, args.state, args.neighborhood)
 
     dispatch = {
         "seed-demo": cmd_seed_demo,

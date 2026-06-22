@@ -6,6 +6,7 @@ import {
   ArrowRight,
   Check,
   CheckCircle,
+  Globe,
   Info,
   MapPin,
   PencilSimple,
@@ -42,13 +43,20 @@ function LeadIcon({ category, size }: { category: string | null; size: number })
   return <Storefront size={size} />;
 }
 
-function fichaRows(l: Lead) {
+// Normaliza o site pra um link clicavel (https na frente quando falta).
+function siteHref(site?: string | null): string | undefined {
+  const s = (site ?? "").trim();
+  if (!s) return undefined;
+  return /^https?:\/\//i.test(s) ? s : `https://${s}`;
+}
+
+function fichaRows(l: Lead): { k: string; v: string; href?: string }[] {
   return [
     { k: "Dono / responsável", v: l.owner_name ?? "-" },
     { k: "Telefone", v: fmtPhone(l.phone) },
     { k: "Instagram", v: l.instagram ?? "-" },
     { k: "CNPJ", v: l.cnpj ? fmtCnpj(l.cnpj) : "-" },
-    { k: "Site", v: l.website ? "Tem" : "Não tem" },
+    { k: "Site", v: l.website ? "Abrir site" : "Não tem", href: siteHref(l.website) },
     { k: "Já anuncia?", v: l.ads_active == null ? "Não sei" : l.ads_active ? "Sim" : "Ainda não" },
   ];
 }
@@ -228,7 +236,19 @@ export default function FilaPage() {
               {fichaRows(cur).map((r) => (
                 <div key={r.k} className="bg-card p-3.5">
                   <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-faint">{r.k}</div>
-                  <div className="text-sm font-semibold">{r.v}</div>
+                  {r.href ? (
+                    <a
+                      href={r.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand hover:underline"
+                    >
+                      <Globe size={15} weight="bold" />
+                      {r.v}
+                    </a>
+                  ) : (
+                    <div className="text-sm font-semibold">{r.v}</div>
+                  )}
                 </div>
               ))}
             </div>

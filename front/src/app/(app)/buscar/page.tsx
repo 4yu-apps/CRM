@@ -12,6 +12,7 @@ import {
   Spinner,
 } from "@phosphor-icons/react";
 import { getRepo } from "@/lib/repo";
+import { useAuth } from "@/lib/auth";
 import { fetchEstados, fetchMunicipios, type Municipio, type UF } from "@/lib/ibge";
 import { geocodeCity, geocodeNeighborhood, type GeoPoint } from "@/lib/geocode";
 import { serviceOptionsForProfile } from "@/lib/professions";
@@ -101,6 +102,7 @@ function ServiceToggle({
 
 export default function BuscarPage() {
   const repo = getRepo();
+  const { user } = useAuth();
 
   const [profile, setProfile] = useState<SearchProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -331,10 +333,22 @@ export default function BuscarPage() {
         default_service_target: serviceOpts.length === 0 ? "indefinido" : service,
       });
 
-      // 3) Dispara o robo. A busca real roda no servidor (GitHub Actions).
+      // 3) Dispara o robo com o ALVO desta busca (dono + endereco digitado): a
+      // busca roda direcionada no servidor (GitHub Actions), independente do
+      // autopilot, e so pros leads deste dono.
       let ok = false;
       try {
-        const res = await fetch("/api/search/run", { method: "POST" });
+        const res = await fetch("/api/search/run", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            owner_id: user?.id ?? null,
+            niche: niche || (profile?.niches ?? [])[0] || "",
+            city: city || null,
+            state: uf || null,
+            neighborhood: neighborhood.trim() || null,
+          }),
+        });
         const data = (await res.json().catch(() => null)) as
           | { ok: boolean; reason?: string }
           | null;
@@ -355,7 +369,7 @@ export default function BuscarPage() {
     } finally {
       setSaving(false);
     }
-  }, [saving, repo, niche, profile, city, uf, neighborhood, radius, service, serviceOpts]);
+  }, [saving, repo, niche, profile, city, uf, neighborhood, radius, service, serviceOpts, user]);
 
   // Coordenadas para o mapa. Prioridade: regiao geocodificada (zoom 12) ->
   // primeira zona de cobertura com coordenada -> centro do Brasil.
