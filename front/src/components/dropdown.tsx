@@ -157,7 +157,7 @@ export function Dropdown({
                 right: align === "end" ? Math.max(0, window.innerWidth - rect.left) : undefined,
                 minWidth: rect.width,
               }}
-              className="z-[60] flex max-h-[320px] min-w-[180px] flex-col overflow-hidden rounded-[14px] border border-border bg-card shadow-xl"
+              className="z-[200] flex max-h-[320px] min-w-[180px] flex-col overflow-hidden rounded-[14px] border border-border bg-card shadow-xl"
             >
               {withSearch && (
                 <div className="relative flex-none border-b border-border p-2">
