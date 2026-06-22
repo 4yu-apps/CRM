@@ -1,15 +1,30 @@
-"""Provedor de rascunho mock: template determinístico, offline, R$0.
+"""Provedor de rascunho mock: template deterministico, offline, R$0.
 
 Segue o GUIA-COPY-HUMANA com tom caloroso, de quem fala com um conhecido:
-cumprimento leve, diz que encontrou o negócio e gostou do trabalho, confirma o
-que eles fazem e faz UMA pergunta. Sem dumpar nota/avaliações, sem se apresentar
-como vendedor, sem travessão. A copy lapidada sai pela IA (Groq/Gemini); isto é
-o piso decente quando a IA não está ligada ou falha.
+cumprimento leve, diz que encontrou o negocio e gostou do trabalho, confirma o
+que eles fazem e faz UMA pergunta aberta. Sem dumpar nota/avaliacoes, sem se
+apresentar como vendedor, sem travessao. A copy lapidada sai pela IA
+(Groq/Gemini); isto e o piso decente quando a IA nao esta ligada ou falha.
+
+As mensagens sao client-facing: pt-BR com acentuacao correta (vai pro WhatsApp
+do cliente). Os comentarios seguem o estilo accent-light do repo.
 """
 from __future__ import annotations
 
 from ..models import Lead
 from .prompt import _brief_key, lead_brief
+
+# Categorias de alimentacao que pedem angulo iFood
+_FOOD_KEYWORDS = (
+    "restaurante", "pizzaria", "lanchonete", "hamburgueria", "hamburguer",
+    "churrascaria", "padaria", "cafe", "cafeteria", "sushi", "japonesa",
+    "italiana", "comida", "buffet", "boteco", "bar e restaurante",
+)
+
+
+def _is_food(b: dict) -> bool:
+    seg = (b.get("segmento") or "").lower()
+    return any(k in seg for k in _FOOD_KEYWORDS)
 
 
 def _abertura(b: dict) -> str:
@@ -22,7 +37,9 @@ def _abertura(b: dict) -> str:
 
 
 def _trafego(b: dict) -> tuple[str, str]:
-    if not b["tem_site"]:
+    if _is_food(b):
+        pergunta = "Vocês já trabalham com iFood ou é mais no salão e entrega própria?"
+    elif not b["tem_site"]:
         pergunta = "Vocês já têm site ou hoje o cliente chega mais pelo Instagram e indicação?"
     elif not b["tem_instagram"]:
         pergunta = "Vocês divulgam mais no Instagram ou é mais no boca a boca?"
@@ -50,7 +67,7 @@ def _design(b: dict) -> tuple[str, str]:
     if not b["tem_site"]:
         pergunta = "Vocês já têm um site ou hoje o cliente acha vocês mais pelo Instagram e indicação?"
     else:
-        pergunta = "Faz tempo que vocês não mexem no site de vocês?"
+        pergunta = "Manter o site atualizado no dia a dia é chato, né? Vocês sentem falta de ter isso no piloto automático?"
     msg1 = f"{_abertura(b)} {pergunta}"
     msg2 = (
         "Eu faço site e identidade visual pra negócio local, bonito e rápido, que passa confiança "
@@ -82,9 +99,9 @@ class MockDraftProvider:
         if key == "marketing":
             return _marketing(b)
         if key == "ambos":
-            # lidera com tráfego, cita a automação de leve no fim (upsell)
+            # lidera com trafego, cita a automacao de leve no fim (upsell)
             msg1, msg2 = _trafego(b)
             msg2 = msg2.rstrip(" .") + ". E depois ainda dá pra automatizar o atendimento no WhatsApp."
             return msg1, msg2
-        # tráfego e indefinido caem no roteiro de tráfego
+        # trafego e indefinido caem no roteiro de trafego
         return _trafego(b)

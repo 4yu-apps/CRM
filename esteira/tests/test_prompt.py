@@ -91,3 +91,19 @@ def test_review_themes_sem_elogio_nao_adiciona_sinal():
     p = build_prompt(lead)
     # sem elogio, o sinal de elogio nao entra (a frase fixa da ancora nao conta)
     assert "os clientes elogiam" not in p
+
+
+def test_prompt_contem_lista_proibido():
+    """SYSTEM_INSTRUCTION deve listar frases proibidas para orientar a IA."""
+    from garimpo_esteira.draft.prompt import SYSTEM_INSTRUCTION
+    assert "espero que" in SYSTEM_INSTRUCTION, "lista PROIBIDO deve incluir 'espero que esteja bem'"
+    assert "revolucionar" in SYSTEM_INSTRUCTION, "lista PROIBIDO deve incluir 'revolucionar'"
+    assert "alavancar" in SYSTEM_INSTRUCTION, "lista PROIBIDO deve incluir 'alavancar'"
+    assert "prezado" in SYSTEM_INSTRUCTION, "lista PROIBIDO deve incluir 'prezado'"
+
+
+def test_prompt_servico_trafego_food_menciona_ifood():
+    """Brief de trafego para negocio de alimentacao deve orientar sobre iFood."""
+    from garimpo_esteira.draft.prompt import _SERVICE_BRIEF
+    brief = _SERVICE_BRIEF["trafego"]
+    assert "iFood" in brief, "brief de trafego deve mencionar iFood como angulo para alimentacao"

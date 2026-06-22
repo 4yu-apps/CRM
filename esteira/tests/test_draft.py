@@ -85,3 +85,59 @@ def test_draft_idempotent(tmp_path):
     _qualificado(sink, phone="44999990001", rating=4.7, reviews_count=200)
     draft_batch(sink, MockDraftProvider(), batch=20)
     assert draft_batch(sink, MockDraftProvider(), batch=20) == []  # nada em 'qualificado'
+
+
+# ---- Novos testes: frases proibidas e angulo iFood ----
+
+_BANNED = [
+    "espero que esteja bem",
+    "sem compromisso",
+    "revolucionar",
+    "alavancar",
+    "prezado",
+    "venho por meio desta",
+    "aproveitar esta oportunidade",
+]
+
+
+def test_mock_sem_frases_proibidas_trafego():
+    m1, m2 = _gen("trafego", category="Salao de Beleza")
+    blob = (m1 + " " + m2).lower()
+    for frase in _BANNED:
+        assert frase.lower() not in blob, f"frase proibida '{frase}' encontrada no roteiro trafego"
+
+
+def test_mock_sem_frases_proibidas_automacao():
+    m1, m2 = _gen("automacao", category="Clinica Odontologica")
+    blob = (m1 + " " + m2).lower()
+    for frase in _BANNED:
+        assert frase.lower() not in blob, f"frase proibida '{frase}' encontrada no roteiro automacao"
+
+
+def test_mock_sem_frases_proibidas_design():
+    m1, m2 = _gen("design", category="Loja de Roupas")
+    blob = (m1 + " " + m2).lower()
+    for frase in _BANNED:
+        assert frase.lower() not in blob, f"frase proibida '{frase}' encontrada no roteiro design"
+
+
+def test_mock_sem_frases_proibidas_marketing():
+    m1, m2 = _gen("marketing", category="Academia")
+    blob = (m1 + " " + m2).lower()
+    for frase in _BANNED:
+        assert frase.lower() not in blob, f"frase proibida '{frase}' encontrada no roteiro marketing"
+
+
+def test_food_trafego_menciona_ifood():
+    """Categoria alimentacao no roteiro de trafego deve perguntar sobre iFood."""
+    m1, m2 = _gen("trafego", category="Pizzaria")
+    assert "iFood" in (m1 + m2), (
+        "Esperado pergunta sobre iFood pra categoria alimentacao, mas nao encontrado. "
+        f"m1={m1!r}"
+    )
+
+
+def test_food_trafego_ifood_e_pergunta_nao_afirmacao():
+    """A mensagem com iFood deve ter ponto de interrogacao (e pergunta, nao afirmacao)."""
+    m1, m2 = _gen("trafego", category="Hamburgueria")
+    assert "?" in m1, f"Esperado '?' em msg1 com iFood mas nao encontrado: {m1!r}"
