@@ -1,6 +1,6 @@
 // src/app/(app)/admin/page.tsx
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import {
   ShieldStar,
@@ -55,30 +55,37 @@ export default function AdminPage() {
   const [inputValue, setInputValue] = useState("");
   const [actionBusy, setActionBusy] = useState(false);
 
-  const load = useCallback(async () => {
-    if (!session?.access_token) return;
-    setLoading(true);
-    setLoadError(null);
-    try {
-      const res = await fetch("/api/admin/profiles", {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-      if (!res.ok) {
-        const j = (await res.json()) as { error?: string };
-        throw new Error(j.error ?? `HTTP ${res.status}`);
-      }
-      const data = (await res.json()) as AdminProfile[];
-      setProfiles(data);
-    } catch (e) {
-      setLoadError(e instanceof Error ? e.message : "Erro ao carregar perfis");
-    } finally {
-      setLoading(false);
-    }
-  }, [session?.access_token]);
+  // Stable ref so doAction and the retry button can call load() without
+  // triggering the react-compiler memoization / set-state-in-effect rules.
+  const loadRef = useRef<(() => Promise<void>) | null>(null);
 
   useEffect(() => {
-    if (isAdmin) void load();
-  }, [isAdmin, load]);
+    if (!isAdmin || !session?.access_token) return;
+    const token = session.access_token;
+
+    const fetchProfiles = async () => {
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const res = await fetch("/api/admin/profiles", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) {
+          const j = (await res.json()) as { error?: string };
+          throw new Error(j.error ?? `HTTP ${res.status}`);
+        }
+        const data = (await res.json()) as AdminProfile[];
+        setProfiles(data);
+      } catch (e) {
+        setLoadError(e instanceof Error ? e.message : "Erro ao carregar perfis");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadRef.current = fetchProfiles;
+    void fetchProfiles();
+  }, [isAdmin, session?.access_token]);
 
   const openModal = (type: Exclude<ModalType, null>, profile: AdminProfile) => {
     setInputValue("");
@@ -125,7 +132,7 @@ export default function AdminPage() {
       };
       toast.success(msgs[modal.type ?? "delete"]);
       setModal(null);
-      await load();
+      await loadRef.current?.();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro na operacao");
     } finally {
@@ -177,7 +184,7 @@ export default function AdminPage() {
           Erro ao carregar: {loadError}
           <button
             type="button"
-            onClick={() => void load()}
+            onClick={() => void loadRef.current?.()}
             className="ml-3 underline"
           >
             Tentar de novo
