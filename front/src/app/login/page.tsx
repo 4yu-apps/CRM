@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -196,6 +197,18 @@ export default function LoginPage() {
                   : tab === "login" ? "Entrar" : "Criar conta"}
               </Button>
             </form>
+
+            <p className="text-center text-[11.5px] leading-relaxed text-muted-foreground">
+              Ao continuar, você concorda com os{" "}
+              <Link href="/termos" className="font-medium text-brand hover:underline">
+                Termos de Uso
+              </Link>{" "}
+              e a{" "}
+              <Link href="/privacidade" className="font-medium text-brand hover:underline">
+                Política de Privacidade
+              </Link>
+              .
+            </p>
           </div>
         </div>
 
