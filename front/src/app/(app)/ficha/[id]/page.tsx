@@ -128,7 +128,7 @@ function EditField({
 // ---------------------------------------------------------------------------
 function DataRow({ label, value, prov, href }: { label: string; value: string; prov?: string | null; href?: string }) {
   return (
-    <div className="flex items-start justify-between gap-3 border-b border-border py-2.5 last:border-0">
+    <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3 last:border-0">
       <span className="text-[13.5px] text-muted-foreground">{label}</span>
       <div className="min-w-0 text-right">
         {href ? (
@@ -543,7 +543,7 @@ export default function FichaPage() {
                 </div>
               </div>
             ) : (
-              <div className="rounded-[14px] border border-border">
+              <div className="overflow-hidden rounded-[14px] border border-border bg-card">
                 <DataRow label="Dono / responsavel" value={lead.owner_name ?? "-"} prov={provOf(provenance, "owner_name")} />
                 <DataRow label="Telefone" value={fmtPhone(lead.phone)} href={waUrl(lead.whatsapp ?? lead.phone)} prov={provOf(provenance, "phone")} />
                 <DataRow label="WhatsApp" value={lead.whatsapp ? fmtPhone(lead.whatsapp) : "-"} href={waUrl(lead.whatsapp)} prov={provOf(provenance, "whatsapp")} />
@@ -552,7 +552,7 @@ export default function FichaPage() {
                 <DataRow label="Facebook" value={lead.facebook ?? "-"} href={fbUrl(lead.facebook)} prov={provOf(provenance, "facebook")} />
                 <DataRow label="CNPJ" value={fmtCnpj(lead.cnpj)} prov={provOf(provenance, "cnpj")} />
                 <DataRow label="Site" value={lead.website ? lead.website : "Nao tem"} href={siteUrl(lead.website)} prov={provOf(provenance, "website")} />
-                <div className="flex items-start justify-between gap-3 border-b border-border py-2.5">
+                <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
                   <span className="text-[13.5px] text-muted-foreground">Ja anuncia?</span>
                   <div className="flex items-center gap-2 text-right">
                     <span className="text-[13.5px] font-semibold text-ink">
