@@ -57,6 +57,41 @@
   font-size: 16px;
   line-height: 1;
 }
+#garimpo-panel .gp-close {
+  background: transparent;
+  border: 0;
+  color: #fff;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  opacity: .9;
+}
+#garimpo-panel .gp-close:hover { opacity: 1; }
+
+/* Launcher flutuante: aparece quando o painel e fechado de vez, pra reabrir. */
+#garimpo-launcher {
+  position: fixed;
+  bottom: 20px;
+  right: 18px;
+  z-index: 2147483000;
+  width: 46px;
+  height: 46px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #7c3aed, #4c1d95);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: .02em;
+  cursor: pointer;
+  box-shadow: 0 10px 26px rgba(32, 16, 64, 0.34);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  transition: transform .15s ease;
+}
+#garimpo-launcher:hover { transform: translateY(-2px); }
 
 #garimpo-panel .gp-body { padding: 14px; display: flex; flex-direction: column; gap: 10px; max-height: 72vh; overflow-y: auto; }
 #garimpo-panel .gp-foot { padding: 6px 12px; font-size: 10px; color: #71717a; border-top: 1px solid #f4f4f5; }

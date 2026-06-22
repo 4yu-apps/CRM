@@ -295,6 +295,8 @@
 
   // src/content/main.mjs
   var PANEL_ID = "garimpo-panel";
+  var LAUNCHER_ID = "garimpo-launcher";
+  var CLOSED_KEY = "garimpo-panel-closed";
   var state = {
     cfg: null,
     repo: null,
@@ -422,11 +424,31 @@
       <span class="gp-src"></span>
       <button class="gp-logout" title="Sair" aria-label="Sair" style="display:none">\u238B</button>
       <button class="gp-min" title="Minimizar painel" aria-label="Minimizar painel">\u2212</button>
+      <button class="gp-close" title="Fechar painel" aria-label="Fechar painel">\xD7</button>
     </div>
     <div class="gp-body"></div>
     <div class="gp-foot">So le seu WhatsApp. Status e edicoes vao pro Garimpo.</div>`;
     document.body.append(panel);
     panel.querySelector(".gp-min").addEventListener("click", () => panel.classList.toggle("gp-collapsed"));
+    const launcher = el("button", { id: LAUNCHER_ID, title: "Abrir Garimpo", textContent: "4Y" });
+    launcher.setAttribute("aria-label", "Abrir Garimpo");
+    document.body.append(launcher);
+    const setClosed = (closed) => {
+      panel.style.display = closed ? "none" : "";
+      launcher.style.display = closed ? "flex" : "none";
+      try {
+        localStorage.setItem(CLOSED_KEY, closed ? "1" : "0");
+      } catch {
+      }
+    };
+    panel.querySelector(".gp-close").addEventListener("click", () => setClosed(true));
+    launcher.addEventListener("click", () => setClosed(false));
+    let closedPref = false;
+    try {
+      closedPref = localStorage.getItem(CLOSED_KEY) === "1";
+    } catch {
+    }
+    setClosed(closedPref);
     panel.querySelector(".gp-logout").addEventListener("click", async () => {
       await logout();
       state.cfg = await getConfig();

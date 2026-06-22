@@ -14,6 +14,10 @@ import { contextualButtons, STATUS_LABEL } from "../lib/state-machine.mjs";
 import { fmtPhone, normalizePhone } from "../lib/normalize.mjs";
 
 const PANEL_ID = "garimpo-panel";
+const LAUNCHER_ID = "garimpo-launcher";
+// Preferencia de painel fechado (por origem, ex: web.whatsapp.com). Fechar de
+// vez esconde o painel e deixa so o launcher; fica fechado ate o usuario reabrir.
+const CLOSED_KEY = "garimpo-panel-closed";
 const state = {
   cfg: null,
   repo: null,
@@ -163,11 +167,29 @@ function mountPanel() {
       <span class="gp-src"></span>
       <button class="gp-logout" title="Sair" aria-label="Sair" style="display:none">⎋</button>
       <button class="gp-min" title="Minimizar painel" aria-label="Minimizar painel">−</button>
+      <button class="gp-close" title="Fechar painel" aria-label="Fechar painel">×</button>
     </div>
     <div class="gp-body"></div>
     <div class="gp-foot">So le seu WhatsApp. Status e edicoes vao pro Garimpo.</div>`;
   document.body.append(panel);
   panel.querySelector(".gp-min").addEventListener("click", () => panel.classList.toggle("gp-collapsed"));
+
+  // Launcher pra reabrir quando o painel e fechado de vez.
+  const launcher = el("button", { id: LAUNCHER_ID, title: "Abrir Garimpo", textContent: "4Y" });
+  launcher.setAttribute("aria-label", "Abrir Garimpo");
+  document.body.append(launcher);
+
+  // Fecha de vez (esconde o painel, mostra o launcher) e lembra a escolha.
+  const setClosed = (closed) => {
+    panel.style.display = closed ? "none" : "";
+    launcher.style.display = closed ? "flex" : "none";
+    try { localStorage.setItem(CLOSED_KEY, closed ? "1" : "0"); } catch { /* sem storage */ }
+  };
+  panel.querySelector(".gp-close").addEventListener("click", () => setClosed(true));
+  launcher.addEventListener("click", () => setClosed(false));
+  let closedPref = false;
+  try { closedPref = localStorage.getItem(CLOSED_KEY) === "1"; } catch { /* ignora */ }
+  setClosed(closedPref);
   panel.querySelector(".gp-logout").addEventListener("click", async () => {
     await logout();
     state.cfg = await getConfig();
