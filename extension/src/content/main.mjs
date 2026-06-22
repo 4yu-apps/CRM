@@ -11,7 +11,7 @@ import { ensureFreshToken, loginWithPassword, logout } from "../lib/auth.mjs";
 import { createRepo } from "../lib/repo.mjs";
 import { matchLead, parsePhone } from "../lib/match.mjs";
 import { contextualButtons, STATUS_LABEL } from "../lib/state-machine.mjs";
-import { fmtPhone } from "../lib/normalize.mjs";
+import { fmtPhone, normalizePhone } from "../lib/normalize.mjs";
 
 const PANEL_ID = "garimpo-panel";
 const state = {
@@ -83,6 +83,19 @@ function saveManual() {
   void setConfig({ manualMatches: state.manual });
 }
 
+// Acha o numero do contato da conversa ABERTA, mesmo quando ele esta salvo (o
+// header so mostra o nome). O WhatsApp embute o numero no data-id das mensagens
+// ("false_554488557262@c.us_XXXX"); pegamos de qualquer bolha. So 1:1 (@c.us);
+// grupo (@g.us) e ignorado. Devolve normalizado (tira o 55) ou null.
+function readPhoneFromChat() {
+  const main = document.querySelector("#main");
+  if (!main) return null;
+  const node = main.querySelector('[data-id*="@c.us"]');
+  if (!node) return null;
+  const m = (node.getAttribute("data-id") || "").match(/(\d{10,15})@c\.us/);
+  return m ? normalizePhone(m[1]) : null;
+}
+
 // ---- leitura do DOM (defensiva; selectors do WA mudam) ----
 function readConversation() {
   const header = document.querySelector("#main header") || document.querySelector("header");
@@ -90,9 +103,10 @@ function readConversation() {
   const titleEl = header.querySelector("span[title]") || header.querySelector('span[dir="auto"]');
   const rawName = titleEl ? (titleEl.getAttribute("title") || titleEl.textContent || "").trim() : "";
   const phoneFromName = parsePhone(rawName);
-  let phone = phoneFromName || parsePhone(header.textContent);
+  // 1) numero no header (contato nao salvo)  2) numero embutido nas mensagens
+  // (contato salvo)  3) numero no texto do header  4) casamento lembrado.
+  let phone = phoneFromName || readPhoneFromChat() || parsePhone(header.textContent);
   const name = phoneFromName ? null : rawName;
-  // casamento lembrado: se ja colamos o numero desse contato antes, reusa.
   if (!phone && rawName && state.manual[rawName]) phone = state.manual[rawName];
   return { name, phone, rawName };
 }

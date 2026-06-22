@@ -352,13 +352,21 @@
   function saveManual() {
     void setConfig({ manualMatches: state.manual });
   }
+  function readPhoneFromChat() {
+    const main = document.querySelector("#main");
+    if (!main) return null;
+    const node = main.querySelector('[data-id*="@c.us"]');
+    if (!node) return null;
+    const m = (node.getAttribute("data-id") || "").match(/(\d{10,15})@c\.us/);
+    return m ? normalizePhone(m[1]) : null;
+  }
   function readConversation() {
     const header = document.querySelector("#main header") || document.querySelector("header");
     if (!header) return { name: null, phone: null, rawName: "" };
     const titleEl = header.querySelector("span[title]") || header.querySelector('span[dir="auto"]');
     const rawName = titleEl ? (titleEl.getAttribute("title") || titleEl.textContent || "").trim() : "";
     const phoneFromName = parsePhone(rawName);
-    let phone = phoneFromName || parsePhone(header.textContent);
+    let phone = phoneFromName || readPhoneFromChat() || parsePhone(header.textContent);
     const name = phoneFromName ? null : rawName;
     if (!phone && rawName && state.manual[rawName]) phone = state.manual[rawName];
     return { name, phone, rawName };
