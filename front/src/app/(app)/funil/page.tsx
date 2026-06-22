@@ -791,6 +791,12 @@ export default function FunilPage() {
       );
 
       if (result.ok) {
+        // Salva o ID do evento para poder cancelar depois se necessario.
+        try {
+          await repo.update(lead.id, { meeting_gcal_event_id: result.eventId });
+        } catch {
+          // best-effort: nao bloqueia
+        }
         toast.success("Evento criado no seu Google Calendar.");
       } else if (result.reason === "token_expirado") {
         toast.message(

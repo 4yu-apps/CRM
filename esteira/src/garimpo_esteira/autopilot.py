@@ -126,7 +126,14 @@ def run_autopilot(
 
             try:
                 inserted = 0
+                lats: list[float] = []
+                lngs: list[float] = []
                 for raw in maps_source.search(term):
+                    lat = raw.get("lat")
+                    lng = raw.get("lng")
+                    if lat is not None and lng is not None:
+                        lats.append(float(lat))
+                        lngs.append(float(lng))
                     lead, findings = result_to_lead(raw, owner)
                     lead_id = sink.insert_lead(lead)
                     if not lead_id:  # dedup
@@ -138,9 +145,21 @@ def run_autopilot(
                 # Maps/sink instavel num nicho nao aborta os outros nichos.
                 continue
 
+            center_lat = sum(lats) / len(lats) if lats else None
+            center_lng = sum(lngs) / len(lngs) if lngs else None
+            # pct: estimativa de cobertura baseada no volume (cap de 100).
+            # Cada pagina do Places traz ~20 resultados; 3 paginas = ~60.
+            # Qualquer retorno ja vale como "varredura iniciada" (minimo 10%).
+            pct = min(100.0, inserted * 5.0) if inserted else 0.0
+
             discovered += inserted
             sink.upsert_coverage(
-                owner, rkey, niche, region_name=(neighborhood or city or None), result_count=inserted
+                owner, rkey, niche,
+                region_name=(neighborhood or city or None),
+                result_count=inserted,
+                center_lat=center_lat,
+                center_lng=center_lng,
+                pct=pct,
             )
             if inserted:
                 sink.log_activity(

@@ -115,6 +115,9 @@ export interface Lead {
   meeting_at?: string | null;
   meeting_link?: string | null;
   meeting_location?: string | null;
+  // ID do evento no Google Calendar. Preenchido apos criar o evento com sucesso;
+  // usado para cancelar o evento quando a reuniao for desmarcada.
+  meeting_gcal_event_id?: string | null;
 
   created_at: string;
   updated_at: string;
@@ -180,6 +183,7 @@ export type LeadEditable = Partial<
     | "meeting_at"
     | "meeting_link"
     | "meeting_location"
+    | "meeting_gcal_event_id"
   >
 >;
 

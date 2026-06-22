@@ -8,6 +8,7 @@ import {
   ArrowRight,
   Barbell,
   Buildings,
+  CalendarX,
   Check,
   CheckCircle,
   Clock,
@@ -35,6 +36,7 @@ import {
   X,
 } from "@phosphor-icons/react";
 import { getRepo } from "@/lib/repo";
+import { useCancelMeeting } from "@/hooks/use-cancel-meeting";
 import { SERVICE_META } from "@/lib/service";
 import { STATUS_META, TONE_CLASSES } from "@/lib/state-machine";
 import {
@@ -339,6 +341,8 @@ export default function FichaPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load]);
+
+  const { cancelMeeting, cancelling } = useCancelMeeting(load);
 
   // ----------- Acoes -----------
 
@@ -671,8 +675,21 @@ export default function FichaPage() {
                 {lead.maps_url && (
                   <DataRow label="No Maps" value="Abrir no Google Maps" href={lead.maps_url} />
                 )}
-                {lead.meeting_at && (
-                  <DataRow label="Reuniao" value={fmtDateTime(lead.meeting_at)} />
+                {lead.meeting_at && !editing && (
+                  <div className="flex items-center justify-between">
+                    <DataRow label="Reuniao" value={fmtDateTime(lead.meeting_at)} />
+                    <button
+                      type="button"
+                      onClick={() => void cancelMeeting(lead)}
+                      disabled={cancelling}
+                      title="Cancelar reuniao"
+                      aria-label="Cancelar reuniao"
+                      className="ml-2 flex items-center gap-1 rounded-[8px] px-2.5 py-1 text-[12px] font-semibold text-rose-500 transition-colors hover:bg-rose-50 disabled:opacity-50"
+                    >
+                      <CalendarX size={14} weight="bold" />
+                      Cancelar reuniao
+                    </button>
+                  </div>
                 )}
                 {lead.meeting_link && (
                   <DataRow label="Link da reuniao" value={lead.meeting_link} href={lead.meeting_link} />

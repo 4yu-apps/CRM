@@ -9,6 +9,7 @@ Cobre:
 - autopilot isola os donos (multi-tenant) e ignora perfis sem autopilot
 - fetch_by_status filtra por dono
 """
+import pytest
 from garimpo_esteira.autopilot import (
     generate_terms,
     region_key,
@@ -203,3 +204,44 @@ def test_autopilot_sem_extras_so_o_perfil(tmp_path):
     maps = FakeMaps(_two_results())
     run_autopilot(sink, maps, MockDraftProvider(), [], batch=20, extra_niches=0)
     assert len(maps.terms) == 2  # so os 2 do perfil
+
+
+def test_autopilot_grava_coordenadas_no_coverage(tmp_path):
+    """Quando os resultados do Maps trazem lat/lng, coverage deve ter center_lat/lng e pct > 0."""
+    sink = _sink(tmp_path)
+    sink.upsert_profile("owner-1", niches=["estetica"], city="Maringa", state="PR", autopilot=True)
+
+    results_com_coords = [
+        {"name": "Estetica A", "formatted_phone_number": "44999990001",
+         "place_id": "p1", "lat": -23.42, "lng": -51.93},
+        {"name": "Estetica B", "formatted_phone_number": "44999990002",
+         "place_id": "p2", "lat": -23.44, "lng": -51.95},
+    ]
+
+    class FakeMapsCoords:
+        def search(self, term):
+            return [dict(r) for r in results_com_coords]
+
+    run_autopilot(sink, FakeMapsCoords(), MockDraftProvider(), [], batch=20)
+
+    cov = [c for c in sink._db["coverage"] if c["owner_id"] == "owner-1"]
+    assert len(cov) == 1
+    rec = cov[0]
+    assert rec["center_lat"] == pytest.approx(-23.43, abs=0.01)
+    assert rec["center_lng"] == pytest.approx(-51.94, abs=0.01)
+    assert rec["pct"] == pytest.approx(10.0)  # 2 resultados * 5 = 10%
+
+
+def test_autopilot_sem_coordenadas_coverage_sem_lat_lng(tmp_path):
+    """Quando os resultados nao trazem lat/lng, coverage grava center_lat=None (sem quebrar)."""
+    sink = _sink(tmp_path)
+    sink.upsert_profile("owner-1", niches=["estetica"], city="Maringa", state="PR", autopilot=True)
+    maps = FakeMaps(_two_results())  # _two_results nao tem lat/lng
+
+    run_autopilot(sink, maps, MockDraftProvider(), [], batch=20)
+
+    cov = [c for c in sink._db["coverage"] if c["owner_id"] == "owner-1"]
+    assert len(cov) == 1
+    assert cov[0]["center_lat"] is None
+    assert cov[0]["center_lng"] is None
+    assert cov[0]["pct"] == pytest.approx(10.0)  # pct calculado pelo inserted mesmo sem coords

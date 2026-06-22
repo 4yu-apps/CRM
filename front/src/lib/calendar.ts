@@ -65,3 +65,46 @@ export async function createCalendarEvent(
     return { ok: false, reason: "falha_rede" };
   }
 }
+
+export type DeleteEventResult =
+  | { ok: true }
+  | { ok: false; reason: string };
+
+/**
+ * Remove um evento do Google Calendar do usuario (best-effort).
+ *
+ * Nunca lanca: qualquer falha vira { ok: false, reason }.
+ * 401/410 sao tratados como sucesso (evento ja foi apagado ou token expirou,
+ * o lead ja foi limpo, entao nao ha mais o que fazer).
+ */
+export async function deleteCalendarEvent(
+  eventId: string,
+): Promise<DeleteEventResult> {
+  if (activeDataSource() !== "supabase") {
+    return { ok: false, reason: "sem_token" };
+  }
+
+  let accessToken: string | null = null;
+  try {
+    const { data } = await getSupabase().auth.getSession();
+    accessToken = data.session?.provider_token ?? null;
+  } catch {
+    return { ok: false, reason: "sem_token" };
+  }
+
+  if (!accessToken) {
+    return { ok: false, reason: "sem_token" };
+  }
+
+  try {
+    const res = await fetch("/api/calendar/delete-event", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accessToken, eventId }),
+    });
+    const json = (await res.json()) as DeleteEventResult;
+    return json;
+  } catch {
+    return { ok: false, reason: "falha_rede" };
+  }
+}
