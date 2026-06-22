@@ -89,7 +89,7 @@ const run = async () => {
   const stLabels = (await one(
     `select e.enumlabel from pg_enum e join pg_type t on t.oid=e.enumtypid where t.typname='service_target'`
   )).map(r => r.enumlabel)
-  stLabels.length === 4 ? ok('enum service_target (4 alvos)') : bad(`enum service_target = ${stLabels.length}/4`)
+  stLabels.length === 6 ? ok('enum service_target (6 alvos)') : bad(`enum service_target = ${stLabels.length}/6`)
   const b1Cols = (await one(
     `select column_name from information_schema.columns
      where table_name='leads' and column_name = any($1)`, [["service_target", "ads_active"]]
@@ -107,6 +107,13 @@ const run = async () => {
      where table_name='leads' and column_name = any($1)`, [b8]
   )).map(r => r.column_name)
   b8Cols.length === b8.length ? ok('colunas B8 (precificacao)') : bad(`colunas B8 = ${b8Cols.length}/${b8.length}`)
+
+  // follow-up MVP: followup_at + followup_note
+  const followupCols = (await one(
+    `select column_name from information_schema.columns
+     where table_name='leads' and column_name = any($1)`, [["followup_at", "followup_note"]]
+  )).map(r => r.column_name)
+  followupCols.length === 2 ? ok('colunas follow-up (followup_at, followup_note)') : bad(`colunas follow-up = ${followupCols.length}/2`)
 
   const rls = await one(
     `select relname from pg_class where relnamespace='public'::regnamespace and relrowsecurity and relname=any($1)`,

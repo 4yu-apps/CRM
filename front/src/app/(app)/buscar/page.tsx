@@ -10,15 +10,18 @@ import {
   MapTrifold,
   Shuffle,
   Spinner,
+  X,
 } from "@phosphor-icons/react";
 import { getRepo } from "@/lib/repo";
 import { useAuth } from "@/lib/auth";
-import { fetchEstados, fetchMunicipios, type Municipio, type UF } from "@/lib/ibge";
+import { fetchEstados, fetchMunicipios } from "@/lib/ibge";
 import { geocodeCity, geocodeNeighborhood, type GeoPoint } from "@/lib/geocode";
 import { serviceOptionsForProfile } from "@/lib/professions";
 import { SERVICE_META } from "@/lib/service";
 import { RAMOS_DISPONIVEIS } from "@/lib/ramos";
 import { Dropdown } from "@/components/dropdown";
+import { CityAutocomplete } from "@/components/city-autocomplete";
+import { MultiRamoDropdown } from "@/components/multi-ramo-dropdown";
 import type { ScanCoverage, SearchProfile, ServiceTarget } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -43,12 +46,19 @@ const RADIUS_OPTIONS = [
   { value: "cidade", label: "Cidade toda" },
 ];
 
+// Converte o valor do campo radius ("10km", "25km", "cidade") para numero em km.
+function radiusValueToKm(r: string): number | undefined {
+  const m = /^(\d+)km$/i.exec(r);
+  if (!m) return undefined;
+  return parseInt(m[1], 10);
+}
+
 // Chave de regiao igual a do robo (autopilot.region_key): cidade + estado sem
 // acento. Usada pra filtrar a cobertura pela cidade escolhida na tela.
 function slugRegion(city: string | null, state: string | null): string {
   const base = `${city ?? ""} ${state ?? ""}`
     .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[̀-ͯ]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
@@ -66,9 +76,7 @@ function pctColor(pct: number): string {
   return "#b9b2c4";
 }
 
-// Toggle de servico-alvo. As opcoes vem do perfil (serviceOptionsForProfile):
-// quem faz "ambos" ve as 3; perfis de servico unico nem chegam aqui (mostram
-// rotulo fixo); perfis "indefinido" escondem o controle.
+// Toggle de servico-alvo.
 function ServiceToggle({
   value,
   options,
@@ -100,6 +108,37 @@ function ServiceToggle({
   );
 }
 
+// Chips dos ramos selecionados com botao de remover individual.
+function RamoChips({
+  ramos,
+  onRemove,
+}: {
+  ramos: string[];
+  onRemove: (r: string) => void;
+}) {
+  if (ramos.length === 0) return null;
+  return (
+    <div className="mt-2 flex flex-wrap gap-1.5">
+      {ramos.map((r) => (
+        <span
+          key={r}
+          className="flex items-center gap-1.5 rounded-full border border-brand/30 bg-brand-50 px-2.5 py-1 text-[12px] font-semibold text-brand"
+        >
+          {r}
+          <button
+            type="button"
+            onClick={() => onRemove(r)}
+            aria-label={`Remover ramo ${r}`}
+            className="flex items-center rounded-full hover:text-brand/70"
+          >
+            <X size={11} weight="bold" />
+          </button>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export default function BuscarPage() {
   const repo = getRepo();
   const { user } = useAuth();
@@ -108,18 +147,16 @@ export default function BuscarPage() {
   const [loading, setLoading] = useState(true);
   const [coverage, setCoverage] = useState<ScanCoverage[]>([]);
 
-  // Campos do formulario
-  const [niche, setNiche] = useState("");
+  // niches e um array (multi-selecao)
+  const [niches, setNiches] = useState<string[]>([]);
   const [uf, setUf] = useState("");
   const [city, setCity] = useState("");
   const [neighborhood, setNeighborhood] = useState("");
   const [radius, setRadius] = useState("10km");
   const [service, setService] = useState<ServiceTarget>("trafego");
 
-  // Listas vindas do IBGE para os selects em cascata
-  const [estados, setEstados] = useState<UF[]>([]);
-  const [municipios, setMunicipios] = useState<Municipio[]>([]);
-  const [loadingCidades, setLoadingCidades] = useState(false);
+  // Estados para o Surpreenda-me
+  const [estados, setEstados] = useState<Awaited<ReturnType<typeof fetchEstados>>>([]);
 
   // Estado de submit + acompanhamento ao vivo da busca
   const [saving, setSaving] = useState(false);
@@ -146,12 +183,12 @@ export default function BuscarPage() {
       const [p, cov] = await Promise.all([repo.getProfile(), repo.listCoverage()]);
       if (p) {
         setProfile(p);
-        setNiche(p.niches[0] ?? "");
+        // Inicia com o primeiro nicho do perfil (retrocompat: uma selecao)
+        setNiches(p.niches.length > 0 ? [p.niches[0]] : []);
         setUf(p.state ?? "");
         setCity(p.city ?? "");
         setNeighborhood(p.neighborhood ?? "");
         setRadius(p.radius ?? "10km");
-        // servico-alvo coerente com o perfil
         const opts = serviceOptionsForProfile(p);
         const saved = p.default_service_target ?? "trafego";
         setService(
@@ -179,38 +216,12 @@ export default function BuscarPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapNiche]);
 
-  // Carrega a lista de estados do IBGE uma vez, ao montar.
+  // Carrega estados uma vez (para o Surpreenda-me)
   useEffect(() => {
     fetchEstados().then(setEstados).catch(() => null);
   }, []);
 
-  // Carrega as cidades sempre que a UF muda. Se a UF ficar vazia, limpa a lista.
-  useEffect(() => {
-    if (!uf) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setMunicipios([]);
-      return;
-    }
-    let ativo = true;
-    setLoadingCidades(true);
-    fetchMunicipios(uf)
-      .then((lista) => {
-        if (ativo) setMunicipios(lista);
-      })
-      .catch(() => {
-        if (ativo) setMunicipios([]);
-      })
-      .finally(() => {
-        if (ativo) setLoadingCidades(false);
-      });
-    return () => {
-      ativo = false;
-    };
-  }, [uf]);
-
-  // Recentra o mapa em TEMPO REAL conforme estado, cidade ou bairro mudam — sem
-  // precisar clicar em buscar. Com bairro, geocodifica o bairro (zoom mais
-  // fino); sem bairro, a cidade. O bairro usa debounce porque e campo de texto.
+  // Recentra o mapa em TEMPO REAL conforme cidade ou bairro mudam
   useEffect(() => {
     if (!city) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -225,7 +236,6 @@ export default function BuscarPage() {
         if (ativo && ponto) setCityPoint(ponto);
       }).catch(() => null);
     };
-    // bairro: espera o usuario parar de digitar; cidade: na hora.
     const t = setTimeout(buscar, bairro ? 600 : 0);
     return () => {
       ativo = false;
@@ -233,9 +243,7 @@ export default function BuscarPage() {
     };
   }, [city, uf, neighborhood]);
 
-  // Acompanhamento ao vivo: enquanto a busca roda (no servidor), consulta o
-  // banco a cada poucos segundos e mostra quantos leads novos chegaram e quantos
-  // ja estao prontos pra revisar. Para sozinho depois de um teto de tempo.
+  // Acompanhamento ao vivo da busca
   useEffect(() => {
     if (!searching || !baseline) return;
     let stop = false;
@@ -255,7 +263,7 @@ export default function BuscarPage() {
           });
         }
       } catch {
-        // soluco de rede: ignora e tenta de novo no proximo tick
+        // solucao de rede: ignora
       }
       if (!stop) {
         if (Date.now() - startedAt < LIMITE_MS) timer = setTimeout(tick, 6000);
@@ -269,19 +277,34 @@ export default function BuscarPage() {
     };
   }, [searching, baseline, repo]);
 
-  // Troca de estado: recarrega cidades (efeito acima) e limpa a cidade escolhida.
-  const handleUfChange = useCallback((novaUf: string) => {
-    setUf(novaUf);
-    setCity("");
+  // Toggle de nicho: adiciona ou remove da lista (multi-selecao)
+  const handleNicheToggle = useCallback((ramo: string) => {
+    setNiches((prev) =>
+      prev.includes(ramo) ? prev.filter((r) => r !== ramo) : [...prev, ramo],
+    );
   }, []);
 
-  // Surpreenda-me: randomiza TUDO menos o servico-alvo — estado, cidade, bairro
-  // e ramo. Util quando a pessoa quer garimpar uma regiao nova sem pensar.
+  // Autocomplete de cidade: selecionar preenche cidade e estado juntos
+  const handleCitySelect = useCallback(
+    ({ cidade, uf: novaUf }: { cidade: string; uf: string }) => {
+      setCity(cidade);
+      setUf(novaUf);
+    },
+    [],
+  );
+
+  const handleCityClear = useCallback(() => {
+    setCity("");
+    setUf("");
+    setCityPoint(null);
+  }, []);
+
+  // Surpreenda-me: randomiza ramo, estado e cidade
   const handleSurpreendaMe = useCallback(async () => {
     const pool = profile?.niches?.length ? profile.niches : RAMOS_DISPONIVEIS;
     const ramo = rnd(pool);
-    setNiche(ramo);
-    setNeighborhood(""); // bairro limpo no sorteio (cobre a cidade toda)
+    setNiches([ramo]);
+    setNeighborhood("");
 
     if (estados.length === 0) {
       toast.success(`Ramo sorteado: ${ramo}`);
@@ -308,7 +331,7 @@ export default function BuscarPage() {
     if (saving) return;
     setSaving(true);
     try {
-      // 1) Marca a linha de base pra medir o que a busca trouxe.
+      // 1) Marca a linha de base
       let base = { total: 0, ready: 0 };
       try {
         const [t, r] = await Promise.all([
@@ -317,15 +340,14 @@ export default function BuscarPage() {
         ]);
         base = { total: t, ready: r };
       } catch {
-        // sem baseline: o acompanhamento mostra a partir de 0
+        // sem baseline
       }
       setBaseline(base);
       setFound({ novos: 0, prontos: 0 });
 
-      // 2) Salva o alvo. Autopilot nao mora mais aqui (fica no Config); por isso
-      // nao mandamos esse campo — o upsert preserva o valor atual.
+      // 2) Salva o alvo com todos os nichos selecionados
       await repo.saveProfile({
-        niches: niche ? [niche] : profile?.niches ?? [],
+        niches: niches.length > 0 ? niches : profile?.niches ?? [],
         city: city || null,
         state: uf || null,
         neighborhood: neighborhood.trim() || null,
@@ -333,64 +355,70 @@ export default function BuscarPage() {
         default_service_target: serviceOpts.length === 0 ? "indefinido" : service,
       });
 
-      // 3) Dispara o robo com o ALVO desta busca (dono + endereco digitado): a
-      // busca roda direcionada no servidor (GitHub Actions), independente do
-      // autopilot, e so pros leads deste dono.
-      let ok = false;
-      try {
-        const res = await fetch("/api/search/run", {
+      // 3) Dispara o robo para cada nicho selecionado em paralelo.
+      // A API /api/search/run aceita um nicho por vez; chamamos uma vez por ramo.
+      const ramosParaBuscar =
+        niches.length > 0 ? niches : (profile?.niches?.slice(0, 1) ?? []);
+      const disparos = ramosParaBuscar.map((nicho) =>
+        fetch("/api/search/run", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             owner_id: user?.id ?? null,
-            niche: niche || (profile?.niches ?? [])[0] || "",
+            niche: nicho,
             city: city || null,
             state: uf || null,
             neighborhood: neighborhood.trim() || null,
           }),
-        });
-        const data = (await res.json().catch(() => null)) as
-          | { ok: boolean; reason?: string }
-          | null;
-        ok = !!data?.ok;
-      } catch {
-        // rede/route indisponivel: cai no proximo ciclo automatico
-      }
+        })
+          .then((res) =>
+            res.json().catch(() => null) as Promise<{ ok: boolean } | null>,
+          )
+          .catch(() => null),
+      );
+      const resultados = await Promise.all(disparos);
+      const algumOk = resultados.some((r) => r?.ok === true);
 
-      // 4) Acompanha os leads chegando de qualquer forma.
+      // 4) Acompanha os leads chegando
       setSearching(true);
-      if (ok) {
-        toast.success("Busca disparada! Acompanhe os leads chegando aqui embaixo.");
+      if (algumOk) {
+        const labelBusca =
+          ramosParaBuscar.length === 1
+            ? `Busca disparada para "${ramosParaBuscar[0]}"!`
+            : `Busca disparada para ${ramosParaBuscar.length} ramos!`;
+        toast.success(`${labelBusca} Acompanhe os leads chegando aqui embaixo.`);
       } else {
-        toast.message("Alvo salvo. O robo busca no proximo ciclo — deixei o acompanhamento ligado.");
+        toast.message(
+          "Alvo salvo. O robo busca no proximo ciclo — deixei o acompanhamento ligado.",
+        );
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao salvar alvo");
     } finally {
       setSaving(false);
     }
-  }, [saving, repo, niche, profile, city, uf, neighborhood, radius, service, serviceOpts, user]);
+  }, [saving, repo, niches, profile, city, uf, neighborhood, radius, service, serviceOpts, user]);
 
-  // Coordenadas para o mapa. Prioridade: regiao geocodificada (zoom 12) ->
-  // primeira zona de cobertura com coordenada -> centro do Brasil.
+  // Coordenadas para o mapa.
   const mapCenter = (() => {
-    if (cityPoint) return { lat: cityPoint.lat, lng: cityPoint.lng, zoom: neighborhood.trim() ? 14 : 12 };
+    if (cityPoint)
+      return { lat: cityPoint.lat, lng: cityPoint.lng, zoom: neighborhood.trim() ? 14 : 12 };
     const first = coverage.find((c) => c.center_lat != null && c.center_lng != null);
     if (first) return { lat: first.center_lat!, lng: first.center_lng!, zoom: 12 };
     return BRASIL_CENTER;
   })();
 
-  // O MapContainer do react-leaflet so usa center/zoom na montagem. Trocar a key
-  // quando o centro muda remonta o mapa ja na regiao escolhida (recentra de fato).
   const mapKey = `${mapCenter.lat.toFixed(3)},${mapCenter.lng.toFixed(3)},${mapCenter.zoom}`;
 
-  // Cobertura mostrada: filtrada pela cidade escolhida (mesma chave do robo).
-  // Sem cidade, mostra tudo.
+  // Cobertura mostrada: filtrada pela cidade escolhida.
   const covFiltered = useMemo(() => {
     if (!city) return coverage;
     const key = slugRegion(city, uf);
     return coverage.filter((z) => z.region_key === key);
   }, [coverage, city, uf]);
+
+  // Raio em km para o mapa visual
+  const radiusKm = radiusValueToKm(radius);
 
   if (loading) {
     return (
@@ -412,13 +440,10 @@ export default function BuscarPage() {
             servidor e os leads novos vao subindo na sua fila — voce acompanha aqui em tempo real.
           </p>
 
-          {/* Ramo */}
+          {/* Ramos (multi-selecao com chips) */}
           <div className="mb-4">
             <div className="mb-1.5 flex items-center justify-between">
-              <label
-                htmlFor="ramo-select"
-                className="block text-[12px] font-bold uppercase tracking-wider text-faint"
-              >
+              <label className="block text-[12px] font-bold uppercase tracking-wider text-faint">
                 Ramo
               </label>
               <button
@@ -432,58 +457,67 @@ export default function BuscarPage() {
                 Surpreenda-me
               </button>
             </div>
-            <Dropdown
-              value={niche}
-              onChange={setNiche}
-              ariaLabel="Ramo"
-              options={[{ value: "", label: "Qualquer ramo" }, ...nicheOptions.map((n) => ({ value: n, label: n }))]}
+            <MultiRamoDropdown
+              selected={niches}
+              options={[...nicheOptions]}
+              onToggle={handleNicheToggle}
             />
+            <RamoChips
+              ramos={niches}
+              onRemove={(r) => setNiches((prev) => prev.filter((x) => x !== r))}
+            />
+            {niches.length > 1 && (
+              <p className="mt-1.5 text-[12px] text-faint">
+                O robo vai buscar em paralelo para cada ramo selecionado.
+              </p>
+            )}
           </div>
 
-          {/* Estado + Cidade em cascata (dados do IBGE) */}
-          <div className="mb-4 grid grid-cols-2 gap-3">
-            <div>
-              <label
-                htmlFor="estado-select"
-                className="mb-1.5 block text-[12px] font-bold uppercase tracking-wider text-faint"
-              >
+          {/* Cidade com autocomplete nacional (tipo Uber) */}
+          <div className="mb-4">
+            <label className="mb-1.5 block text-[12px] font-bold uppercase tracking-wider text-faint">
+              Cidade
+            </label>
+            <CityAutocomplete
+              cidade={city}
+              uf={uf}
+              onSelect={handleCitySelect}
+              onClear={handleCityClear}
+              placeholder="Digite a cidade (ex: Maringa, Sao Paulo...)"
+            />
+            <p className="mt-1.5 text-[12px] text-faint">
+              Comece a digitar e escolha a cidade. O estado e preenchido automaticamente.
+            </p>
+          </div>
+
+          {/* Estado (somente leitura — preenchido pelo autocomplete de cidade) */}
+          {uf && (
+            <div className="mb-4">
+              <label className="mb-1.5 block text-[12px] font-bold uppercase tracking-wider text-faint">
                 Estado
               </label>
-              <Dropdown
-                value={uf}
-                onChange={handleUfChange}
-                ariaLabel="Estado"
-                placeholder="Escolha o estado"
-                options={estados.map((e) => ({ value: e.sigla, label: `${e.nome} (${e.sigla})` }))}
-              />
+              <div className="flex items-center justify-between rounded-xl border border-border-2 bg-surface-2 px-4 py-3 text-[13.5px] text-ink-2">
+                <span>{uf}</span>
+                <button
+                  type="button"
+                  onClick={handleCityClear}
+                  className="text-[12px] text-faint hover:text-ink"
+                  aria-label="Limpar estado e cidade"
+                >
+                  <X size={14} />
+                </button>
+              </div>
             </div>
-            <div>
-              <label
-                htmlFor="cidade-select"
-                className="mb-1.5 block text-[12px] font-bold uppercase tracking-wider text-faint"
-              >
-                Cidade
-              </label>
-              <Dropdown
-                value={city}
-                onChange={setCity}
-                ariaLabel="Cidade"
-                disabled={!uf || loadingCidades}
-                placeholder={
-                  !uf ? "Escolha o estado antes" : loadingCidades ? "Carregando cidades..." : "Escolha a cidade"
-                }
-                options={municipios.map((m) => ({ value: m.nome, label: m.nome }))}
-              />
-            </div>
-          </div>
+          )}
 
-          {/* Bairro ou zona (texto livre, opcional, agora de verdade) */}
+          {/* Bairro ou zona (texto livre, opcional) */}
           <div className="mb-4">
             <label
               htmlFor="bairro-input"
               className="mb-1.5 block text-[12px] font-bold uppercase tracking-wider text-faint"
             >
-              Bairro ou zona <span className="font-medium normal-case text-faint">(opcional)</span>
+              Bairro ou zona{" "}
+              <span className="font-medium normal-case text-faint">(opcional)</span>
             </label>
             <input
               id="bairro-input"
@@ -502,10 +536,15 @@ export default function BuscarPage() {
             <label className="mb-1.5 block text-[12px] font-bold uppercase tracking-wider text-faint">
               Raio de atuacao
             </label>
-            <Dropdown value={radius} onChange={setRadius} ariaLabel="Raio de atuacao" options={RADIUS_OPTIONS} />
+            <Dropdown
+              value={radius}
+              onChange={setRadius}
+              ariaLabel="Raio de atuacao"
+              options={RADIUS_OPTIONS}
+            />
           </div>
 
-          {/* Servico alvo — reflete a profissao do perfil. */}
+          {/* Servico alvo */}
           {serviceOpts.length > 0 && (
             <div className="mb-6">
               <label className="mb-1.5 block text-[12px] font-bold uppercase tracking-wider text-faint">
@@ -514,7 +553,9 @@ export default function BuscarPage() {
               {serviceOpts.length === 1 ? (
                 <div className="flex items-center gap-2 rounded-xl border border-border-2 bg-surface-2 px-4 py-3 text-[14px] font-semibold text-ink-2">
                   {SERVICE_META[serviceOpts[0]].label}
-                  <span className="text-[12px] font-medium text-faint">(definido no seu perfil)</span>
+                  <span className="text-[12px] font-medium text-faint">
+                    (definido no seu perfil)
+                  </span>
                 </div>
               ) : (
                 <ServiceToggle value={service} options={serviceOpts} onChange={setService} />
@@ -560,7 +601,8 @@ export default function BuscarPage() {
                   <strong className="text-[18px] text-ink">{found.novos}</strong> negocios novos
                 </span>
                 <span>
-                  <strong className="text-[18px] text-ink">{found.prontos}</strong> prontos pra revisar
+                  <strong className="text-[18px] text-ink">{found.prontos}</strong> prontos pra
+                  revisar
                 </span>
               </div>
               {found.prontos > 0 && (
@@ -578,7 +620,7 @@ export default function BuscarPage() {
             </div>
           )}
 
-          {/* Nota informativa sempre visivel */}
+          {/* Nota informativa */}
           {!searching && (
             <div className="mt-4 flex items-center gap-2 text-[12.5px] text-faint">
               <Info size={14} />
@@ -613,7 +655,10 @@ export default function BuscarPage() {
               value={mapNiche ?? ""}
               onChange={(v) => setMapNiche(v || undefined)}
               ariaLabel="Filtrar ramo no mapa"
-              options={[{ value: "", label: "Todos os ramos" }, ...nicheOptions.map((n) => ({ value: n, label: n }))]}
+              options={[
+                { value: "", label: "Todos os ramos" },
+                ...nicheOptions.map((n) => ({ value: n, label: n })),
+              ]}
             />
           </div>
 
@@ -628,25 +673,40 @@ export default function BuscarPage() {
               centerLat={mapCenter.lat}
               centerLng={mapCenter.lng}
               zoom={mapCenter.zoom}
+              cityName={city || undefined}
+              stateName={uf || undefined}
+              radiusKm={radiusKm}
             />
           </div>
 
           {/* Legenda */}
           <div className="mb-5 flex gap-4 text-[12px] text-muted-foreground">
             <span className="flex items-center gap-1.5">
-              <span className="h-[11px] w-[11px] rounded-[3px]" style={{ background: "#7C3AED" }} />
+              <span
+                className="h-[11px] w-[11px] rounded-[3px]"
+                style={{ background: "#7C3AED" }}
+              />
               Alto (70%+)
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="h-[11px] w-[11px] rounded-[3px]" style={{ background: "#9B6BE8" }} />
+              <span
+                className="h-[11px] w-[11px] rounded-[3px]"
+                style={{ background: "#9B6BE8" }}
+              />
               Medio (30-69%)
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="h-[11px] w-[11px] rounded-[3px]" style={{ background: "#C4A8F0" }} />
+              <span
+                className="h-[11px] w-[11px] rounded-[3px]"
+                style={{ background: "#C4A8F0" }}
+              />
               Iniciando
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="h-[11px] w-[11px] rounded-[3px]" style={{ background: "#b9b2c4" }} />
+              <span
+                className="h-[11px] w-[11px] rounded-[3px]"
+                style={{ background: "#b9b2c4" }}
+              />
               Ainda nao
             </span>
           </div>
@@ -666,13 +726,13 @@ export default function BuscarPage() {
           ) : (
             <div className="flex flex-col gap-3.5">
               {covFiltered.map((z) => {
-                const label =
+                const zonaLabel =
                   (z.region_name ?? z.region_key) + (z.niche ? ` / ${z.niche}` : "");
                 const color = pctColor(z.pct);
                 return (
                   <div key={z.id}>
                     <div className="mb-1.5 flex items-center justify-between text-[13.5px]">
-                      <span className="font-semibold text-ink-2">{label}</span>
+                      <span className="font-semibold text-ink-2">{zonaLabel}</span>
                       <span className="text-faint">
                         {z.pct}%{" "}
                         <span className="text-[12px]">({z.result_count} leads)</span>

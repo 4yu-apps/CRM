@@ -25,6 +25,22 @@ import { ProvenanceList } from "./provenance-list";
 import { ScoreMeter } from "./score-meter";
 import { HistoryTimeline } from "./history-timeline";
 
+// --- utilitarios de data ---
+function addDays(date: Date, days: number): Date {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+function fmtBRL(value: number): string {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+
 const EDIT_FIELDS: { key: keyof LeadEditable; label: string }[] = [
   { key: "business_name", label: "Nome do negocio" },
   { key: "phone", label: "Telefone" },
@@ -65,6 +81,16 @@ export function LeadDetailSheet({
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
+  // Modal de valor fechado (intercepta transicao para "fechado")
+  const [dealModal, setDealModal] = useState(false);
+  const [dealValue, setDealValue] = useState("");
+  const [dealSaving, setDealSaving] = useState(false);
+
+  // Follow-up
+  const [followupNote, setFollowupNote] = useState("");
+  const [followupAt, setFollowupAt] = useState<string | null>(null);
+  const [followupSaving, setFollowupSaving] = useState(false);
+
   const load = useCallback(async () => {
     if (!leadId) return;
     setLoading(true);
@@ -83,7 +109,11 @@ export function LeadDetailSheet({
     // fetch-on-open: carrega o detalhe quando abre/troca de lead.
     /* eslint-disable react-hooks/set-state-in-effect */
     if (leadId) void load();
-    else setDetail(null);
+    else {
+      setDetail(null);
+      setFollowupAt(null);
+      setFollowupNote("");
+    }
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [leadId, load]);
 
@@ -115,6 +145,12 @@ export function LeadDetailSheet({
 
   const doTransition = async (to: LeadStatus, label: string) => {
     if (!lead) return;
+    // Intercepta transicao para "fechado": abre modal de valor
+    if (to === "fechado") {
+      setDealValue(lead.deal_value != null ? String(lead.deal_value) : lead.suggested_value != null ? String(lead.suggested_value) : "");
+      setDealModal(true);
+      return;
+    }
     try {
       await repo.transition(lead.id, to, "human");
       toast.success(`Status: ${label}`);
@@ -122,6 +158,54 @@ export function LeadDetailSheet({
       onChanged();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Transicao invalida");
+    }
+  };
+
+  const confirmDeal = async () => {
+    if (!lead) return;
+    const num = parseFloat(dealValue.replace(",", "."));
+    if (!dealValue || isNaN(num) || num <= 0) {
+      toast.warning("Informe um valor valido para registrar o negocio.");
+      return;
+    }
+    setDealSaving(true);
+    try {
+      await repo.update(lead.id, {
+        deal_value: num,
+        deal_closed_at: new Date().toISOString(),
+      });
+      await repo.transition(lead.id, "fechado", "human");
+      setDealModal(false);
+      setDealValue("");
+      toast.success("Negocio fechado registrado.");
+      await load();
+      onChanged();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao registrar negocio");
+    } finally {
+      setDealSaving(false);
+    }
+  };
+
+  const saveFollowup = async () => {
+    if (!lead) return;
+    if (!followupAt) {
+      toast.warning("Escolha uma data para o follow-up.");
+      return;
+    }
+    setFollowupSaving(true);
+    try {
+      await repo.update(lead.id, {
+        followup_at: followupAt,
+        followup_note: followupNote.trim() || null,
+      });
+      toast.success("Follow-up salvo.");
+      await load();
+      onChanged();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao salvar follow-up");
+    } finally {
+      setFollowupSaving(false);
     }
   };
 
@@ -173,9 +257,54 @@ export function LeadDetailSheet({
     lead && ["rascunho_pronto", "aprovado", "enviado"].includes(lead.status) &&
     (lead.draft_msg1 || lead.draft_msg2);
 
+  const hasFollowup = lead && ["enviado", "sem_resposta"].includes(lead.status);
+  const isFechado = lead?.status === "fechado";
+
+  // Inicializa followupAt/Note quando carrega o lead (uma unica vez por abertura)
+  const followupAtFromLead = lead?.followup_at ?? null;
+  const followupNoteFromLead = lead?.followup_note ?? "";
+
   return (
     <Sheet open={!!leadId} onOpenChange={(o) => !o && onClose()}>
       <SheetContent className="w-full gap-0 overflow-y-auto sm:max-w-2xl">
+        {/* Modal de valor fechado */}
+        {dealModal && lead && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-[400px] overflow-hidden rounded-2xl bg-card shadow-xl">
+              <div className="border-b border-border px-6 py-4">
+                <div className="text-base font-bold">Registrar negocio fechado</div>
+                <div className="text-[12.5px] text-muted-foreground">{lead.business_name}</div>
+              </div>
+              <div className="px-6 py-4 space-y-3">
+                {lead.suggested_value != null && (
+                  <p className="text-[12.5px] text-muted-foreground">
+                    IA sugeriu <strong className="text-foreground">{fmtBRL(lead.suggested_value)}</strong> — confirme ou ajuste abaixo.
+                  </p>
+                )}
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1 block">Valor fechado (R$)</Label>
+                  <Input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="Ex: 1500"
+                    value={dealValue}
+                    onChange={(e) => setDealValue(e.target.value)}
+                    autoFocus
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3 px-6 pb-5">
+                <Button variant="outline" className="flex-1" onClick={() => setDealModal(false)}>
+                  Cancelar
+                </Button>
+                <Button className="flex-1" onClick={confirmDeal} disabled={dealSaving}>
+                  {dealSaving ? "Salvando..." : "Confirmar"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {loading || !lead ? (
           <div className="space-y-4 p-6">
             <Skeleton className="h-8 w-2/3" />
@@ -206,6 +335,112 @@ export function LeadDetailSheet({
               <Section title="Proximo passo">
                 <StatusActions lead={lead} onTransition={doTransition} />
               </Section>
+
+              {/* Negocio fechado */}
+              {isFechado && (
+                <Section title="Negocio fechado">
+                  <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-800 dark:bg-emerald-950/30">
+                    {lead.deal_value != null ? (
+                      <div>
+                        <div className="text-[13px] font-semibold text-emerald-700 dark:text-emerald-400">
+                          {fmtBRL(lead.deal_value)}
+                        </div>
+                        {lead.suggested_value != null && (
+                          <div className="mt-0.5 text-[11.5px] text-muted-foreground">
+                            IA sugeriu {fmtBRL(lead.suggested_value)}
+                          </div>
+                        )}
+                        {lead.deal_closed_at && (
+                          <div className="mt-0.5 text-[11.5px] text-muted-foreground">
+                            Fechado {fmtRelative(lead.deal_closed_at)}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <p className="text-[12.5px] text-muted-foreground">
+                          Nenhum valor registrado ainda.
+                          {lead.suggested_value != null && (
+                            <> IA sugeriu <strong>{fmtBRL(lead.suggested_value)}</strong>.</>
+                          )}
+                        </p>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setDealValue(lead.suggested_value != null ? String(lead.suggested_value) : "");
+                            setDealModal(true);
+                          }}
+                        >
+                          Registrar valor
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </Section>
+              )}
+
+              {/* Follow-up */}
+              {hasFollowup && (
+                <Section title="Follow-up">
+                  <div className="space-y-3 rounded-md border border-border bg-muted/30 p-3">
+                    <p className="text-[12.5px] text-muted-foreground">
+                      Quando quer re-abordar esse lead?
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {[1, 3, 5, 7, 10].map((days) => {
+                        const d = addDays(new Date(), days);
+                        const iso = d.toISOString();
+                        const isSelected = followupAt
+                          ? new Date(followupAt).toDateString() === d.toDateString()
+                          : followupAtFromLead
+                            ? new Date(followupAtFromLead).toDateString() === d.toDateString()
+                            : false;
+                        return (
+                          <button
+                            key={days}
+                            type="button"
+                            onClick={() => setFollowupAt(iso)}
+                            className={[
+                              "rounded-full border px-3 py-1 text-xs font-semibold transition-colors",
+                              isSelected
+                                ? "border-brand bg-brand text-white"
+                                : "border-border bg-card text-ink-2 hover:border-brand/50 hover:bg-brand-50 hover:text-brand",
+                            ].join(" ")}
+                          >
+                            +{days}d
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {(followupAt ?? followupAtFromLead) && (
+                      <p className="text-[11.5px] text-muted-foreground">
+                        Follow-up em{" "}
+                        <strong className="text-foreground">
+                          {new Date(followupAt ?? followupAtFromLead!).toLocaleDateString("pt-BR")}
+                        </strong>
+                      </p>
+                    )}
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Mensagem do follow-up (opcional)</Label>
+                      <textarea
+                        value={followupNote || followupNoteFromLead}
+                        onChange={(e) => setFollowupNote(e.target.value)}
+                        placeholder="Ex: Ola, voltei pra saber se voce teve a chance de pensar..."
+                        rows={3}
+                        className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-brand focus:ring-0"
+                      />
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={saveFollowup}
+                      disabled={followupSaving || (!followupAt && !followupAtFromLead)}
+                    >
+                      {followupSaving ? "Salvando..." : "Salvar follow-up"}
+                    </Button>
+                  </div>
+                </Section>
+              )}
 
               {hasDraft && (
                 <Section title="Rascunho: ver, editar, aprovar">

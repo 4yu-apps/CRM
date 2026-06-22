@@ -2,13 +2,33 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { HandGrabbing, CalendarBlank, CurrencyDollar, X, DotsThreeVertical, CaretRight } from "@phosphor-icons/react";
+import { HandGrabbing, CalendarBlank, CurrencyDollar, X, DotsThreeVertical, CaretRight, Bell } from "@phosphor-icons/react";
 import { useLeads } from "@/hooks/use-leads";
 import { SERVICE_META } from "@/lib/service";
 import { createCalendarEvent } from "@/lib/calendar";
 import { canTransition } from "@/lib/state-machine";
 import { cn } from "@/lib/utils";
 import type { Lead, LeadStatus, DealBilling } from "@/lib/types";
+
+function fmtBRL(value: number): string {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+function getFollowupBadge(lead: Lead): "hoje" | "atrasado" | null {
+  if (!lead.followup_at) return null;
+  if (["fechado", "respondeu", "interessado", "reuniao", "proposta", "perdido", "sem_interesse", "descartado"].includes(lead.status)) return null;
+  const due = new Date(lead.followup_at);
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+  if (due >= todayStart && due <= todayEnd) return "hoje";
+  if (due < todayStart) return "atrasado";
+  return null;
+}
 
 // ---------------------------------------------------------------------------
 // Mapa de colunas do kanban
@@ -111,6 +131,22 @@ function FunnelMeetingModal({ lead, onConfirm, onClose }: MeetingModalProps) {
   const [link, setLink] = useState("");
   const [location, setLocation] = useState("");
 
+  // Sugestoes rapidas de horario
+  function quickDate(hoursFromNow: number): string {
+    const d = new Date();
+    d.setMinutes(0, 0, 0);
+    d.setHours(d.getHours() + hoursFromNow);
+    const p = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+  }
+
+  const QUICK_OPTIONS = [
+    { label: "Amanha 10h", hours: () => { const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(10, 0, 0, 0); const p = (n: number) => String(n).padStart(2, "0"); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T10:00`; } },
+    { label: "Em 2h", hours: () => quickDate(2) },
+    { label: "Em 24h", hours: () => quickDate(24) },
+    { label: "Em 48h", hours: () => quickDate(48) },
+  ];
+
   return (
     <div
       onClick={onClose}
@@ -139,12 +175,39 @@ function FunnelMeetingModal({ lead, onConfirm, onClose }: MeetingModalProps) {
           <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-faint">
             Data e hora da reuniao
           </label>
+          {/* Sugestoes rapidas */}
+          <div className="mb-2.5 flex flex-wrap gap-1.5">
+            {QUICK_OPTIONS.map((opt) => {
+              const val = opt.hours();
+              const isSelected = dateTime === val;
+              return (
+                <button
+                  key={opt.label}
+                  type="button"
+                  onClick={() => setDateTime(val)}
+                  className={cn(
+                    "rounded-full border px-3 py-1 text-[11.5px] font-semibold transition-colors",
+                    isSelected
+                      ? "border-brand bg-brand text-white"
+                      : "border-border-2 bg-surface-2 text-ink-2 hover:border-brand/50 hover:bg-brand-50 hover:text-brand"
+                  )}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
           <input
             type="datetime-local"
             value={dateTime}
             onChange={(e) => setDateTime(e.target.value)}
             className="w-full rounded-xl border border-border-2 bg-surface-2 px-3.5 py-3 text-sm outline-none focus:border-brand"
           />
+          {dateTime && (
+            <p className="mt-1.5 text-[11.5px] font-semibold text-brand">
+              {new Date(dateTime).toLocaleString("pt-BR", { dateStyle: "full", timeStyle: "short" })}
+            </p>
+          )}
 
           <div className="mt-4 mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-faint">
             Como vai ser
@@ -230,7 +293,7 @@ interface DealModalProps {
 }
 
 function FunnelDealModal({ lead, onConfirm, onClose }: DealModalProps) {
-  const [value, setValue] = useState("");
+  const [value, setValue] = useState(lead.suggested_value != null ? String(lead.suggested_value) : "");
   const [billing, setBilling] = useState<DealBilling>("mensal_fixo");
   const [months, setMonths] = useState("");
 
@@ -281,10 +344,15 @@ function FunnelDealModal({ lead, onConfirm, onClose }: DealModalProps) {
             <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-faint">
               Valor fechado (R$)
             </label>
+            {lead.suggested_value != null && (
+              <p className="mb-1.5 text-[12px] text-muted-foreground">
+                IA sugeriu <strong className="text-foreground">{fmtBRL(lead.suggested_value)}</strong>
+              </p>
+            )}
             <input
               type="text"
               inputMode="decimal"
-              placeholder="Ex: 1500"
+              placeholder={lead.suggested_value != null ? String(lead.suggested_value) : "Ex: 1500"}
               value={value}
               onChange={(e) => setValue(e.target.value)}
               className="w-full rounded-xl border border-border-2 bg-surface-2 px-3.5 py-3 text-sm outline-none focus:border-brand"
@@ -360,6 +428,7 @@ interface FunnelCardProps {
 function FunnelCard({ lead, onDragStart, onMove }: FunnelCardProps) {
   const router = useRouter();
   const service = SERVICE_META[lead.service_target] ?? SERVICE_META.indefinido;
+  const followupBadge = getFollowupBadge(lead);
 
   return (
     <div
@@ -396,7 +465,7 @@ function FunnelCard({ lead, onDragStart, onMove }: FunnelCardProps) {
           <DotsThreeVertical size={18} weight="bold" />
         </button>
       </div>
-      <div className="mt-2.5">
+      <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
         <span
           className={cn(
             "inline-flex items-center rounded-full px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wider",
@@ -405,6 +474,24 @@ function FunnelCard({ lead, onDragStart, onMove }: FunnelCardProps) {
         >
           {service.short}
         </span>
+        {lead.status === "fechado" && lead.deal_value != null && (
+          <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10.5px] font-bold text-emerald-700 dark:text-emerald-400">
+            <CurrencyDollar size={11} weight="bold" />
+            {fmtBRL(lead.deal_value)}
+          </span>
+        )}
+        {followupBadge === "hoje" && (
+          <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10.5px] font-bold text-amber-700 dark:text-amber-300">
+            <Bell size={11} weight="fill" />
+            Follow-up hoje
+          </span>
+        )}
+        {followupBadge === "atrasado" && (
+          <span className="inline-flex items-center gap-0.5 rounded-full bg-rose-500/15 px-2 py-0.5 text-[10.5px] font-bold text-rose-700 dark:text-rose-400">
+            <Bell size={11} weight="fill" />
+            Follow-up atrasado
+          </span>
+        )}
       </div>
     </div>
   );
@@ -844,15 +931,32 @@ export default function FunilPage() {
   // Render
   // -------------------------------------------------------------------------
 
+  // Resumo de fechados para exibir no topo do funil
+  const fechadosSummary = useMemo(() => {
+    const fechados = localLeads.filter((l) => l.status === "fechado");
+    const receita = fechados.reduce((s, l) => s + (l.deal_value ?? 0), 0);
+    return { count: fechados.length, receita };
+  }, [localLeads]);
+
   return (
     <div
       className="mx-auto w-full max-w-[1760px]"
       onDragEnd={handleDragEnd}
     >
-      {/* Instrucao */}
-      <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
-        <HandGrabbing size={17} className="text-brand" />
-        Arraste o card, ou toque nos 3 pontinhos pra mover. No celular, deslize as colunas de lado.
+      {/* Instrucao + resumo de receita */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <HandGrabbing size={17} className="text-brand" />
+          Arraste o card, ou toque nos 3 pontinhos pra mover. No celular, deslize as colunas de lado.
+        </div>
+        {fechadosSummary.count > 0 && (
+          <div className="flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3.5 py-1.5 text-[12.5px] font-semibold text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-400">
+            <CurrencyDollar size={14} weight="bold" />
+            {fechadosSummary.receita > 0
+              ? `${fmtBRL(fechadosSummary.receita)} · ${fechadosSummary.count} ${fechadosSummary.count === 1 ? "contrato fechado" : "contratos fechados"}`
+              : `${fechadosSummary.count} ${fechadosSummary.count === 1 ? "contrato fechado" : "contratos fechados"}`}
+          </div>
+        )}
       </div>
 
       {/* Colunas estilo Trello: largura fixa e scroll horizontal em qualquer

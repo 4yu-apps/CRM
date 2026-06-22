@@ -135,7 +135,7 @@ function buildKpis(leads: Lead[]): KpiData[] {
     },
     {
       ic: <ChatCircleDots size={17} className="text-brand" />,
-      label: "Em conversa",
+      label: "Em contato",
       value: emConversa,
       deltaNum: conversaThis - conversaPrev,
       deltaLabel: fmtDelta(conversaThis - conversaPrev),
@@ -182,7 +182,7 @@ function buildFunnelBars(leads: Lead[]): FunnelBar[] {
     { label: "Passaram no filtro", value: passaram },
     { label: "Enviados", value: stages.find((s) => s.status === "enviado")?.reached ?? 0 },
     { label: "Responderam", value: stages.find((s) => s.status === "respondeu")?.reached ?? 0 },
-    { label: "Reunioes", value: stages.find((s) => s.status === "reuniao")?.reached ?? 0 },
+    { label: "Reuniões", value: stages.find((s) => s.status === "reuniao")?.reached ?? 0 },
     { label: "Fecharam", value: stages.find((s) => s.status === "fechado")?.reached ?? 0 },
   ];
 
@@ -306,7 +306,7 @@ export default function ResultadosPage() {
 
         {/* barras do funil */}
         <div className="fu rounded-[18px] border border-border bg-card p-6 shadow-[var(--shadow)]">
-          <div className="mb-5 text-[16px] font-bold">Do encontrado ao fechado</div>
+          <div className="mb-5 text-[16px] font-bold">Da prospecção ao fechamento</div>
           {loading ? (
             <div className="space-y-3">
               {Array.from({ length: 6 }).map((_, i) => (

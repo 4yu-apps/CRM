@@ -120,6 +120,10 @@ export interface Lead {
   // usado para cancelar o evento quando a reuniao for desmarcada.
   meeting_gcal_event_id?: string | null;
 
+  // Follow-up MVP: data do lembrete e mensagem sugerida.
+  followup_at?: string | null;
+  followup_note?: string | null;
+
   created_at: string;
   updated_at: string;
 
@@ -185,6 +189,8 @@ export type LeadEditable = Partial<
     | "meeting_link"
     | "meeting_location"
     | "meeting_gcal_event_id"
+    | "followup_at"
+    | "followup_note"
   >
 >;
 

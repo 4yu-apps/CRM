@@ -13,7 +13,7 @@ export function StatsBar({ leads }: { leads: Lead[] }) {
   const cards = [
     { label: "Leads ativos", value: ativos, hint: "no funil" },
     { label: "Aguardando aprovacao", value: aguardandoAprovacao, hint: "rascunho pronto", accent: "text-violet-600 dark:text-violet-400" },
-    { label: "Em conversa", value: emConversa, hint: "respondeu+", accent: "text-emerald-600 dark:text-emerald-400" },
+    { label: "Em contato", value: emConversa, hint: "respondeu+", accent: "text-emerald-600 dark:text-emerald-400" },
     { label: "Fechados", value: fechados, hint: "ganhos", accent: "text-emerald-600 dark:text-emerald-400" },
   ];
 

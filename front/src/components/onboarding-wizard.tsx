@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -17,10 +17,9 @@ import {
 } from "@phosphor-icons/react";
 import { getRepo } from "@/lib/repo";
 import { useAuth } from "@/lib/auth";
-import { fetchEstados, fetchMunicipios, type Municipio, type UF } from "@/lib/ibge";
 import { getProfession, PROFESSIONS, type Profession } from "@/lib/professions";
 import type { SearchProfileInput, ServiceTarget } from "@/lib/types";
-import { Dropdown } from "@/components/dropdown";
+import { CityAutocomplete } from "@/components/city-autocomplete";
 import { ProfessionCard } from "@/components/profession-card";
 import { cn } from "@/lib/utils";
 
@@ -65,41 +64,6 @@ export function OnboardingWizard() {
   const [state, setState] = useState("");
   const [city, setCity] = useState("");
 
-  // Listas do IBGE para os selects em cascata (estado -> cidade).
-  const [estados, setEstados] = useState<UF[]>([]);
-  const [municipios, setMunicipios] = useState<Municipio[]>([]);
-  const [loadingCidades, setLoadingCidades] = useState(false);
-
-  // Carrega estados uma vez (so quando chega na etapa de regiao, pra nao buscar a toa).
-  useEffect(() => {
-    if (step !== 1 || estados.length > 0) return;
-    fetchEstados().then(setEstados).catch(() => null);
-  }, [step, estados.length]);
-
-  // Recarrega cidades quando a UF muda. UF vazia limpa a lista.
-  useEffect(() => {
-    if (!state) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setMunicipios([]);
-      return;
-    }
-    let ativo = true;
-    setLoadingCidades(true);
-    fetchMunicipios(state)
-      .then((lista) => {
-        if (ativo) setMunicipios(lista);
-      })
-      .catch(() => {
-        if (ativo) setMunicipios([]);
-      })
-      .finally(() => {
-        if (ativo) setLoadingCidades(false);
-      });
-    return () => {
-      ativo = false;
-    };
-  }, [state]);
-
   // Escolher profissao: guarda o id, pre-seleciona o servico-alvo e sugere os
   // nichos da area (o usuario pode ajustar depois, na Configuracao).
   const chooseProfession = useCallback((p: Profession) => {
@@ -108,9 +72,17 @@ export function OnboardingWizard() {
     setNiches(p.suggestedNiches);
   }, []);
 
-  const handleStateChange = useCallback((novaUf: string) => {
-    setState(novaUf);
+  const handleCitySelect = useCallback(
+    ({ cidade, uf }: { cidade: string; uf: string }) => {
+      setCity(cidade);
+      setState(uf);
+    },
+    [],
+  );
+
+  const handleCityClear = useCallback(() => {
     setCity("");
+    setState("");
   }, []);
 
   const selectedProfession = getProfession(profession);
@@ -267,38 +239,32 @@ export function OnboardingWizard() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                  <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-faint">
-                    Estado
-                  </span>
-                  <Dropdown
-                    value={state}
-                    onChange={handleStateChange}
-                    ariaLabel="Estado"
-                    placeholder="Escolha o estado"
-                    options={estados.map((uf) => ({ value: uf.sigla, label: `${uf.nome} (${uf.sigla})` }))}
-                  />
-                </div>
+              <div className="space-y-4">
                 <div>
                   <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-faint">
                     Cidade base
                   </span>
-                  <Dropdown
-                    value={city}
-                    onChange={setCity}
-                    ariaLabel="Cidade base"
-                    disabled={!state || loadingCidades}
-                    placeholder={
-                      !state
-                        ? "Escolha o estado antes"
-                        : loadingCidades
-                          ? "Carregando cidades..."
-                          : "Escolha a cidade"
-                    }
-                    options={municipios.map((m) => ({ value: m.nome, label: m.nome }))}
+                  <CityAutocomplete
+                    cidade={city}
+                    uf={state}
+                    onSelect={handleCitySelect}
+                    onClear={handleCityClear}
+                    placeholder="Digite a cidade (ex: Maringa, Sao Paulo...)"
                   />
+                  <p className="mt-1.5 text-[12px] text-faint">
+                    Comece a digitar e escolha a cidade. O estado e preenchido automaticamente.
+                  </p>
                 </div>
+                {state && (
+                  <div>
+                    <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-faint">
+                      Estado detectado
+                    </span>
+                    <div className="rounded-xl border border-border-2 bg-surface-2 px-4 py-3 text-[13.5px] font-semibold text-ink-2">
+                      {state}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
