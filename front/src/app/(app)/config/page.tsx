@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -12,11 +12,9 @@ import {
   HandWaving,
   Info,
   MapPin,
-  Plus,
   PuzzlePiece,
   Robot,
   Storefront,
-  Tag,
   Target,
   X,
 } from "@phosphor-icons/react";
@@ -26,6 +24,7 @@ import { fetchEstados, fetchMunicipios, type Municipio, type UF } from "@/lib/ib
 import { PROFESSIONS, getProfession, type Profession } from "@/lib/professions";
 import type { SearchProfile, SearchProfileInput, ServiceTarget } from "@/lib/types";
 import { RAMOS_DISPONIVEIS } from "@/lib/ramos";
+import { Dropdown } from "@/components/dropdown";
 import { cn } from "@/lib/utils";
 
 
@@ -513,77 +512,41 @@ export default function ConfigPage() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             {/* Estado (UF) */}
             <div>
-              <label
-                htmlFor="config-estado"
-                className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-faint"
-              >
+              <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-faint">
                 Estado
-              </label>
-              <select
-                id="config-estado"
+              </span>
+              <Dropdown
                 value={state}
-                onChange={(e) => handleStateChange(e.target.value)}
-                className="w-full rounded-xl border border-border-2 bg-surface-2 px-3.5 py-2.5 text-sm outline-none focus:border-brand"
-              >
-                <option value="">Escolha o estado</option>
-                {estados.map((uf) => (
-                  <option key={uf.id} value={uf.sigla}>
-                    {uf.nome} ({uf.sigla})
-                  </option>
-                ))}
-              </select>
+                onChange={handleStateChange}
+                ariaLabel="Estado"
+                placeholder="Escolha o estado"
+                options={estados.map((uf) => ({ value: uf.sigla, label: `${uf.nome} (${uf.sigla})` }))}
+              />
             </div>
 
             {/* Cidade base (cascata a partir do estado) */}
             <div>
-              <label
-                htmlFor="config-cidade"
-                className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-faint"
-              >
+              <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-faint">
                 Cidade base
-              </label>
-              <select
-                id="config-cidade"
+              </span>
+              <Dropdown
                 value={city}
-                onChange={(e) => setCity(e.target.value)}
+                onChange={setCity}
+                ariaLabel="Cidade base"
                 disabled={!state || loadingCidades}
-                className="w-full rounded-xl border border-border-2 bg-surface-2 px-3.5 py-2.5 text-sm outline-none focus:border-brand disabled:opacity-60"
-              >
-                <option value="">
-                  {!state
-                    ? "Escolha o estado antes"
-                    : loadingCidades
-                      ? "Carregando cidades..."
-                      : "Escolha a cidade"}
-                </option>
-                {municipios.map((m) => (
-                  <option key={m.id} value={m.nome}>
-                    {m.nome}
-                  </option>
-                ))}
-              </select>
+                placeholder={
+                  !state ? "Escolha o estado antes" : loadingCidades ? "Carregando cidades..." : "Escolha a cidade"
+                }
+                options={municipios.map((m) => ({ value: m.nome, label: m.nome }))}
+              />
             </div>
 
             {/* Raio */}
             <div>
-              <label
-                htmlFor="config-raio"
-                className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-faint"
-              >
+              <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-faint">
                 Raio de atuacao
-              </label>
-              <select
-                id="config-raio"
-                value={radius}
-                onChange={(e) => setRadius(e.target.value)}
-                className="w-full rounded-xl border border-border-2 bg-surface-2 px-3.5 py-2.5 text-sm outline-none focus:border-brand"
-              >
-                {RAIOS.map((r) => (
-                  <option key={r.value} value={r.value}>
-                    {r.label}
-                  </option>
-                ))}
-              </select>
+              </span>
+              <Dropdown value={radius} onChange={setRadius} ariaLabel="Raio de atuacao" options={RAIOS} />
             </div>
           </div>
         </Section>

@@ -16,6 +16,8 @@ import { fetchEstados, fetchMunicipios, type Municipio, type UF } from "@/lib/ib
 import { geocodeCity, geocodeNeighborhood, type GeoPoint } from "@/lib/geocode";
 import { serviceOptionsForProfile } from "@/lib/professions";
 import { SERVICE_META } from "@/lib/service";
+import { RAMOS_DISPONIVEIS } from "@/lib/ramos";
+import { Dropdown } from "@/components/dropdown";
 import type { ScanCoverage, SearchProfile, ServiceTarget } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -31,21 +33,6 @@ const CoverageMap = dynamic(() => import("@/components/coverage-map"), {
 
 // Centro padrao do Brasil (usado quando sem coordenadas no perfil)
 const BRASIL_CENTER = { lat: -14.235, lng: -51.925, zoom: 4 };
-
-const NICHE_OPTIONS = [
-  "Hamburgueria",
-  "Barbearia",
-  "Estetica",
-  "Restaurante",
-  "Petshop",
-  "Academia",
-  "Odontologia",
-  "Cafeteria",
-  "Confeitaria",
-  "Auto Spa",
-  "Pilates",
-  "Yoga",
-];
 
 const RADIUS_OPTIONS = [
   { value: "5km", label: "Ate 5 km" },
@@ -147,9 +134,9 @@ export default function BuscarPage() {
   // Opcoes de servico-alvo conforme a profissao configurada no perfil.
   const serviceOpts = useMemo(() => serviceOptionsForProfile(profile), [profile]);
 
-  // Nichos oferecidos: os do perfil primeiro, depois o catalogo geral (sem repetir).
+  // Nichos oferecidos: os do perfil primeiro, depois os 20 ramos canonicos (sem repetir).
   const nicheOptions = useMemo(() => {
-    return Array.from(new Set([...(profile?.niches ?? []), ...NICHE_OPTIONS]));
+    return Array.from(new Set([...(profile?.niches ?? []), ...RAMOS_DISPONIVEIS]));
   }, [profile]);
 
   const load = useCallback(async () => {
@@ -289,7 +276,7 @@ export default function BuscarPage() {
   // Surpreenda-me: randomiza TUDO menos o servico-alvo — estado, cidade, bairro
   // e ramo. Util quando a pessoa quer garimpar uma regiao nova sem pensar.
   const handleSurpreendaMe = useCallback(async () => {
-    const pool = profile?.niches?.length ? profile.niches : NICHE_OPTIONS;
+    const pool = profile?.niches?.length ? profile.niches : RAMOS_DISPONIVEIS;
     const ramo = rnd(pool);
     setNiche(ramo);
     setNeighborhood(""); // bairro limpo no sorteio (cobre a cidade toda)
@@ -431,19 +418,12 @@ export default function BuscarPage() {
                 Surpreenda-me
               </button>
             </div>
-            <select
-              id="ramo-select"
+            <Dropdown
               value={niche}
-              onChange={(e) => setNiche(e.target.value)}
-              className="w-full rounded-xl border border-border-2 bg-surface-2 px-4 py-3.5 text-[14.5px] text-ink outline-none focus:border-brand"
-            >
-              <option value="">Qualquer ramo</option>
-              {nicheOptions.map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
+              onChange={setNiche}
+              ariaLabel="Ramo"
+              options={[{ value: "", label: "Qualquer ramo" }, ...nicheOptions.map((n) => ({ value: n, label: n }))]}
+            />
           </div>
 
           {/* Estado + Cidade em cascata (dados do IBGE) */}
@@ -455,19 +435,13 @@ export default function BuscarPage() {
               >
                 Estado
               </label>
-              <select
-                id="estado-select"
+              <Dropdown
                 value={uf}
-                onChange={(e) => handleUfChange(e.target.value)}
-                className="w-full rounded-xl border border-border-2 bg-surface-2 px-4 py-3.5 text-[14.5px] text-ink outline-none focus:border-brand"
-              >
-                <option value="">Escolha o estado</option>
-                {estados.map((e) => (
-                  <option key={e.id} value={e.sigla}>
-                    {e.nome} ({e.sigla})
-                  </option>
-                ))}
-              </select>
+                onChange={handleUfChange}
+                ariaLabel="Estado"
+                placeholder="Escolha o estado"
+                options={estados.map((e) => ({ value: e.sigla, label: `${e.nome} (${e.sigla})` }))}
+              />
             </div>
             <div>
               <label
@@ -476,26 +450,16 @@ export default function BuscarPage() {
               >
                 Cidade
               </label>
-              <select
-                id="cidade-select"
+              <Dropdown
                 value={city}
-                onChange={(e) => setCity(e.target.value)}
+                onChange={setCity}
+                ariaLabel="Cidade"
                 disabled={!uf || loadingCidades}
-                className="w-full rounded-xl border border-border-2 bg-surface-2 px-4 py-3.5 text-[14.5px] text-ink outline-none focus:border-brand disabled:opacity-60"
-              >
-                <option value="">
-                  {!uf
-                    ? "Escolha o estado antes"
-                    : loadingCidades
-                      ? "Carregando cidades..."
-                      : "Escolha a cidade"}
-                </option>
-                {municipios.map((m) => (
-                  <option key={m.id} value={m.nome}>
-                    {m.nome}
-                  </option>
-                ))}
-              </select>
+                placeholder={
+                  !uf ? "Escolha o estado antes" : loadingCidades ? "Carregando cidades..." : "Escolha a cidade"
+                }
+                options={municipios.map((m) => ({ value: m.nome, label: m.nome }))}
+              />
             </div>
           </div>
 
@@ -524,17 +488,7 @@ export default function BuscarPage() {
             <label className="mb-1.5 block text-[12px] font-bold uppercase tracking-wider text-faint">
               Raio de atuacao
             </label>
-            <select
-              value={radius}
-              onChange={(e) => setRadius(e.target.value)}
-              className="w-full rounded-xl border border-border-2 bg-surface-2 px-4 py-3.5 text-[14.5px] text-ink outline-none focus:border-brand"
-            >
-              {RADIUS_OPTIONS.map((r) => (
-                <option key={r.value} value={r.value}>
-                  {r.label}
-                </option>
-              ))}
-            </select>
+            <Dropdown value={radius} onChange={setRadius} ariaLabel="Raio de atuacao" options={RADIUS_OPTIONS} />
           </div>
 
           {/* Servico alvo — reflete a profissao do perfil. */}
@@ -641,18 +595,12 @@ export default function BuscarPage() {
 
           {/* Filtro de nicho no mapa */}
           <div className="mb-3">
-            <select
+            <Dropdown
               value={mapNiche ?? ""}
-              onChange={(e) => setMapNiche(e.target.value || undefined)}
-              className="w-full rounded-xl border border-border-2 bg-surface-2 px-3 py-2.5 text-[13.5px] text-ink outline-none focus:border-brand"
-            >
-              <option value="">Todos os ramos</option>
-              {nicheOptions.map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => setMapNiche(v || undefined)}
+              ariaLabel="Filtrar ramo no mapa"
+              options={[{ value: "", label: "Todos os ramos" }, ...nicheOptions.map((n) => ({ value: n, label: n }))]}
+            />
           </div>
 
           {/* Mapa */}

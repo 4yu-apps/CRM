@@ -19,6 +19,9 @@ import type { ActivityEvent, ActivityType } from "@/lib/types";
 
 // ---- helpers ----------------------------------------------------------------
 
+// Marca da ultima vez que o usuario viu o feed (localStorage, por dispositivo).
+const ACTIVITY_SEEN_KEY = "gp-activity-seen-at";
+
 function saudacao(): string {
   const h = new Date().getHours();
   if (h < 12) return "Bom dia";
@@ -65,12 +68,35 @@ export default function InicioPage() {
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
   const [activityLoading, setActivityLoading] = useState(true);
 
+  // Feed "o que rolou enquanto voce nao tava". A janela tem um piso rolante de
+  // 24h (o "reset diario": abrindo todo dia, voce so ve o dia) e estica pra tras
+  // ate a sua ultima visita quando voce fica dias fora (acumula as rodadas do
+  // cron que voce perdeu). Sempre limitado a 30 itens. A "ultima visita" mora no
+  // localStorage (por dispositivo) e e atualizada a cada abertura.
   useEffect(() => {
+    const DIA = 24 * 60 * 60 * 1000;
+    let ultimaVisita = 0;
+    try {
+      const raw = localStorage.getItem(ACTIVITY_SEEN_KEY);
+      ultimaVisita = raw ? Number(raw) || 0 : 0;
+    } catch {
+      /* sem localStorage: trata como primeiro acesso */
+    }
+    const agora = Date.now();
+    // Piso de 24h; se a ultima visita for mais antiga, a janela estica ate ela.
+    const janelaInicio = ultimaVisita > 0 ? Math.min(agora - DIA, ultimaVisita) : agora - DIA;
+
     void getRepo()
       .listActivity(30)
       .then((ev) => {
-        setActivity(ev);
+        const naJanela = ev.filter((e) => +new Date(e.created_at) > janelaInicio).slice(0, 30);
+        setActivity(naJanela);
         setActivityLoading(false);
+        try {
+          localStorage.setItem(ACTIVITY_SEEN_KEY, String(agora));
+        } catch {
+          /* ignora */
+        }
       })
       .catch(() => setActivityLoading(false));
   }, []);
