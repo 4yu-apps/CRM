@@ -25,21 +25,9 @@ import { useAuth } from "@/lib/auth";
 import { fetchEstados, fetchMunicipios, type Municipio, type UF } from "@/lib/ibge";
 import { PROFESSIONS, getProfession, type Profession } from "@/lib/professions";
 import type { SearchProfile, SearchProfileInput, ServiceTarget } from "@/lib/types";
+import { RAMOS_DISPONIVEIS } from "@/lib/ramos";
 import { cn } from "@/lib/utils";
 
-// Ramos sugeridos como ponto de partida
-const RAMOS_SUGERIDOS = [
-  "Hamburgueria",
-  "Barbearia",
-  "Petshop",
-  "Restaurante",
-  "Academia",
-  "Clinica odontologica",
-  "Cafeteria",
-  "Estetica",
-  "Pilates",
-  "Papelaria",
-];
 
 const RAIOS: { value: string; label: string }[] = [
   { value: "5km", label: "Ate 5 km" },
@@ -189,9 +177,6 @@ export default function ConfigPage() {
   const [municipios, setMunicipios] = useState<Municipio[]>([]);
   const [loadingCidades, setLoadingCidades] = useState(false);
 
-  // Input de ramo personalizado
-  const [nicheInput, setNicheInput] = useState("");
-  const nicheRef = useRef<HTMLInputElement>(null);
 
   // Carregar perfil existente
   useEffect(() => {
@@ -285,13 +270,6 @@ export default function ConfigPage() {
     });
   }, []);
 
-  const handleNicheInputKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" || e.key === ",") {
-      e.preventDefault();
-      addNiche(nicheInput);
-      setNicheInput("");
-    }
-  };
 
   // Salvar
   const save = useCallback(async () => {
@@ -503,34 +481,11 @@ export default function ConfigPage() {
             </div>
           )}
 
-          {/* Campo para adicionar ramo personalizado */}
-          <div className="mb-4 flex gap-2">
-            <div className="relative flex-1">
-              <Tag size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-faint" />
-              <input
-                ref={nicheRef}
-                value={nicheInput}
-                onChange={(e) => setNicheInput(e.target.value)}
-                onKeyDown={handleNicheInputKey}
-                placeholder="Digite um ramo e pressione Enter"
-                className="w-full rounded-xl border border-border-2 bg-surface-2 py-2.5 pl-10 pr-3.5 text-sm outline-none focus:border-brand"
-              />
-            </div>
-            <button
-              type="button"
-              onClick={() => { addNiche(nicheInput); setNicheInput(""); }}
-              disabled={!nicheInput.trim()}
-              className="flex items-center gap-1.5 rounded-xl border border-border-2 bg-card px-4 py-2.5 text-sm font-semibold text-ink-2 transition-colors hover:bg-surface-2 disabled:opacity-40"
-            >
-              <Plus size={15} weight="bold" /> Adicionar
-            </button>
-          </div>
-
-          {/* Sugestoes rapidas */}
+          {/* Ramos disponiveis */}
           <div>
-            <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-faint">Sugestoes rapidas</div>
+            <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-faint">Ramos disponiveis</div>
             <div className="flex flex-wrap gap-2">
-              {RAMOS_SUGERIDOS.filter((r) => !niches.map((n) => n.toLowerCase()).includes(r.toLowerCase())).map((r) => (
+              {RAMOS_DISPONIVEIS.filter((r) => !niches.map((n) => n.toLowerCase()).includes(r.toLowerCase())).map((r) => (
                 <button
                   key={r}
                   type="button"
@@ -540,8 +495,8 @@ export default function ConfigPage() {
                   + {r}
                 </button>
               ))}
-              {RAMOS_SUGERIDOS.filter((r) => !niches.map((n) => n.toLowerCase()).includes(r.toLowerCase())).length === 0 && (
-                <span className="text-[13px] text-faint">Voce ja selecionou todos os sugeridos.</span>
+              {RAMOS_DISPONIVEIS.filter((r) => !niches.map((n) => n.toLowerCase()).includes(r.toLowerCase())).length === 0 && (
+                <span className="text-[13px] text-faint">Voce ja selecionou todos.</span>
               )}
             </div>
           </div>

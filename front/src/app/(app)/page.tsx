@@ -67,7 +67,7 @@ export default function InicioPage() {
 
   useEffect(() => {
     void getRepo()
-      .listActivity(20)
+      .listActivity(30)
       .then((ev) => {
         setActivity(ev);
         setActivityLoading(false);

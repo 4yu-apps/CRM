@@ -13,12 +13,15 @@ import {
   WhatsappLogo,
   Globe,
   X,
+  Download,
+  Funnel,
 } from "@phosphor-icons/react";
 import { useLeads } from "@/hooks/use-leads";
 import { STATUS_META, STATUS_ORDER, TONE_CLASSES } from "@/lib/state-machine";
 import { SERVICE_META } from "@/lib/service";
 import { fmtRelative } from "@/lib/format";
 import type { Lead, LeadStatus } from "@/lib/types";
+import { RAMOS_DISPONIVEIS } from "@/lib/ramos";
 import { cn } from "@/lib/utils";
 
 type SortKey = "recent" | "name" | "score";
@@ -101,9 +104,11 @@ export default function ContatosPage() {
 
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<LeadStatus | "">("");
+  const [ramoFilter, setRamoFilter] = useState<string>("");
   const [showArchived, setShowArchived] = useState(false);
   const [sort, setSort] = useState<SortKey>("recent");
 
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Lead | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -112,6 +117,7 @@ export default function ContatosPage() {
     const out = leads
       .filter((l) => (showArchived ? true : !l.archived))
       .filter((l) => (statusFilter ? l.status === statusFilter : true))
+      .filter((l) => (ramoFilter ? l.category === ramoFilter : true))
       .filter((l) => matchesQuery(l, q));
     out.sort((a, b) => {
       if (sort === "name") return (a.business_name ?? "").localeCompare(b.business_name ?? "");
@@ -119,7 +125,7 @@ export default function ContatosPage() {
       return +new Date(b.updated_at) - +new Date(a.updated_at);
     });
     return out;
-  }, [leads, q, statusFilter, showArchived, sort]);
+  }, [leads, q, statusFilter, ramoFilter, showArchived, sort]);
 
   // Contagem por status (entre os nao-arquivados) pro select mostrar so o que existe.
   const statusCounts = useMemo(() => {
@@ -130,6 +136,53 @@ export default function ContatosPage() {
     }
     return m;
   }, [leads, showArchived]);
+
+  const toggleSelect = useCallback((leadId: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(leadId)) {
+        next.delete(leadId);
+      } else {
+        next.add(leadId);
+      }
+      return next;
+    });
+  }, []);
+
+  const selectAll = useCallback(() => {
+    if (selected.size === filtered.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(filtered.map((l) => l.id)));
+    }
+  }, [filtered, selected.size]);
+
+  const exportCsv = useCallback(() => {
+    if (selected.size === 0) {
+      toast.error("Selecione pelo menos um contato");
+      return;
+    }
+    const toExport = filtered.filter((l) => selected.has(l.id));
+    const headers = ["Negocio", "Status", "Categoria", "Cidade/Estado", "Telefone", "WhatsApp", "Instagram", "Site", "Score"];
+    const rows = toExport.map((l) => [
+      l.business_name ?? "",
+      STATUS_META[l.status].label,
+      l.category ?? "",
+      [l.city, l.state].filter(Boolean).join("/") || "",
+      l.phone ?? "",
+      l.whatsapp ?? "",
+      l.instagram ?? "",
+      l.website ?? "",
+      l.score ?? "",
+    ]);
+    const csv = [headers, ...rows].map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `contatos-${new Date().toISOString().split("T")[0]}.csv`;
+    link.click();
+    toast.success(`Exportados ${selected.size} contatos`);
+  }, [filtered, selected]);
 
   const toggleArchive = useCallback(
     async (lead: Lead) => {
@@ -173,59 +226,96 @@ export default function ContatosPage() {
   return (
     <div className="mx-auto max-w-[1180px]">
       {/* Barra de ferramentas */}
-      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center">
-        <div className="relative flex-1">
-          <MagnifyingGlass size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-faint" />
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Buscar por nome, cidade, telefone..."
-            className="w-full rounded-xl border border-border-2 bg-surface-2 py-3 pl-10 pr-4 text-[14px] text-ink outline-none focus:border-brand"
-          />
-        </div>
-        <div className="flex gap-2.5">
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter((e.target.value as LeadStatus) || "")}
-            className="rounded-xl border border-border-2 bg-surface-2 px-3 py-3 text-[13.5px] text-ink outline-none focus:border-brand"
-          >
-            <option value="">Todos os status</option>
-            {STATUS_ORDER.map((s) => {
-              const n = statusCounts.get(s) ?? 0;
-              return (
-                <option key={s} value={s}>
-                  {STATUS_META[s].label}
-                  {n ? ` (${n})` : ""}
+      <div className="mb-4 flex flex-col gap-3">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+          <div className="relative flex-1">
+            <MagnifyingGlass size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-faint" />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Buscar por nome, cidade, telefone..."
+              className="w-full rounded-xl border border-border-2 bg-surface-2 py-3 pl-10 pr-4 text-[14px] text-ink outline-none focus:border-brand"
+            />
+          </div>
+          <div className="flex gap-2.5">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter((e.target.value as LeadStatus) || "")}
+              className="rounded-xl border border-border-2 bg-surface-2 px-3 py-3 text-[13.5px] text-ink outline-none focus:border-brand"
+            >
+              <option value="">Todos os status</option>
+              {STATUS_ORDER.map((s) => {
+                const n = statusCounts.get(s) ?? 0;
+                return (
+                  <option key={s} value={s}>
+                    {STATUS_META[s].label}
+                    {n ? ` (${n})` : ""}
+                  </option>
+                );
+              })}
+            </select>
+            <select
+              value={ramoFilter}
+              onChange={(e) => setRamoFilter(e.target.value)}
+              className="rounded-xl border border-border-2 bg-surface-2 px-3 py-3 text-[13.5px] text-ink outline-none focus:border-brand"
+            >
+              <option value="">Todos os ramos</option>
+              {RAMOS_DISPONIVEIS.map((r) => (
+                <option key={r} value={r}>
+                  {r}
                 </option>
-              );
-            })}
-          </select>
-          <select
-            value={sort}
-            onChange={(e) => setSort(e.target.value as SortKey)}
-            className="rounded-xl border border-border-2 bg-surface-2 px-3 py-3 text-[13.5px] text-ink outline-none focus:border-brand"
-          >
-            {SORTS.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            onClick={() => setShowArchived((v) => !v)}
-            className={cn(
-              "flex items-center gap-1.5 rounded-xl border px-3 py-3 text-[13px] font-semibold transition-colors",
-              showArchived
-                ? "border-brand bg-brand-50 text-brand"
-                : "border-border-2 bg-surface-2 text-muted-foreground hover:text-ink",
-            )}
-            title="Mostrar/ocultar arquivados"
-          >
-            <Archive size={15} weight={showArchived ? "fill" : "regular"} />
-            <span className="hidden sm:inline">Arquivados</span>
-          </button>
+              ))}
+            </select>
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value as SortKey)}
+              className="rounded-xl border border-border-2 bg-surface-2 px-3 py-3 text-[13.5px] text-ink outline-none focus:border-brand"
+            >
+              {SORTS.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => setShowArchived((v) => !v)}
+              className={cn(
+                "flex items-center gap-1.5 rounded-xl border px-3 py-3 text-[13px] font-semibold transition-colors",
+                showArchived
+                  ? "border-brand bg-brand-50 text-brand"
+                  : "border-border-2 bg-surface-2 text-muted-foreground hover:text-ink",
+              )}
+              title="Mostrar/ocultar arquivados"
+            >
+              <Archive size={15} weight={showArchived ? "fill" : "regular"} />
+              <span className="hidden sm:inline">Arquivados</span>
+            </button>
+          </div>
         </div>
+        {selected.size > 0 && (
+          <div className="flex items-center gap-2 rounded-xl border border-brand/30 bg-brand-50 px-4 py-3">
+            <div className="flex-1 text-sm font-semibold text-brand">
+              {selected.size} selecionado{selected.size !== 1 ? "s" : ""}
+            </div>
+            <button
+              type="button"
+              onClick={exportCsv}
+              className="flex items-center gap-1.5 rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-white hover:bg-brand-600 transition-colors"
+            >
+              <Download size={14} />
+              Exportar CSV
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelected(new Set())}
+              className="flex items-center gap-1.5 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-ink hover:bg-surface-2 transition-colors"
+            >
+              <X size={14} />
+              Limpar
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="mb-3 text-[13px] text-muted-foreground">
@@ -237,7 +327,13 @@ export default function ContatosPage() {
       {/* Lista / tabela */}
       <div className="overflow-hidden rounded-[16px] border border-border bg-card shadow-[var(--shadow)]">
         {/* Cabecalho (desktop) */}
-        <div className="hidden grid-cols-[2.4fr_1fr_1.1fr_1fr_0.6fr_0.9fr_auto] gap-3 border-b border-border bg-surface-2 px-5 py-3 text-[11.5px] font-bold uppercase tracking-wider text-faint lg:grid">
+        <div className="hidden grid-cols-[auto_2.4fr_1fr_1.1fr_1fr_0.6fr_0.9fr_auto] gap-3 border-b border-border bg-surface-2 px-5 py-3 text-[11.5px] font-bold uppercase tracking-wider text-faint lg:grid lg:items-center">
+          <input
+            type="checkbox"
+            checked={selected.size > 0 && selected.size === filtered.length}
+            onChange={selectAll}
+            className="h-4 w-4 cursor-pointer rounded"
+          />
           <span>Negocio</span>
           <span>Status</span>
           <span>Local</span>
@@ -260,9 +356,21 @@ export default function ContatosPage() {
             {filtered.map((lead) => (
               <div
                 key={lead.id}
-                onClick={() => router.push(`/ficha/${lead.id}`)}
-                className="grid cursor-pointer grid-cols-1 gap-2 px-5 py-3.5 transition-colors hover:bg-accent/40 lg:grid-cols-[2.4fr_1fr_1.1fr_1fr_0.6fr_0.9fr_auto] lg:items-center lg:gap-3"
+                className="group grid cursor-pointer grid-cols-1 gap-2 px-5 py-3.5 transition-colors hover:bg-accent/40 lg:grid-cols-[auto_2.4fr_1fr_1.1fr_1fr_0.6fr_0.9fr_auto] lg:items-center lg:gap-3"
               >
+                <div className="hidden lg:flex">
+                  <input
+                    type="checkbox"
+                    checked={selected.has(lead.id)}
+                    onChange={() => toggleSelect(lead.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="h-4 w-4 cursor-pointer rounded"
+                  />
+                </div>
+                <div
+                  onClick={() => router.push(`/ficha/${lead.id}`)}
+                  className="contents"
+                >
                 {/* Negocio */}
                 <div className="min-w-0">
                   <div className="truncate text-[14.5px] font-semibold text-ink">
@@ -342,6 +450,7 @@ export default function ContatosPage() {
                   >
                     <Trash size={16} />
                   </button>
+                </div>
                 </div>
               </div>
             ))}
