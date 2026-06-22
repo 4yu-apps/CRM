@@ -69,6 +69,12 @@ class Lead:
     service_target: ServiceTarget = "indefinido"
     ads_active: bool | None = None      # "ja anuncia?" (null = desconhecido)
 
+    # sinais tecnicos do site, extraidos de graca do HTML (pixel, widget de chat,
+    # form, mobile, peso, stack, og...). Alimentam o score por profissao e a ficha.
+    site_signals: dict[str, Any] | None = None
+    # cobertura de contatos achados no enriquecimento (0..1). Badge de "lead pobre".
+    match_rate: float | None = None
+
     # precificação (B8): valor sugerido pela IA/heuristica (a humana decide)
     suggested_value: float | None = None
     suggested_value_reason: str | None = None

@@ -100,6 +100,7 @@ def run_autopilot(
             continue
         city, state = prof.get("city"), prof.get("state")
         neighborhood = prof.get("neighborhood")
+        profession = prof.get("profession")  # define a lente do score e a copy
         rkey = region_key(city, state)
         covered = (
             {(rk, slug(nn)) for rk, nn in sink.fetch_covered_keys(owner)}
@@ -154,8 +155,8 @@ def run_autopilot(
         # erro de um dono nao bloqueia os proximos donos.
         for stage in (
             lambda: enrich_batch(sink, sources, batch=batch, delay=delay, owner_id=owner),
-            lambda: score_batch(sink, batch=batch, owner_id=owner),
-            lambda: draft_batch(sink, provider, batch=batch, owner_id=owner),
+            lambda: score_batch(sink, batch=batch, owner_id=owner, profession=profession),
+            lambda: draft_batch(sink, provider, batch=batch, owner_id=owner, profession=profession),
         ):
             try:
                 stage()

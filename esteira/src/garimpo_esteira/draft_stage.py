@@ -12,9 +12,14 @@ from .draft.base import DraftProvider
 from .sink.base import LeadSink
 
 
-def draft_one(lead, provider: DraftProvider, sink: LeadSink) -> tuple[str, str] | None:
+def draft_one(
+    lead, provider: DraftProvider, sink: LeadSink, profession: str | None = None
+) -> tuple[str, str] | None:
     if lead.opt_out:
         return None  # LGPD: não rascunha contato pra quem pediu opt-out
+    # profissao do dono guia a copy (lida em prompt.build_prompt / mock via getattr)
+    if profession:
+        setattr(lead, "profession", profession)
     msg1, msg2 = provider.generate(lead)
     sink.update_lead_fields(lead.id, {
         "draft_msg1": msg1,
@@ -29,12 +34,12 @@ def draft_one(lead, provider: DraftProvider, sink: LeadSink) -> tuple[str, str] 
 
 def draft_batch(
     sink: LeadSink, provider: DraftProvider, *, batch: int = 20, status="qualificado",
-    owner_id: str | None = None,
+    owner_id: str | None = None, profession: str | None = None,
 ) -> list[tuple[str, tuple[str, str]]]:
     leads = sink.fetch_by_status(status, batch, owner_id)
     out: list[tuple[str, tuple[str, str]]] = []
     for lead in leads:
-        result = draft_one(lead, provider, sink)
+        result = draft_one(lead, provider, sink, profession)
         if result:
             out.append((lead.id, result))
     if out and leads:

@@ -43,7 +43,7 @@ SYSTEM_INSTRUCTION = (
     "ponto. Sem buzzword, sem emoji, sem regra de tres, sem 'nao e so X, e Y'."
 )
 
-# Foco da copy por servico (B1) — orienta o gancho e o pitch.
+# Foco da copy por servico/profissao — orienta o gancho e o pitch.
 _SERVICE_BRIEF = {
     "trafego": (
         "Servico: TRAFEGO (anuncio local). Gancho em movimento e visibilidade. "
@@ -58,15 +58,41 @@ _SERVICE_BRIEF = {
         "Servico: TRAFEGO + AUTOMACAO. Lidera com trafego e cita a automacao de "
         "leve no fim como upsell ('e ainda da pra automatizar o atendimento depois')."
     ),
+    "design": (
+        "Servico: DESIGN / SITE. Gancho na presenca digital (site fraco, antigo, "
+        "nao adaptado pra celular, ou ausente). Valor: um site/visual bonito e "
+        "rapido que passa confianca e converte quem encontra o negocio."
+    ),
+    "marketing": (
+        "Servico: MARKETING / SOCIAL. Gancho na presenca da marca nas redes "
+        "(rede fraca, parada ou ausente). Valor: presenca constante e cuidada que "
+        "mantem o negocio na cabeca do cliente. NAO prometa numero de seguidores."
+    ),
     "indefinido": (
         "Servico: a definir; lidere com trafego (anuncio local) como padrao."
     ),
 }
 
+# profissao do dono -> qual brief de copy usar.
+_PROF_TO_BRIEF = {
+    "trafego": "trafego", "automacao": "automacao", "ambos": "ambos",
+    "design": "design", "web": "design", "branding": "design",
+    "marketing": "marketing",
+}
+
+
+def _brief_key(lead: Lead) -> str:
+    prof = (getattr(lead, "profession", None) or "").strip().lower()
+    if prof in _PROF_TO_BRIEF:
+        return _PROF_TO_BRIEF[prof]
+    # sem profissao: cai no servico-alvo do score (trafego/automacao/ambos)
+    return getattr(lead, "service_target", "indefinido") or "indefinido"
+
 
 def build_prompt(lead: Lead) -> str:
     b = lead_brief(lead)
-    target = getattr(lead, "service_target", "indefinido") or "indefinido"
+    key = _brief_key(lead)
+    sig = getattr(lead, "site_signals", None) or {}
     # contexto pra VOCE, modelo. NAO repita numeros na mensagem (ver regra critica).
     sinais = []
     if b["nota"] is not None and b["nota"] >= 4.3:
@@ -74,13 +100,19 @@ def build_prompt(lead: Lead) -> str:
     elif b["nota"] is not None:
         sinais.append("reputacao mediana")
     if not b["tem_site"]:
-        sinais.append("nao tem site (descuido digital, oportunidade)")
+        sinais.append("nao tem site (oportunidade de criar a presenca)")
+    elif sig.get("mobile_ready") is False:
+        sinais.append("tem site, mas nao e adaptado pra celular")
+    elif sig.get("stack") in ("wix", "wordpress", "squarespace"):
+        sinais.append(f"site feito em {sig.get('stack')} (da pra modernizar)")
     if not b["tem_instagram"]:
         sinais.append("sem presenca no Instagram")
+    if sig.get("has_chat_widget") is False and key == "automacao":
+        sinais.append("atende sem chatbot no site (tudo na mao)")
     sinais_txt = "; ".join(sinais) or "poucos sinais publicos"
     return (
         f"{SYSTEM_INSTRUCTION}\n\n"
-        f"{_SERVICE_BRIEF.get(target, _SERVICE_BRIEF['indefinido'])}\n\n"
+        f"{_SERVICE_BRIEF.get(key, _SERVICE_BRIEF['indefinido'])}\n\n"
         f"Negocio: {b['nome']} ({b['segmento']}) em {b['cidade']}.\n"
         f"Sinais: {sinais_txt}.\n\n"
         'Responda em JSON: {"msg1": "...", "msg2": "..."}'

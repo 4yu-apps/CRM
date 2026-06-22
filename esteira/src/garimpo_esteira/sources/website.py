@@ -7,6 +7,7 @@ trafego), nao erro.
 """
 from __future__ import annotations
 
+import json
 import re
 from typing import Callable
 
@@ -129,6 +130,70 @@ def extract_phone(html: str) -> str | None:
     return None
 
 
+# --- sinais tecnicos do site (de graca, do HTML que ja baixamos) -----------
+# Respondem as perguntas que tarfego/automacao/UX precisam, sem API paga e sem
+# a Biblioteca de Anuncios da Meta. Cada um e um regex barato no HTML.
+_FB_PIXEL_RE = re.compile(r"fbq\(|fbevents\.js|connect\.facebook\.net/[^\"']*fbevents|/tr\?id=\d+", re.I)
+_GOOGLE_TAG_RE = re.compile(r"googletagmanager\.com/gtag|gtag\(|google-analytics\.com|googleadservices\.com|google_conversion", re.I)
+_VIEWPORT_RE = re.compile(r"<meta[^>]+name=[\"']viewport[\"']", re.I)
+_H1_RE = re.compile(r"<h1[\s>]", re.I)
+_TITLE_RE = re.compile(r"<title[\s>][^<]*\S[^<]*</title>", re.I)
+_DESC_RE = re.compile(r"<meta[^>]+name=[\"']description[\"'][^>]*content=[\"'][^\"']+", re.I)
+_OGIMG_RE = re.compile(r"<meta[^>]+property=[\"']og:image[\"']", re.I)
+_FORM_RE = re.compile(r"<form[\s>]", re.I)
+# widgets de chat/atendimento (vendor -> regex)
+_CHAT_VENDORS = {
+    "tawk": r"tawk\.to",
+    "zendesk": r"zendesk|zdassets|zopim",
+    "crisp": r"crisp\.chat",
+    "manychat": r"manychat",
+    "jivochat": r"jivo(?:site|chat)",
+    "rdstation": r"rdstation|rdmkt",
+    "intercom": r"intercom",
+    "drift": r"drift\.com",
+    "hubspot": r"hs-scripts|js\.hs-scripts",
+}
+# stack/construtor do site (pelo HTML/markup conhecido)
+_STACKS = {
+    "wix": r"wix\.com|wixstatic|_wix",
+    "wordpress": r"wp-content|wp-includes|/wp-json",
+    "squarespace": r"squarespace",
+    "webflow": r"webflow",
+    "shopify": r"cdn\.shopify|myshopify",
+    "loja_integrada": r"lojaintegrada",
+}
+
+
+def extract_site_signals(html: str, *, url: str = "") -> dict:
+    """Diagnostico tecnico do site a partir do HTML. Tudo de graca.
+
+    has_fb_pixel/has_google_tag: rastreamento de anuncio (responde "ja anuncia?"
+    sem a API da Meta). has_chat_widget/has_form: sinais de automacao. mobile_
+    ready/slow/stack/has_h1/has_title/has_description/https: qualidade do site
+    (UX/web). page_kb: peso aproximado.
+    """
+    h = html or ""
+    chat_vendor = next((v for v, rx in _CHAT_VENDORS.items() if re.search(rx, h, re.I)), None)
+    stack = next((s for s, rx in _STACKS.items() if re.search(rx, h, re.I)), None)
+    page_kb = round(len(h.encode("utf-8", "ignore")) / 1024)
+    return {
+        "has_fb_pixel": bool(_FB_PIXEL_RE.search(h)),
+        "has_google_tag": bool(_GOOGLE_TAG_RE.search(h)),
+        "has_chat_widget": chat_vendor is not None,
+        "chat_vendor": chat_vendor,
+        "has_form": bool(_FORM_RE.search(h)),
+        "mobile_ready": bool(_VIEWPORT_RE.search(h)),
+        "page_kb": page_kb,
+        "slow": page_kb > 1500,
+        "stack": stack,
+        "https": url.startswith("https://"),
+        "has_h1": bool(_H1_RE.search(h)),
+        "has_title": bool(_TITLE_RE.search(h)),
+        "has_description": bool(_DESC_RE.search(h)),
+        "og_image": bool(_OGIMG_RE.search(h)),
+    }
+
+
 class WebsiteSource:
     name = "website"
 
@@ -171,6 +236,14 @@ class WebsiteSource:
                 # so vira coluna se o lead ainda nao tem telefone (cascade decide);
                 # aqui a gente registra o achado pra proveniencia.
                 findings.append(Finding("phone", self.name, tel, 0.5))
+
+            # Sinais tecnicos do site (de graca). Viram a coluna site_signals
+            # (cascade trata o JSON). Se achar Pixel/tag de anuncio, deriva
+            # ads_active=sim ("ja anuncia?") sem depender da API da Meta.
+            sig = extract_site_signals(html, url=site)
+            findings.append(Finding("site_signals", self.name, json.dumps(sig), 0.9))
+            if sig["has_fb_pixel"] or sig["has_google_tag"]:
+                findings.append(Finding("ads_active", self.name, "sim", 0.6))
 
             # Reforço por LLM: so quando o regex nao achou nenhuma rede/whatsapp
             # (lead pobre de contato), pra limitar chamadas. Preenche so o que

@@ -12,6 +12,7 @@ import {
   CheckCircle,
   Clock,
   Coffee,
+  Copy,
   CurrencyCircleDollar,
   ForkKnife,
   Hamburger,
@@ -50,6 +51,7 @@ import type {
   Lead,
   LeadDetail,
   LeadEditable,
+  SiteSignals,
 } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
@@ -198,6 +200,83 @@ function toLocalInput(iso?: string | null): string {
   if (Number.isNaN(d.getTime())) return "";
   const p = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+// ---------------------------------------------------------------------------
+// Calcula quantos dias o lead esta no status atual
+// ---------------------------------------------------------------------------
+function daysInStatus(history: { changed_at: string }[]): number | null {
+  if (history.length === 0) return null;
+  // history vem ordenado do mais recente pro mais antigo (ascending: false no repo)
+  const last = new Date(history[0].changed_at);
+  if (Number.isNaN(last.getTime())) return null;
+  const now = new Date();
+  return Math.floor((now.getTime() - last.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function statusAgeLabel(days: number | null): string | null {
+  if (days === null) return null;
+  if (days === 0) return "hoje neste status";
+  if (days === 1) return "ha 1 dia neste status";
+  return `ha ${days} dias neste status`;
+}
+
+// ---------------------------------------------------------------------------
+// Painel de diagnostico do site
+// ---------------------------------------------------------------------------
+function SiteSignalsPanel({ signals }: { signals: SiteSignals }) {
+  type Chip = { label: string; variant: "neutral" | "positive" | "warn" };
+  const chips: Chip[] = [];
+
+  if (signals.has_fb_pixel || signals.has_google_tag) {
+    chips.push({ label: "Ja anuncia (rastreamento no site)", variant: "positive" });
+  }
+  if (signals.has_chat_widget === true) {
+    const vendor = signals.chat_vendor ? ` (${signals.chat_vendor})` : "";
+    chips.push({ label: `Tem chatbot${vendor}`, variant: "neutral" });
+  } else if (signals.has_chat_widget === false) {
+    chips.push({ label: "Atende no manual", variant: "neutral" });
+  }
+  if (signals.has_form === true) {
+    chips.push({ label: "Tem formulario", variant: "neutral" });
+  }
+  if (signals.mobile_ready === false) {
+    chips.push({ label: "Site nao adaptado pro celular", variant: "warn" });
+  }
+  if (signals.slow === true) {
+    chips.push({ label: "Site pesado", variant: "warn" });
+  }
+  if (signals.stack) {
+    chips.push({ label: `Feito em ${signals.stack}`, variant: "neutral" });
+  }
+  if (signals.https === false) {
+    chips.push({ label: "Site sem HTTPS", variant: "warn" });
+  }
+
+  if (chips.length === 0) return null;
+
+  return (
+    <div className="rounded-[14px] border border-border bg-surface-2 p-4">
+      <div className="mb-3 text-[11px] font-bold uppercase tracking-wider text-faint">
+        Diagnostico do site
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {chips.map((chip, i) => (
+          <span
+            key={i}
+            className={cn(
+              "rounded-full px-2.5 py-1 text-[12px]",
+              chip.variant === "positive" && "bg-emerald-500/12 text-emerald-700",
+              chip.variant === "warn" && "bg-amber-500/15 text-amber-700",
+              chip.variant === "neutral" && "bg-accent text-ink-2",
+            )}
+          >
+            {chip.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -402,7 +481,10 @@ export default function FichaPage() {
     return `https://wa.me/${num}?text=${encodeURIComponent(text)}`;
   };
 
-  const draftFull = [lead.draft_msg1, lead.draft_msg2].filter(Boolean).join("\n\n");
+  const statusAgeDays = daysInStatus(history);
+  const statusAgeText = statusAgeLabel(statusAgeDays);
+
+
 
   return (
     <div className="mx-auto max-w-[880px]">
@@ -434,6 +516,14 @@ export default function FichaPage() {
               <span className={cn("rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider", service.badge)}>
                 {service.short}
               </span>
+              {lead.match_rate != null && lead.match_rate < 0.4 && (
+                <span
+                  className="rounded-full bg-amber-500/15 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-amber-700"
+                  title="Achei poucos canais de contato deste lead"
+                >
+                  Poucos contatos
+                </span>
+              )}
             </div>
             <div className="mt-1.5 flex flex-wrap items-center gap-3.5 text-[13.5px] text-muted-foreground">
               {(lead.neighborhood || lead.city) && (
@@ -446,6 +536,9 @@ export default function FichaPage() {
                   <Star size={14} weight="fill" className="text-[#E8A93B]" /> {lead.rating}{" "}
                   {lead.reviews_count != null && <span className="text-faint">({lead.reviews_count})</span>}
                 </span>
+              )}
+              {statusAgeText && (
+                <span className="text-[12px] text-faint">{statusAgeText}</span>
               )}
             </div>
           </div>
@@ -575,6 +668,9 @@ export default function FichaPage() {
                 <DataRow label="Endereco" value={lead.address ?? "-"} prov={provOf(provenance, "address")} />
                 <DataRow label="Bairro" value={lead.neighborhood ?? "-"} prov={provOf(provenance, "neighborhood")} />
                 <DataRow label="Cidade / UF" value={[lead.city, lead.state].filter(Boolean).join(" / ") || "-"} />
+                {lead.maps_url && (
+                  <DataRow label="No Maps" value="Abrir no Google Maps" href={lead.maps_url} />
+                )}
                 {lead.meeting_at && (
                   <DataRow label="Reuniao" value={fmtDateTime(lead.meeting_at)} />
                 )}
@@ -610,6 +706,11 @@ export default function FichaPage() {
                   </div>
                 )}
               </div>
+            )}
+
+            {/* Diagnostico do site */}
+            {lead.site_signals && (
+              <SiteSignalsPanel signals={lead.site_signals} />
             )}
 
             {/* Valor sugerido pela IA (B8) */}
@@ -648,7 +749,19 @@ export default function FichaPage() {
                 <div className="flex flex-col gap-2.5">
                   {lead.draft_msg1 && (
                     <div>
-                      <div className="mb-1 text-[11px] font-semibold text-faint">1. Abertura</div>
+                      <div className="mb-1 flex items-center justify-between">
+                        <span className="text-[11px] font-semibold text-faint">1. Abertura</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void navigator.clipboard.writeText(lead.draft_msg1 ?? "");
+                            toast.success("Copiado");
+                          }}
+                          className="flex items-center gap-1 text-[11px] font-semibold text-brand hover:underline"
+                        >
+                          <Copy size={12} /> Copiar abertura
+                        </button>
+                      </div>
                       <div className="rounded-[12px] border border-border bg-surface-2 p-3.5 text-[13.5px] leading-relaxed text-ink-2">
                         {lead.draft_msg1}
                       </div>
@@ -656,15 +769,27 @@ export default function FichaPage() {
                   )}
                   {lead.draft_msg2 && (
                     <div>
-                      <div className="mb-1 text-[11px] font-semibold text-faint">2. Pitch</div>
+                      <div className="mb-1 flex items-center justify-between">
+                        <span className="text-[11px] font-semibold text-faint">2. Pitch</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void navigator.clipboard.writeText(lead.draft_msg2 ?? "");
+                            toast.success("Copiado");
+                          }}
+                          className="flex items-center gap-1 text-[11px] font-semibold text-brand hover:underline"
+                        >
+                          <Copy size={12} /> Copiar pitch
+                        </button>
+                      </div>
                       <div className="rounded-[12px] border border-border bg-surface-2 p-3.5 text-[13.5px] leading-relaxed text-ink-2">
                         {lead.draft_msg2}
                       </div>
                     </div>
                   )}
-                  {lead.phone && draftFull && (
+                  {lead.phone && lead.draft_msg1 && (
                     <a
-                      href={waLink(draftFull)}
+                      href={waLink(lead.draft_msg1)}
                       target="_blank"
                       rel="noreferrer"
                       className="flex items-center justify-center gap-2 rounded-[13px] p-3.5 text-sm font-bold text-white"

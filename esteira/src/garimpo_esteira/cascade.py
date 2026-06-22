@@ -9,6 +9,7 @@ Garantias (critérios de aceite, Fase 2):
 """
 from __future__ import annotations
 
+import json
 import time
 from collections.abc import Sequence
 
@@ -36,15 +37,27 @@ def enrich_lead(
         for f in findings:
             sink.record_provenance(lead.id, f.field_name, f.source, f.value, f.confidence)
             all_findings.append(f)
+            # site_signals: chega como JSON; vira a coluna jsonb (sempre atualiza,
+            # e o retrato mais novo do site). Nao passa pelo gate de ENRICHABLE.
+            if f.field_name == "site_signals" and f.value:
+                try:
+                    column_updates["site_signals"] = json.loads(f.value)
+                    setattr(lead, "site_signals", column_updates["site_signals"])
+                except (ValueError, TypeError):
+                    pass
+                continue
             # preenche coluna real só se estiver vazia (não sobrescreve edição humana)
             if f.field_name in ENRICHABLE_FIELDS and f.value and not lead.get(f.field_name):
                 column_updates[f.field_name] = f.value
                 setattr(lead, f.field_name, f.value)  # reflete no objeto p/ match_rate
 
+    rate = match_rate(lead)
+    # persiste a cobertura de contatos (badge de "lead pobre" na fila/ficha)
+    column_updates["match_rate"] = round(rate, 2)
+
     if column_updates:
         sink.update_lead_fields(lead.id, column_updates)
 
-    rate = match_rate(lead)
     new_status: LeadStatus = lead.status
     if advance_status:
         new_status = "enriquecido"

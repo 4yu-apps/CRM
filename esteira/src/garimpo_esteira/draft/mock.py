@@ -9,7 +9,7 @@ o piso decente quando a IA não está ligada ou falha.
 from __future__ import annotations
 
 from ..models import Lead
-from .prompt import lead_brief
+from .prompt import _brief_key, lead_brief
 
 
 def _abertura(b: dict) -> str:
@@ -46,16 +46,42 @@ def _automacao(b: dict) -> tuple[str, str]:
     return msg1, msg2
 
 
+def _design(b: dict) -> tuple[str, str]:
+    if not b["tem_site"]:
+        pergunta = "Vocês já têm um site ou hoje o cliente acha vocês mais pelo Instagram e indicação?"
+    else:
+        pergunta = "Faz tempo que vocês não mexem no site de vocês?"
+    msg1 = f"{_abertura(b)} {pergunta}"
+    msg2 = (
+        "Eu faço site e identidade visual pra negócio local, bonito e rápido, que passa confiança "
+        "e funciona bem no celular. Podemos trocar uma ideia? posso te mandar um exemplo."
+    )
+    return msg1, msg2
+
+
+def _marketing(b: dict) -> tuple[str, str]:
+    msg1 = f"{_abertura(b)} Quem cuida das redes de vocês hoje, é alguém de fora ou vocês mesmos?"
+    msg2 = (
+        "Eu cuido das redes de negócio local, pra manter a presença ativa e a marca na cabeça do "
+        "cliente, sem você ter que parar pra postar. Podemos trocar uma ideia?"
+    )
+    return msg1, msg2
+
+
 class MockDraftProvider:
     model = "mock"
 
     def generate(self, lead: Lead) -> tuple[str, str]:
         b = lead_brief(lead)
-        target = getattr(lead, "service_target", "indefinido")
+        key = _brief_key(lead)
 
-        if target == "automacao":
+        if key == "automacao":
             return _automacao(b)
-        if target == "ambos":
+        if key == "design":
+            return _design(b)
+        if key == "marketing":
+            return _marketing(b)
+        if key == "ambos":
             # lidera com tráfego, cita a automação de leve no fim (upsell)
             msg1, msg2 = _trafego(b)
             msg2 = msg2.rstrip(" .") + ". E depois ainda dá pra automatizar o atendimento no WhatsApp."

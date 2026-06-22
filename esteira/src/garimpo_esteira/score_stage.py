@@ -18,9 +18,12 @@ def _ads_signal(provenance: list[dict]) -> bool | None:
     return None
 
 
-def score_one(lead, sink: LeadSink) -> ScoreResult:
+def score_one(lead, sink: LeadSink, profession: str | None = None) -> ScoreResult:
     ads_active = _ads_signal(sink.fetch_provenance(lead.id))
-    result = score_lead(lead, {"ads_active": ads_active})
+    # sinais tecnicos do site (de graca) entram no score; ads_active tambem pode
+    # vir derivado do Pixel detectado no HTML.
+    signals = {"ads_active": ads_active, "site": getattr(lead, "site_signals", None) or {}}
+    result = score_lead(lead, signals, profession)
     fields: dict[str, object] = {
         "score": result.score,
         "score_reason": result.reason,
@@ -40,10 +43,11 @@ def score_one(lead, sink: LeadSink) -> ScoreResult:
 
 
 def score_batch(
-    sink: LeadSink, *, batch: int = 20, status="enriquecido", owner_id: str | None = None
+    sink: LeadSink, *, batch: int = 20, status="enriquecido", owner_id: str | None = None,
+    profession: str | None = None,
 ) -> list[ScoreResult]:
     leads = sink.fetch_by_status(status, batch, owner_id)
-    results = [score_one(lead, sink) for lead in leads]
+    results = [score_one(lead, sink, profession) for lead in leads]
     discarded = [r for r in results if r.decision == "descartado"]
     if discarded and leads:
         owner_id = leads[0].owner_id or ""
