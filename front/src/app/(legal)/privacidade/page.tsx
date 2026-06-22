@@ -32,6 +32,10 @@ export default function PrivacidadePage() {
       <h3>Dados que você nos dá</h3>
       <ul>
         <li>Cadastro: seu nome, email e senha.</li>
+        <li>
+          Login com Google: ao entrar com sua Conta do Google, recebemos seu nome, email e foto de perfil
+          públicos, usados apenas para autenticar e identificar a sua conta.
+        </li>
         <li>Configuração: cidade, bairros e ramos que você quer prospectar.</li>
         <li>Comunicação: mensagens que você troca com nosso suporte.</li>
       </ul>
@@ -60,7 +64,37 @@ export default function PrivacidadePage() {
         sempre feito por você, manualmente, do seu próprio número.
       </p>
 
-      <h2 id="compartilha">4. Com quem a gente compartilha</h2>
+      <h2 id="google">4. Acesso à sua Conta Google e ao Google Calendar</h2>
+      <p>
+        Se você entrar com sua Conta do Google e autorizar o acesso à agenda, o 4YUmkt usa a permissão do
+        Google Calendar (escopo calendar.events) com uma finalidade única e específica:{" "}
+        <strong>criar, atualizar e remover os eventos das reuniões que você mesmo agenda dentro do app</strong>.
+      </p>
+      <ul>
+        <li>O acesso é usado apenas a seu pedido, quando você agenda ou cancela uma reunião no sistema.</li>
+        <li>Não lemos, não analisamos, não armazenamos nem compartilhamos os demais eventos da sua agenda.</li>
+        <li>Não usamos os dados da sua Conta Google para anúncios, e não os vendemos nem transferimos a terceiros.</li>
+        <li>
+          Você pode revogar esse acesso quando quiser em{" "}
+          <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer">
+            myaccount.google.com/permissions
+          </a>
+          .
+        </li>
+      </ul>
+      <p>
+        O uso e a transferência, pelo 4YUmkt, de informações recebidas das APIs do Google seguem a{" "}
+        <a
+          href="https://developers.google.com/terms/api-services-user-data-policy"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Política de Dados do Usuário dos Serviços de API do Google
+        </a>
+        , incluindo os requisitos de Uso Limitado (Limited Use).
+      </p>
+
+      <h2 id="compartilha">5. Com quem a gente compartilha</h2>
       <p>A gente não vende seus dados. Compartilhamos apenas com:</p>
       <ul>
         <li>
@@ -70,7 +104,7 @@ export default function PrivacidadePage() {
         <li>Autoridades, quando exigido por lei ou ordem judicial.</li>
       </ul>
 
-      <h2 id="lgpd">5. Seus direitos (LGPD)</h2>
+      <h2 id="lgpd">6. Seus direitos (LGPD)</h2>
       <p>De acordo com a Lei Geral de Proteção de Dados, você pode, a qualquer momento:</p>
       <ul>
         <li>Confirmar se a gente trata seus dados e acessar o que temos.</li>
@@ -85,34 +119,34 @@ export default function PrivacidadePage() {
         dentro dos prazos da lei.
       </p>
 
-      <h2 id="seguranca">6. Como a gente protege</h2>
+      <h2 id="seguranca">7. Como a gente protege</h2>
       <p>
         Usamos medidas técnicas e organizacionais para manter seus dados seguros, como criptografia em
         trânsito, controle de acesso e monitoramento. Nenhum sistema é 100% à prova de falhas, mas a gente
         trata segurança como prioridade.
       </p>
 
-      <h2 id="retencao">7. Por quanto tempo guardamos</h2>
+      <h2 id="retencao">8. Por quanto tempo guardamos</h2>
       <p>
         Mantemos seus dados enquanto sua conta estiver ativa e pelo tempo necessário para cumprir obrigações
         legais. Se você cancelar, removemos ou anonimizamos seus dados pessoais, salvo o que a lei exigir
         manter.
       </p>
 
-      <h2 id="cookies">8. Cookies</h2>
+      <h2 id="cookies">9. Cookies</h2>
       <p>
         Usamos cookies essenciais para manter você logado e a plataforma funcionando, e cookies de uso para
         entender como melhorar a experiência. Você pode gerenciar cookies nas configurações do seu
         navegador.
       </p>
 
-      <h2 id="mudancas">9. Mudanças nesta política</h2>
+      <h2 id="mudancas">10. Mudanças nesta política</h2>
       <p>
         Se a gente atualizar esta política, avisamos pelo site ou por email antes das mudanças valerem. A
         data no topo sempre mostra a versão mais recente.
       </p>
 
-      <h2 id="contato">10. Fale com a gente</h2>
+      <h2 id="contato">11. Fale com a gente</h2>
       <p>
         Qualquer dúvida sobre privacidade, escreva para{" "}
         <a href="mailto:4yumkt@gmail.com">4yumkt@gmail.com</a> ou chame no WhatsApp{" "}
