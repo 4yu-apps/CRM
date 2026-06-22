@@ -16,6 +16,7 @@ interface AuthContextValue {
   mode: "mock" | "supabase";
   // null = ainda verificando; true = tem perfil de busca; false = precisa de onboarding
   hasProfile: boolean | null;
+  isAdmin: boolean;
   // Reavalia o perfil (chamar depois de salvar a Configuracao pra liberar o gate)
   refreshProfile: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
@@ -36,6 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(mode === "supabase");
   // mock ja tem perfil demo; supabase comeca como "verificando" (null)
   const [hasProfile, setHasProfile] = useState<boolean | null>(mode === "mock" ? true : null);
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
 
   useEffect(() => {
     if (mode !== "supabase") return;
@@ -62,9 +64,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const profile = await getRepo().getProfile();
       setHasProfile(!!profile);
+      setIsAdmin(profile?.is_admin === true);
     } catch {
       // erro de leitura do perfil nao bloqueia o app
       setHasProfile(true);
+      setIsAdmin(false);
     }
   }, [mode]);
 
@@ -140,11 +144,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setSession(null);
     setHasProfile(null);
+    setIsAdmin(false);
   };
 
   return (
     <AuthContext.Provider
-      value={{ user, session, loading, mode, hasProfile, refreshProfile, signIn, signUp, signInWithGoogle, signOut }}
+      value={{ user, session, loading, mode, hasProfile, isAdmin, refreshProfile, signIn, signUp, signInWithGoogle, signOut }}
     >
       {children}
     </AuthContext.Provider>
