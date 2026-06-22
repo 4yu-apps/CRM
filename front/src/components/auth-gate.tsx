@@ -3,9 +3,11 @@ import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { OnboardingWizard } from "./onboarding-wizard";
+import { Landing } from "./landing";
 
 // Gate de autenticacao + primeiro acesso:
-//   - sem sessao fora de /login -> redireciona pra /login
+//   - deslogado na home ("/") -> mostra a landing publica (nao redireciona)
+//   - deslogado em outra rota privada -> redireciona pra /login
 //   - logado mas sem profissao escolhida -> wizard de onboarding (bloqueia o app
 //     ate a profissao ser salva; a profissao dirige score e copy)
 //   - modo mock nunca bloqueia (usuario demo, perfil demo ja completo)
@@ -19,9 +21,15 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   const isPublic = PUBLIC_PATHS.includes(pathname);
+  // A home ("/") deslogada e a landing publica: nao manda pro login, mostra a LP.
+  const isHome = pathname === "/";
 
-  // Sem sessao: manda pro login (exceto em rotas publicas)
-  const needsLogin = mode === "supabase" && !loading && !user && !isPublic;
+  // Deslogado na home: mostra a landing (rota publica de fato, sem redirect).
+  const showLanding = mode === "supabase" && !loading && !user && isHome;
+
+  // Sem sessao: manda pro login (exceto em rotas publicas e na home).
+  const needsLogin =
+    mode === "supabase" && !loading && !user && !isPublic && !isHome;
 
   // Ainda resolvendo sessao: renderiza nada para evitar flash (rota publica nao espera)
   const isResolving = mode === "supabase" && loading && !isPublic;
@@ -40,6 +48,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   }, [needsLogin, router]);
 
   if (isResolving) return null;
+  if (showLanding) return <Landing />;
   if (needsLogin) return null;
   if (checkingProfile) return null;
   if (needsOnboarding) return <OnboardingWizard />;

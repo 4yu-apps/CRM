@@ -1,84 +1,122 @@
 import type { Metadata } from "next";
-import { H2, LegalPage } from "../legal";
+import { LegalPage } from "../legal";
 
 export const metadata: Metadata = {
-  title: "Política de Privacidade | 4YUmkt CRM",
-  description: "Como o 4YUmkt CRM coleta, usa e protege os dados.",
+  title: "Política de Privacidade | 4YUmkt",
+  description: "Como o 4YUmkt coleta, usa e protege os dados.",
 };
 
 export default function PrivacidadePage() {
   return (
-    <LegalPage title="Política de Privacidade" updatedAt="22 de junho de 2026">
-      <p>
-        Esta Política explica como o 4YUmkt CRM (o aplicativo, o sistema) trata os dados de quem usa
-        a plataforma e os dados de prospecção coletados durante o uso. Ao acessar o sistema você
-        concorda com o descrito aqui.
+    <LegalPage
+      title="Política de Privacidade"
+      updatedAt="22 de junho de 2026"
+      crossLabel="Ver Termos de Uso"
+      crossHref="/termos"
+    >
+      <p style={{ fontSize: 16, color: "#3B3354" }}>
+        No 4YUmkt, a gente leva privacidade a sério. Esta política explica, sem juridiquês desnecessário,
+        quais dados a gente coleta, por que coleta e o que você pode fazer a respeito. Ao usar a plataforma,
+        você concorda com o que está aqui.
       </p>
 
-      <H2>Quem somos</H2>
+      <h2 id="quem">1. Quem somos</h2>
       <p>
-        O 4YUmkt CRM é uma ferramenta de prospecção de clientes operada pela 4YUmkt. Contato:
-        4yumkt@gmail.com.
+        O 4YUmkt é uma plataforma de prospecção para gestores de tráfego. A gente encontra negócios em
+        fontes públicas, organiza essas informações e entrega para o profissional de marketing decidir como
+        abordar. O contato do nosso encarregado de dados é{" "}
+        <a href="mailto:4yumkt@gmail.com">4yumkt@gmail.com</a>.
       </p>
 
-      <H2>Dados que coletamos</H2>
+      <h2 id="coleta">2. Quais dados a gente coleta</h2>
+      <h3>Dados que você nos dá</h3>
+      <ul>
+        <li>Cadastro: seu nome, email e senha.</li>
+        <li>Configuração: cidade, bairros e ramos que você quer prospectar.</li>
+        <li>Comunicação: mensagens que você troca com nosso suporte.</li>
+      </ul>
+      <h3>Dados de negócios prospectados</h3>
       <p>
-        <strong>Dados da sua conta:</strong> ao entrar com e-mail e senha ou com sua Conta do Google,
-        coletamos seu e-mail e um identificador de conta para autenticar você e isolar seus dados.
-        Quando você entra com o Google, recebemos seu nome, e-mail e foto de perfil públicos.
+        Para montar as fichas de leads, a gente reúne informações disponíveis publicamente, como nome do
+        estabelecimento, endereço, telefone comercial, perfil em redes sociais, site e avaliações públicas.
+        Não coletamos dados sensíveis nem informações pessoais privadas de terceiros.
       </p>
+      <h3>Dados de uso</h3>
+      <ul>
+        <li>Como você navega na plataforma, quais telas usa e quais ações realiza.</li>
+        <li>Dados técnicos do seu dispositivo e navegador, por segurança e desempenho.</li>
+      </ul>
+
+      <h2 id="uso">3. Por que a gente usa esses dados</h2>
+      <ul>
+        <li>Para encontrar e organizar leads relevantes para o seu negócio.</li>
+        <li>Para evitar mostrar o mesmo lead duas vezes.</li>
+        <li>Para manter sua conta segura e funcionando.</li>
+        <li>Para melhorar a plataforma e dar suporte quando você precisa.</li>
+        <li>Para cumprir obrigações legais.</li>
+      </ul>
       <p>
-        <strong>Dados de prospecção:</strong> o sistema reúne informações públicas de negócios (nome,
-        endereço, telefone, site, redes sociais, avaliações públicas) a partir de fontes abertas como
-        o Google Maps e o site do próprio negócio, para montar e qualificar sua lista de leads.
-      </p>
-      <p>
-        <strong>Configurações e atividade:</strong> guardamos suas preferências de busca (região,
-        nichos, área de atuação) e o histórico de ações dentro do sistema para fazer a ferramenta
-        funcionar.
+        O 4YUmkt nunca envia mensagens em seu nome de forma automática. O disparo de qualquer abordagem é
+        sempre feito por você, manualmente, do seu próprio número.
       </p>
 
-      <H2>Uso do Google Calendar</H2>
+      <h2 id="compartilha">4. Com quem a gente compartilha</h2>
+      <p>A gente não vende seus dados. Compartilhamos apenas com:</p>
+      <ul>
+        <li>
+          Prestadores de serviço que nos ajudam a operar (como hospedagem em nuvem), sempre sob contrato e
+          dever de sigilo.
+        </li>
+        <li>Autoridades, quando exigido por lei ou ordem judicial.</li>
+      </ul>
+
+      <h2 id="lgpd">5. Seus direitos (LGPD)</h2>
+      <p>De acordo com a Lei Geral de Proteção de Dados, você pode, a qualquer momento:</p>
+      <ul>
+        <li>Confirmar se a gente trata seus dados e acessar o que temos.</li>
+        <li>Corrigir dados incompletos ou desatualizados.</li>
+        <li>Pedir a exclusão dos seus dados.</li>
+        <li>Revogar o consentimento e cancelar a conta.</li>
+        <li>Pedir a portabilidade dos seus dados.</li>
+      </ul>
       <p>
-        Se você conectar sua Conta do Google e autorizar o acesso à agenda, o sistema usa esse acesso
-        apenas para <strong>criar e remover eventos de reunião que você mesmo agenda</strong> dentro
-        do CRM. Não lemos, não analisamos e não compartilhamos o conteúdo da sua agenda. Você pode
-        revogar esse acesso a qualquer momento nas configurações da sua Conta do Google.
+        Para exercer qualquer um desses direitos, é só escrever para{" "}
+        <a href="mailto:4yumkt@gmail.com">4yumkt@gmail.com</a>. A gente responde o mais rápido possível,
+        dentro dos prazos da lei.
       </p>
 
-      <H2>Como usamos os dados</H2>
+      <h2 id="seguranca">6. Como a gente protege</h2>
       <p>
-        Usamos os dados para autenticar você, montar e qualificar leads, gerar rascunhos de mensagem
-        para sua revisão, organizar seu funil e operar os recursos do sistema. O sistema nunca envia
-        mensagens sozinho: todo contato depende da sua aprovação.
+        Usamos medidas técnicas e organizacionais para manter seus dados seguros, como criptografia em
+        trânsito, controle de acesso e monitoramento. Nenhum sistema é 100% à prova de falhas, mas a gente
+        trata segurança como prioridade.
       </p>
 
-      <H2>Compartilhamento</H2>
+      <h2 id="retencao">7. Por quanto tempo guardamos</h2>
       <p>
-        Não vendemos seus dados. Compartilhamos dados apenas com provedores de infraestrutura
-        necessários para o funcionamento (por exemplo, hospedagem e banco de dados), e quando exigido
-        por lei. Seus dados de conta e seus leads são isolados por conta: outros usuários não acessam
-        o que é seu.
+        Mantemos seus dados enquanto sua conta estiver ativa e pelo tempo necessário para cumprir obrigações
+        legais. Se você cancelar, removemos ou anonimizamos seus dados pessoais, salvo o que a lei exigir
+        manter.
       </p>
 
-      <H2>Seus direitos (LGPD)</H2>
+      <h2 id="cookies">8. Cookies</h2>
       <p>
-        Você pode solicitar acesso, correção ou exclusão dos seus dados, e revogar consentimentos, a
-        qualquer momento pelo e-mail 4yumkt@gmail.com. Negócios prospectados que peçam para não serem
-        contatados são marcados como opt-out e deixam de receber abordagem.
+        Usamos cookies essenciais para manter você logado e a plataforma funcionando, e cookies de uso para
+        entender como melhorar a experiência. Você pode gerenciar cookies nas configurações do seu
+        navegador.
       </p>
 
-      <H2>Retenção e segurança</H2>
+      <h2 id="mudancas">9. Mudanças nesta política</h2>
       <p>
-        Mantemos os dados enquanto sua conta estiver ativa ou conforme necessário para operar o
-        serviço. Adotamos medidas técnicas razoáveis para proteger os dados contra acesso não
-        autorizado.
+        Se a gente atualizar esta política, avisamos pelo site ou por email antes das mudanças valerem. A
+        data no topo sempre mostra a versão mais recente.
       </p>
 
-      <H2>Alterações</H2>
+      <h2 id="contato">10. Fale com a gente</h2>
       <p>
-        Podemos atualizar esta Política. Mudanças relevantes serão sinalizadas dentro do sistema. O
-        uso continuado após a atualização significa concordância com a nova versão.
+        Qualquer dúvida sobre privacidade, escreva para{" "}
+        <a href="mailto:4yumkt@gmail.com">4yumkt@gmail.com</a> ou chame no WhatsApp{" "}
+        <a href="https://wa.me/5511911001414">(11) 91100-1414</a>.
       </p>
     </LegalPage>
   );
