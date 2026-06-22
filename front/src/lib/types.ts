@@ -205,6 +205,7 @@ export interface SearchProfile {
   radius: string;                 // "5km" | "10km" | "25km" | "50km" | "cidade"
   default_service_target: ServiceTarget;
   autopilot: boolean;
+  is_admin?: boolean;
   // Profissao/vertical do usuario (catalogo em lib/professions). Define os
   // nichos sugeridos e o servico-alvo padrao no onboarding. Coluna criada por
   // migracao em outro fluxo; opcional ate todo perfil ter escolhido.
