@@ -76,3 +76,56 @@ def test_digital_neglect_scores_higher_for_trafego():
     without = score_lead(_lead(website=None)).reason["trafego"]["score"]
     with_site = score_lead(_lead(website="x.com")).reason["trafego"]["score"]
     assert without > with_site
+
+
+# ------------------------------------------------------------------
+# lente marketing: instagram_status influencia o score
+# ------------------------------------------------------------------
+
+def test_marketing_sem_instagram_pontua_mais_alto_que_ativo():
+    # sem Instagram (22 pts) > ativo (6 pts): oportunidade maior sem presenca
+    sem = score_lead(_lead(instagram=None), profession="marketing").reason["marketing"]["score"]
+    ativo = score_lead(
+        _lead(instagram="@conta"),
+        {"instagram_status": "ativo"},
+        profession="marketing",
+    ).reason["marketing"]["score"]
+    assert sem > ativo
+
+
+def test_marketing_parado_pontua_mais_alto_que_ativo():
+    # parado (18 pts) > ativo (6 pts): da pra assumir a gestao
+    parado = score_lead(
+        _lead(instagram="@conta"),
+        {"instagram_status": "parado"},
+        profession="marketing",
+    ).reason["marketing"]["score"]
+    ativo = score_lead(
+        _lead(instagram="@conta"),
+        {"instagram_status": "ativo"},
+        profession="marketing",
+    ).reason["marketing"]["score"]
+    assert parado > ativo
+
+
+def test_marketing_sem_instagram_score_22_no_item():
+    # sem Instagram => item Instagram vale 22 pts
+    r = score_lead(_lead(instagram=None), profession="marketing")
+    crit = r.reason["marketing"]["criteria"]
+    ig_item = next(c for c in crit if c["label"] == "Instagram")
+    assert ig_item["points"] == 22
+
+
+def test_marketing_summary_com_instagram_parado_menciona_parado():
+    r = score_lead(
+        _lead(instagram="@conta"),
+        {"instagram_status": "parado"},
+        profession="marketing",
+    )
+    assert "parado" in r.reason["summary"].lower()
+
+
+def test_marketing_summary_sem_travessao():
+    r = score_lead(_lead(instagram=None), profession="marketing")
+    assert "—" not in r.reason["summary"]
+    assert "--" not in r.reason["summary"]

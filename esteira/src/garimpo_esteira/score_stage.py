@@ -18,11 +18,20 @@ def _ads_signal(provenance: list[dict]) -> bool | None:
     return None
 
 
+def _ig_signal(provenance: list[dict]) -> str | None:
+    for p in provenance:
+        if p.get("field_name") == "instagram_status":
+            return p.get("value")  # "ativo" | "parado"
+    return None
+
+
 def score_one(lead, sink: LeadSink, profession: str | None = None) -> ScoreResult:
-    ads_active = _ads_signal(sink.fetch_provenance(lead.id))
+    prov = sink.fetch_provenance(lead.id)
+    ads_active = _ads_signal(prov)
+    ig_status = _ig_signal(prov)
     # sinais tecnicos do site (de graca) entram no score; ads_active tambem pode
     # vir derivado do Pixel detectado no HTML.
-    signals = {"ads_active": ads_active, "site": getattr(lead, "site_signals", None) or {}}
+    signals = {"ads_active": ads_active, "site": getattr(lead, "site_signals", None) or {}, "instagram_status": ig_status}
     result = score_lead(lead, signals, profession)
     fields: dict[str, object] = {
         "score": result.score,

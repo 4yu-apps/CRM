@@ -252,10 +252,15 @@ def score_marketing(lead: Lead, signals: dict[str, Any]) -> tuple[int, list[dict
     def add(label: str, pts_note: tuple[int, str]) -> None:
         crit.append({"label": label, "points": pts_note[0], "note": pts_note[1]})
 
-    if is_present("instagram", lead.instagram):
-        add("Instagram", (6, "tem Instagram (da pra avaliar a gestao)"))
-    else:
+    ig_status = signals.get("instagram_status")
+    if not is_present("instagram", lead.instagram):
         add("Instagram", (22, "sem Instagram, presenca a construir"))
+    elif ig_status == "parado":
+        add("Instagram", (18, "tem Instagram mas parado, da pra assumir a gestao"))
+    elif ig_status == "ativo":
+        add("Instagram", (6, "Instagram ativo, bem cuidado"))
+    else:
+        add("Instagram", (6, "tem Instagram (da pra avaliar a gestao)"))
     if is_present("facebook", lead.facebook):
         add("Facebook", (3, "tem Facebook"))
     else:
@@ -318,6 +323,8 @@ def _summary(lens: str, target: ServiceTarget, lead: Lead, signals: dict[str, An
         falta = []
         if not is_present("instagram", lead.instagram):
             falta.append("sem Instagram")
+        elif signals.get("instagram_status") == "parado":
+            falta.append("Instagram parado")
         if not is_present("facebook", lead.facebook):
             falta.append("sem Facebook")
         det = ", ".join(falta) or "presenca a fortalecer"

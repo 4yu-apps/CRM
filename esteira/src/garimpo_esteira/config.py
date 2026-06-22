@@ -45,6 +45,9 @@ class Config:
     maps_key: str | None = None
     maps_pages: int = 3               # paginas do Places por busca (~20 cada)
     extra_niches: int = 0             # nichos aleatorios extras por run (variedade)
+    ig_business_id: str | None = None
+    ig_token: str | None = None
+    ig_stale_days: int = 60
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -69,6 +72,9 @@ class Config:
             maps_key=os.getenv("GOOGLE_MAPS_API_KEY"),
             maps_pages=int(os.getenv("GARIMPO_MAPS_PAGES", "3")),
             extra_niches=int(os.getenv("GARIMPO_EXTRA_NICHES", "0")),
+            ig_business_id=os.getenv("INSTAGRAM_BUSINESS_ID"),
+            ig_token=os.getenv("INSTAGRAM_TOKEN") or os.getenv("META_AD_LIBRARY_TOKEN"),
+            ig_stale_days=int(os.getenv("GARIMPO_IG_STALE_DAYS", "60")),
         )
 
 
@@ -116,9 +122,20 @@ def build_sources(cfg: Config) -> list[Source]:
             cfg.groq_key, "https://api.groq.com/openai/v1", cfg.extract_model
         )
 
+    from .sources.instagram import business_discovery_probe
+
+    ig = (
+        InstagramSource(
+            probe=business_discovery_probe(cfg.ig_business_id, cfg.ig_token),
+            stale_days=cfg.ig_stale_days,
+        )
+        if cfg.ig_business_id and cfg.ig_token
+        else InstagramSource(stale_days=cfg.ig_stale_days)
+    )
+
     return [
         CnpjSource(),
-        InstagramSource(),
+        ig,
         WebsiteSource(llm_extract=llm_extract),
         ad,
     ]
