@@ -14,7 +14,7 @@ from pathlib import Path
 
 from .autopilot import region_key, run_autopilot, search_term
 from .cascade import enrich_batch, enrich_lead
-from .config import FIXTURES_DIR, Config, build_maps_source, build_provider, build_sink, build_sources
+from .config import FIXTURES_DIR, Config, build_maps_source, build_provider, build_reviews_source, build_sink, build_sources
 from .discovery import discover
 from .draft_stage import draft_batch
 from .models import Lead
@@ -107,8 +107,9 @@ def cmd_score(cfg: Config) -> int:
 def cmd_draft(cfg: Config) -> int:
     sink = build_sink(cfg)
     provider = build_provider(cfg)
+    reviews_source = build_reviews_source(cfg)
     print(f"draft · sink={cfg.sink} llm={cfg.llm} ({provider.model}) batch={cfg.batch}")
-    results = draft_batch(sink, provider, batch=cfg.batch)
+    results = draft_batch(sink, provider, batch=cfg.batch, reviews_source=reviews_source)
     if not results:
         print("  nada para rascunhar (status=qualificado vazio)")
         return 0
@@ -140,10 +141,12 @@ def cmd_autopilot(cfg: Config) -> int:
     maps = build_maps_source(cfg)
     provider = build_provider(cfg)
     sources = build_sources(cfg)
+    reviews_source = build_reviews_source(cfg)
     print(f"autopilot · sink={cfg.sink} maps={cfg.maps_mode} llm={cfg.llm}")
     summary = run_autopilot(
         sink, maps, provider, sources,
         batch=cfg.batch, delay=cfg.delay, extra_niches=cfg.extra_niches,
+        reviews_source=reviews_source,
     )
     if not summary:
         print("  nenhum perfil com autopilot ligado (nada a fazer)")
@@ -172,6 +175,7 @@ def cmd_search(
     maps = build_maps_source(cfg)
     provider = build_provider(cfg)
     sources = build_sources(cfg)
+    reviews_source = build_reviews_source(cfg)
     term = search_term(niche, city, state, neighborhood)
 
     profession = None
@@ -189,7 +193,7 @@ def cmd_search(
     # pipeline so deste dono (enrich -> score na lente da profissao -> draft)
     enrich_batch(sink, sources, batch=cfg.batch, delay=cfg.delay, owner_id=owner_id)
     score_batch(sink, batch=cfg.batch, owner_id=owner_id, profession=profession)
-    draft_batch(sink, provider, batch=cfg.batch, owner_id=owner_id, profession=profession)
+    draft_batch(sink, provider, batch=cfg.batch, owner_id=owner_id, profession=profession, reviews_source=reviews_source)
 
     # memoria de cobertura + feed de atividade do dono
     if hasattr(sink, "upsert_coverage"):

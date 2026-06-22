@@ -87,6 +87,7 @@ def run_autopilot(
     skip_covered: bool = True,
     extra_niches: int = 0,
     rng: random.Random | None = None,
+    reviews_source=None,
 ) -> list[dict]:
     """Itera os perfis com autopilot ligado. Por dono: descobre (pulando o ja
     varrido) e roda o pipeline so nos leads dele. Retorna um resumo por dono.
@@ -175,7 +176,7 @@ def run_autopilot(
         for stage in (
             lambda: enrich_batch(sink, sources, batch=batch, delay=delay, owner_id=owner),
             lambda: score_batch(sink, batch=batch, owner_id=owner, profession=profession),
-            lambda: draft_batch(sink, provider, batch=batch, owner_id=owner, profession=profession),
+            lambda: draft_batch(sink, provider, batch=batch, owner_id=owner, profession=profession, reviews_source=reviews_source),
         ):
             try:
                 stage()

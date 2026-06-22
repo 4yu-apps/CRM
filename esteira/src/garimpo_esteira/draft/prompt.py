@@ -128,6 +128,11 @@ def build_prompt(lead: Lead) -> str:
             "rechamar o cliente que ja foi la"
         )
 
+    # ancora de elogios reais (review_themes.elogio, quando disponivel)
+    themes = getattr(lead, "review_themes", None) or {}
+    if themes.get("elogio"):
+        sinais.append(f"os clientes elogiam {themes['elogio']}")
+
     sinais_txt = "; ".join(sinais) or "poucos sinais publicos"
 
     # linha de diagnostico do analista (score_reason.summary), quando disponivel
@@ -140,7 +145,7 @@ def build_prompt(lead: Lead) -> str:
     ancora = (
         "Ancora obrigatoria: abra a msg1 com UM fato real e especifico deste negocio "
         "(a boa reputacao na regiao, o Instagram parado, a falta de site, o que os "
-        "clientes elogiam). NUNCA numero cru. Sem um fato concreto, nao escreva a abertura."
+        "clientes valorizam). NUNCA numero cru. Sem um fato concreto, nao escreva a abertura."
     )
 
     return (

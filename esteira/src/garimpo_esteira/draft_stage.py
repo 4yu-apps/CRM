@@ -1,11 +1,12 @@
-"""Estágio de rascunho — qualificado -> rascunho_pronto.
+"""Estagio de rascunho (qualificado -> rascunho_pronto).
 
 A IA escreve as 2 mensagens; o humano edita e aprova depois (no front). O
-sistema NUNCA envia. Respeita opt-out (LGPD): lead opt-out não gera copy de
-contato — fica em 'qualificado'.
+sistema NUNCA envia. Respeita opt-out (LGPD): lead opt-out nao gera copy de
+contato, fica em 'qualificado'.
 """
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 
 from .draft.base import DraftProvider
@@ -13,13 +14,24 @@ from .sink.base import LeadSink
 
 
 def draft_one(
-    lead, provider: DraftProvider, sink: LeadSink, profession: str | None = None
+    lead, provider: DraftProvider, sink: LeadSink, profession: str | None = None,
+    reviews_source=None,
 ) -> tuple[str, str] | None:
     if lead.opt_out:
-        return None  # LGPD: não rascunha contato pra quem pediu opt-out
-    # profissao do dono guia a copy (lida em prompt.build_prompt / mock via getattr)
+        return None  # LGPD: nao rascunha contato pra quem pediu opt-out
     if profession:
         setattr(lead, "profession", profession)
+    if reviews_source is not None:
+        try:
+            for f in reviews_source.enrich(lead):
+                sink.record_provenance(lead.id, f.field_name, f.source, f.value, f.confidence)
+                if f.field_name == "review_themes" and f.value:
+                    try:
+                        setattr(lead, "review_themes", json.loads(f.value))
+                    except (ValueError, TypeError):
+                        pass
+        except Exception:
+            pass
     msg1, msg2 = provider.generate(lead)
     sink.update_lead_fields(lead.id, {
         "draft_msg1": msg1,
@@ -35,11 +47,12 @@ def draft_one(
 def draft_batch(
     sink: LeadSink, provider: DraftProvider, *, batch: int = 20, status="qualificado",
     owner_id: str | None = None, profession: str | None = None,
+    reviews_source=None,
 ) -> list[tuple[str, tuple[str, str]]]:
     leads = sink.fetch_by_status(status, batch, owner_id)
     out: list[tuple[str, tuple[str, str]]] = []
     for lead in leads:
-        result = draft_one(lead, provider, sink, profession)
+        result = draft_one(lead, provider, sink, profession, reviews_source=reviews_source)
         if result:
             out.append((lead.id, result))
     if out and leads:

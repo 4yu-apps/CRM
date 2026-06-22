@@ -75,3 +75,19 @@ def test_angulo_2_nao_dispara_com_poucas_avaliacoes():
     lead = _lead(rating=4.8, reviews_count=100, website=None, instagram=None)
     p = build_prompt(lead)
     assert "base fiel" not in p
+
+
+def test_review_themes_elogio_aparece_nos_sinais():
+    lead = _lead()
+    setattr(lead, "review_themes", {"elogio": "a borda da pizza", "reclamacao": "", "resumo": "ok"})
+    p = build_prompt(lead)
+    # o sinal de elogio entra com o conteudo real (ancora pra copy)
+    assert "os clientes elogiam a borda da pizza" in p
+
+
+def test_review_themes_sem_elogio_nao_adiciona_sinal():
+    lead = _lead()
+    setattr(lead, "review_themes", {"elogio": "", "reclamacao": "fila", "resumo": "ok"})
+    p = build_prompt(lead)
+    # sem elogio, o sinal de elogio nao entra (a frase fixa da ancora nao conta)
+    assert "os clientes elogiam" not in p

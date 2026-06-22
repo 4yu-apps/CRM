@@ -48,6 +48,7 @@ class Config:
     ig_business_id: str | None = None
     ig_token: str | None = None
     ig_stale_days: int = 60
+    reviews_enabled: bool = False
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -75,6 +76,7 @@ class Config:
             ig_business_id=os.getenv("INSTAGRAM_BUSINESS_ID"),
             ig_token=os.getenv("INSTAGRAM_TOKEN") or os.getenv("META_AD_LIBRARY_TOKEN"),
             ig_stale_days=int(os.getenv("GARIMPO_IG_STALE_DAYS", "60")),
+            reviews_enabled=os.getenv("GARIMPO_REVIEWS", "0") in ("1", "true", "True"),
         )
 
 
@@ -159,6 +161,22 @@ def build_provider(cfg: Config) -> DraftProvider:
         prov = OpenAICompatDraftProvider(cfg.groq_key, "https://api.groq.com/openai/v1", cfg.groq_model)
         return FallbackDraftProvider(prov, mock)
     return mock
+
+
+def build_reviews_source(cfg: Config):
+    """Fabrica a ReviewsSource. Retorna None se desligada ou sem chave."""
+    if not cfg.reviews_enabled or not cfg.maps_key:
+        return None
+    from .sources.reviews import ReviewsSource, place_details_reviews
+
+    summarize = None
+    if cfg.groq_key:
+        from .sources.reviews import make_groq_review_summarizer
+
+        summarize = make_groq_review_summarizer(
+            cfg.groq_key, "https://api.groq.com/openai/v1", cfg.extract_model
+        )
+    return ReviewsSource(fetch=place_details_reviews(cfg.maps_key), summarize=summarize)
 
 
 def build_maps_source(cfg: Config) -> MapsSource:
