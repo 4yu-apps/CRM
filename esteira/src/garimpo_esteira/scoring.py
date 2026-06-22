@@ -364,9 +364,9 @@ def score_lead(
     elif lens == "automacao":
         best, winning_crit, target = a_score, a_crit, "automacao"
     elif lens == "design":
-        best, winning_crit, target = d_score, d_crit, "indefinido"
+        best, winning_crit, target = d_score, d_crit, "design"
     elif lens == "marketing":
-        best, winning_crit, target = m_score, m_crit, "indefinido"
+        best, winning_crit, target = m_score, m_crit, "marketing"
     elif lens == "ambos":
         best = max(t_score, a_score)
         if t_score >= AMBOS_BAR and a_score >= AMBOS_BAR:

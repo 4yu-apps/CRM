@@ -17,6 +17,16 @@ export const SERVICE_META: Record<ServiceTarget, { label: string; short: string;
     short: "Ambos",
     badge: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
   },
+  design: {
+    label: "Site / UX Design",
+    short: "Design",
+    badge: "bg-violet-500/15 text-violet-700 dark:text-violet-300",
+  },
+  marketing: {
+    label: "Marketing / Social",
+    short: "Marketing",
+    badge: "bg-pink-500/15 text-pink-700 dark:text-pink-300",
+  },
   indefinido: {
     label: "A definir",
     short: "A definir",

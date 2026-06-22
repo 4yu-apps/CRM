@@ -16,8 +16,9 @@ LeadSource = Literal[
     "website", "meta_ad_library", "manual", "extension",
 ]
 
-# Servico-alvo do lead (B1): decidido pelo score (trafego x automacao x ambos).
-ServiceTarget = Literal["trafego", "automacao", "ambos", "indefinido"]
+# Servico-alvo do lead, dirigido pela profissao do dono: trafego/automacao/ambos
+# (gestor), design (UX/web/branding), marketing (social), ou indefinido.
+ServiceTarget = Literal["trafego", "automacao", "ambos", "design", "marketing", "indefinido"]
 
 # Campos do lead que as fontes podem preencher (proveniência por campo).
 ENRICHABLE_FIELDS = (

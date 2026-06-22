@@ -30,8 +30,9 @@ export type LeadSource =
 
 export type ActorType = "human" | "system" | "extension";
 
-// Servico-alvo do lead (B1, dois servicos): trafego, automacao, ambos.
-export type ServiceTarget = "trafego" | "automacao" | "ambos" | "indefinido";
+// Servico-alvo do lead, dirigido pela profissao do dono: trafego, automacao,
+// ambos (gestor), design (UX/web/branding), marketing (social), ou indefinido.
+export type ServiceTarget = "trafego" | "automacao" | "ambos" | "design" | "marketing" | "indefinido";
 
 // Tipo de cobranca do valor fechado (B8): mensal fixo ou por prazo X meses.
 export type DealBilling = "mensal_fixo" | "por_prazo";

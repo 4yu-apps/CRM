@@ -33,7 +33,11 @@ def score_one(lead, sink: LeadSink, profession: str | None = None) -> ScoreResul
     # B8: ja deixa um valor sugerido pro lead qualificado (aparece na ficha e na
     # Reuniao). E sugestao com motivo; a humana decide na conversa.
     if result.decision == "qualificado":
-        value, reason = suggest_value(result.service_target, lead.reviews_count, lead.rating)
+        stack = (getattr(lead, "site_signals", None) or {}).get("stack")
+        value, reason = suggest_value(
+            result.service_target, lead.reviews_count, lead.rating,
+            category=lead.category, stack=stack,
+        )
         fields["suggested_value"] = value
         fields["suggested_value_reason"] = reason
     sink.update_lead_fields(lead.id, fields)
