@@ -21,7 +21,6 @@ import {
   X,
 } from "@phosphor-icons/react";
 import { getRepo } from "@/lib/repo";
-import { SERVICE_META } from "@/lib/service";
 import { useAuth } from "@/lib/auth";
 import { fetchEstados, fetchMunicipios, type Municipio, type UF } from "@/lib/ibge";
 import { PROFESSIONS, getProfession, type Profession } from "@/lib/professions";
@@ -50,11 +49,21 @@ const RAIOS: { value: string; label: string }[] = [
   { value: "cidade", label: "Cidade toda" },
 ];
 
-const SERVICOS: { value: ServiceTarget; label: string }[] = [
-  { value: "trafego", label: SERVICE_META.trafego.label },
-  { value: "automacao", label: SERVICE_META.automacao.label },
-  { value: "ambos", label: SERVICE_META.ambos.label },
-];
+// O servico-alvo NAO e uma escolha a parte: ele SAI da profissao. Este texto
+// explica, na propria secao da area, o que a profissao escolhida implica pra
+// busca — deixando o vinculo profissao -> servico claro, sem secao redundante.
+function serviceFocusText(p: Profession): string {
+  switch (p.defaultService) {
+    case "trafego":
+      return "Foco em Trafego: a busca mira negocios que precisam de anuncio.";
+    case "automacao":
+      return "Foco em Automacao: a busca mira quem atende muito no manual.";
+    case "ambos":
+      return "Trafego + Automacao: na tela Buscar voce escolhe o foco a cada busca.";
+    default:
+      return "Voce capta pelos nichos da sua area — sem alvo de trafego/automacao.";
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Toggle simples sem dependencia de lib
@@ -429,6 +438,7 @@ export default function ConfigPage() {
                 <span>
                   Boa. Voce mira em: <strong className="font-bold text-brand">{selectedProfession.mira}</strong>{" "}
                   Ja deixei os nichos dessa area sugeridos abaixo, mas pode mexer a vontade.
+                  <span className="mt-1 block text-faint">{serviceFocusText(selectedProfession)}</span>
                 </span>
               </div>
             )}
@@ -449,7 +459,12 @@ export default function ConfigPage() {
                 />
               ))}
             </div>
-            {!selectedProfession && (
+            {selectedProfession ? (
+              <div className="mt-4 flex items-start gap-2.5 rounded-[14px] border border-brand/20 bg-brand-50/70 px-4 py-3 text-[13px] leading-relaxed text-ink-2">
+                <Target size={16} className="mt-0.5 flex-none text-brand" />
+                <span>{serviceFocusText(selectedProfession)}</span>
+              </div>
+            ) : (
               <div className="mt-4 flex items-center gap-2 text-[12.5px] text-faint">
                 <Info size={14} />
                 Voce ainda nao escolheu uma area. Escolha uma pra eu afinar as sugestoes.
@@ -619,53 +634,7 @@ export default function ConfigPage() {
         </Section>
 
         {/* ------------------------------------------------------------------ */}
-        {/* 3. Servico padrao */}
-        {/* ------------------------------------------------------------------ */}
-        <Section
-          title="Servico padrao"
-          sub="Qual servico voce oferece na maioria dos contatos? Uso como filtro ao pontuar os leads."
-          icon={<Tag size={20} />}
-        >
-          <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
-            {SERVICOS.map((s) => {
-              const meta = SERVICE_META[s.value];
-              const selected = serviceTarget === s.value;
-              return (
-                <button
-                  key={s.value}
-                  type="button"
-                  onClick={() => setServiceTarget(s.value)}
-                  className={cn(
-                    "flex flex-1 items-center gap-3 rounded-[14px] border px-4 py-3.5 text-left transition-colors",
-                    selected
-                      ? "border-brand bg-brand-50"
-                      : "border-border-2 bg-surface-2 hover:border-brand/40 hover:bg-brand-50/50",
-                  )}
-                >
-                  <div
-                    className={cn(
-                      "flex size-5 flex-none items-center justify-center rounded-full border-2 transition-colors",
-                      selected ? "border-brand bg-brand" : "border-border-2 bg-card",
-                    )}
-                  >
-                    {selected && <Check size={11} weight="bold" className="text-white" />}
-                  </div>
-                  <div>
-                    <div className={cn("text-[13.5px] font-bold", selected ? "text-brand" : "text-ink")}>
-                      {s.label}
-                    </div>
-                    <span className={cn("inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider", meta.badge)}>
-                      {meta.short}
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </Section>
-
-        {/* ------------------------------------------------------------------ */}
-        {/* 4. Piloto automatico */}
+        {/* Piloto automatico */}
         {/* ------------------------------------------------------------------ */}
         <div className="overflow-hidden rounded-[20px] border border-border bg-card shadow-[var(--shadow)]">
           <div className="flex items-center justify-between gap-4 p-6">
