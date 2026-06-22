@@ -196,7 +196,7 @@ export default function AdminPage() {
       {!loading && !loadError && profiles.length > 0 && (
         <div className="overflow-hidden rounded-[16px] border border-border bg-card shadow-[var(--shadow)]">
           {/* Cabecalho da tabela (desktop) */}
-          <div className="hidden grid-cols-[2fr_1.2fr_1fr_0.6fr_1.2fr_0.5fr_0.5fr_auto] gap-3 border-b border-border bg-surface-2 px-5 py-3 text-[11.5px] font-bold uppercase tracking-wider text-faint lg:grid lg:items-center">
+          <div className="hidden grid-cols-[2fr_1.2fr_1fr_0.6fr_1.2fr_0.5fr_0.5fr_120px] gap-3 border-b border-border bg-surface-2 px-5 py-3 text-[11.5px] font-bold uppercase tracking-wider text-faint lg:grid lg:items-center">
             <span>E-mail</span>
             <span>Area</span>
             <span>Local</span>
@@ -214,7 +214,7 @@ export default function AdminPage() {
                 <div
                   key={p.owner_id}
                   className={cn(
-                    "grid grid-cols-1 gap-2 px-5 py-3.5 text-[13.5px] transition-colors lg:grid-cols-[2fr_1.2fr_1fr_0.6fr_1.2fr_0.5fr_0.5fr_auto] lg:items-center lg:gap-3",
+                    "grid grid-cols-1 gap-2 px-5 py-3.5 text-[13.5px] transition-colors lg:grid-cols-[2fr_1.2fr_1fr_0.6fr_1.2fr_0.5fr_0.5fr_120px] lg:items-center lg:gap-3",
                     isSelf ? "bg-brand-50/60" : "hover:bg-accent/30",
                   )}
                 >
