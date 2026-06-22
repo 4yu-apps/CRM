@@ -16,6 +16,7 @@ import {
   ForkKnife,
   Hamburger,
   Info,
+  MagnifyingGlass,
   MapPin,
   NotePencil,
   PawPrint,
@@ -173,6 +174,22 @@ function fbUrl(handle?: string | null): string | undefined {
   const h = (handle ?? "").trim().replace(/^@/, "").replace(/\/+$/, "");
   if (!h) return undefined;
   return /^https?:\/\//i.test(h) ? h : `https://facebook.com/${h}`;
+}
+// Biblioteca de Anuncios da Meta JA pesquisada pelo negocio (Brasil, todos os
+// anuncios). Sem API: e a checagem manual — abre o site publico (sem login) com
+// o nome do negocio (ou @ do Instagram) pro Eduardo ver se o lead anuncia.
+function adLibraryUrl(lead: { business_name: string | null; instagram: string | null }): string | undefined {
+  const term = (lead.business_name || lead.instagram || "").replace(/^@/, "").trim();
+  if (!term) return undefined;
+  const p = new URLSearchParams({
+    active_status: "all",
+    ad_type: "all",
+    country: "BR",
+    q: term,
+    search_type: "keyword_unordered",
+    media_type: "all",
+  });
+  return `https://www.facebook.com/ads/library/?${p.toString()}`;
 }
 // ISO -> valor do <input type="datetime-local"> (local, sem timezone).
 function toLocalInput(iso?: string | null): string {
@@ -535,7 +552,26 @@ export default function FichaPage() {
                 <DataRow label="Facebook" value={lead.facebook ?? "-"} href={fbUrl(lead.facebook)} prov={provOf(provenance, "facebook")} />
                 <DataRow label="CNPJ" value={fmtCnpj(lead.cnpj)} prov={provOf(provenance, "cnpj")} />
                 <DataRow label="Site" value={lead.website ? lead.website : "Nao tem"} href={siteUrl(lead.website)} prov={provOf(provenance, "website")} />
-                <DataRow label="Ja anuncia?" value={lead.ads_active == null ? "Nao sei" : lead.ads_active ? "Sim" : "Ainda nao"} />
+                <div className="flex items-start justify-between gap-3 border-b border-border py-2.5">
+                  <span className="text-[13.5px] text-muted-foreground">Ja anuncia?</span>
+                  <div className="flex items-center gap-2 text-right">
+                    <span className="text-[13.5px] font-semibold text-ink">
+                      {lead.ads_active == null ? "Nao sei" : lead.ads_active ? "Sim" : "Ainda nao"}
+                    </span>
+                    {adLibraryUrl(lead) && (
+                      <a
+                        href={adLibraryUrl(lead)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Conferir na Biblioteca de Anuncios da Meta (busca pelo nome do negocio)"
+                        aria-label="Conferir na Biblioteca de Anuncios da Meta"
+                        className="flex size-6 items-center justify-center rounded-md text-faint transition-colors hover:bg-accent hover:text-brand"
+                      >
+                        <MagnifyingGlass size={14} weight="bold" />
+                      </a>
+                    )}
+                  </div>
+                </div>
                 <DataRow label="Endereco" value={lead.address ?? "-"} prov={provOf(provenance, "address")} />
                 <DataRow label="Bairro" value={lead.neighborhood ?? "-"} prov={provOf(provenance, "neighborhood")} />
                 <DataRow label="Cidade / UF" value={[lead.city, lead.state].filter(Boolean).join(" / ") || "-"} />
