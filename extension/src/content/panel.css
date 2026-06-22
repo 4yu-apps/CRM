@@ -58,8 +58,12 @@
   line-height: 1;
 }
 
-#garimpo-panel .gp-body { padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+#garimpo-panel .gp-body { padding: 14px; display: flex; flex-direction: column; gap: 10px; max-height: 72vh; overflow-y: auto; }
 #garimpo-panel .gp-foot { padding: 6px 12px; font-size: 10px; color: #71717a; border-top: 1px solid #f4f4f5; }
+#garimpo-panel .gp-hint { font-size: 11px; color: #9a92ad; margin: -4px 0 0; }
+#garimpo-panel .gp-logout { background: transparent; border: 0; color: #fff; cursor: pointer; font-size: 14px; line-height: 1; opacity: .85; }
+#garimpo-panel .gp-logout:hover { opacity: 1; }
+#garimpo-panel .gp-login { display: flex; flex-direction: column; gap: 8px; }
 
 #garimpo-panel .gp-name { font-weight: 600; font-size: 14px; }
 #garimpo-panel .gp-meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }

@@ -1,12 +1,16 @@
 (() => {
   // src/lib/config.mjs
   var DEFAULTS = {
-    dataSource: "mock",
-    // mock | supabase
-    supabaseUrl: "",
-    anonKey: "",
-    accessToken: ""
-    // JWT do usuario logado (RLS)
+    dataSource: "supabase",
+    // mock | supabase (ja vem supabase)
+    supabaseUrl: "https://uqwnpuonrbupsqstetww.supabase.co",
+    anonKey: "sb_publishable_qSYj4Gyj4r7BZVQqpJnfAQ_4LwxEdtw",
+    accessToken: "",
+    // JWT do usuario logado (RLS) — vem do login no card
+    refreshToken: "",
+    // renova o token sozinho (sessao longa, sem cair a cada 1h)
+    expiresAt: 0
+    // epoch ms de expiracao do accessToken
   };
   async function getConfig() {
     if (typeof chrome === "undefined" || !chrome.storage) return { ...DEFAULTS };
@@ -14,7 +18,7 @@
     return { ...DEFAULTS, ...stored };
   }
   function activeDataSource(cfg) {
-    return cfg.dataSource === "supabase" && cfg.supabaseUrl && cfg.anonKey ? "supabase" : "mock";
+    return cfg.dataSource === "supabase" && cfg.supabaseUrl && cfg.anonKey && cfg.accessToken ? "supabase" : "mock";
   }
 
   // src/lib/mock-data.mjs

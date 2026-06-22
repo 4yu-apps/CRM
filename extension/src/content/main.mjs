@@ -1,60 +1,29 @@
-// Card lateral READ-ONLY sobre o WhatsApp Web. Le a conversa aberta, casa com
-// o lead no nosso banco e mostra botoes de status contextuais. NUNCA envia,
-// NUNCA injeta texto no WhatsApp, NUNCA raspa contato em massa. A unica escrita
-// e o status do lead no NOSSO banco (via repo).
-import { getConfig } from "../lib/config.mjs";
+// Card lateral sobre o WhatsApp Web. Le a conversa aberta, casa com o lead no
+// nosso banco e deixa atualizar status + editar o lead (notas, contato, dono,
+// orcamento, reuniao). READ-ONLY sobre o WhatsApp: NUNCA envia, NUNCA injeta
+// texto, NUNCA raspa contato em massa. A unica escrita e no NOSSO banco.
+//
+// Plug-and-play: ja vem apontado pro banco de producao (config.mjs); o usuario
+// so loga (e-mail+senha) no proprio card. O casamento por numero fica LEMBRADO
+// por contato (cola uma vez, vale pra sempre, sobrevive a reload).
+import { getConfig, setConfig } from "../lib/config.mjs";
+import { ensureFreshToken, loginWithPassword, logout } from "../lib/auth.mjs";
 import { createRepo } from "../lib/repo.mjs";
 import { matchLead, parsePhone } from "../lib/match.mjs";
 import { contextualButtons, STATUS_LABEL } from "../lib/state-machine.mjs";
 import { fmtPhone } from "../lib/normalize.mjs";
 
 const PANEL_ID = "garimpo-panel";
-let repo = null;
-let leads = [];
-let manualPhone = null; // override do "colar numero"
-let lastKey = "";
+const state = {
+  cfg: null,
+  repo: null,
+  leads: [],
+  loggedIn: false,
+  lastKey: "",
+  lastName: "", // nome da conversa aberta (chave do casamento lembrado)
+  manual: {}, // { nomeDaConversa: telefone } — casamento por numero, lembrado
+};
 
-async function init() {
-  const cfg = await getConfig();
-  repo = createRepo(cfg);
-  await refreshLeads();
-  mountPanel(repo.source);
-  observe();
-  evaluate(true);
-}
-
-async function refreshLeads() {
-  try {
-    leads = await repo.listLeads();
-  } catch (e) {
-    leads = [];
-    console.warn("[garimpo] nao consegui listar leads:", e.message);
-  }
-}
-
-// ---- leitura do DOM (defensiva; selectors do WA mudam) ----
-function readConversation() {
-  if (manualPhone) return { name: null, phone: manualPhone };
-  const header = document.querySelector("#main header") || document.querySelector("header");
-  if (!header) return { name: null, phone: null };
-  const titleEl = header.querySelector("span[title]") || header.querySelector('span[dir="auto"]');
-  const rawName = titleEl ? (titleEl.getAttribute("title") || titleEl.textContent || "").trim() : "";
-  const phoneFromName = parsePhone(rawName);
-  const phone = phoneFromName || parsePhone(header.textContent);
-  return { name: phoneFromName ? null : rawName, phone };
-}
-
-function evaluate(force = false) {
-  const parsed = readConversation();
-  const key = `${parsed.phone || ""}|${parsed.name || ""}`;
-  if (!force && key === lastKey) return;
-  lastKey = key;
-  renderBody(parsed, matchLead(parsed, leads));
-}
-
-// Campos que dá pra editar/preencher pela extensão (no nosso banco). É por aqui
-// que entra o que a pessoa descobre na conversa: nome do dono, contato que
-// faltava, orçamento sugerido.
 const EDIT_FIELDS = [
   { key: "owner_name", label: "Dono / responsavel", type: "text" },
   { key: "phone", label: "Telefone", type: "text" },
@@ -62,23 +31,93 @@ const EDIT_FIELDS = [
   { key: "email", label: "E-mail", type: "text" },
   { key: "instagram", label: "Instagram", type: "text" },
   { key: "deal_value", label: "Orcamento (R$)", type: "number" },
-  { key: "meeting_link", label: "Link da reuniao", type: "text" },
+  { key: "meeting_link", label: "Link da reuniao (online)", type: "text" },
   { key: "meeting_location", label: "Local (presencial)", type: "text" },
 ];
 
-// ISO -> valor do input datetime-local (local, sem timezone) e volta.
-function toLocalInput(iso) {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const p = (n) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+async function init() {
+  state.cfg = await getConfig();
+  const fresh = await ensureFreshToken(state.cfg);
+  if (fresh && fresh !== state.cfg.accessToken) state.cfg = await getConfig();
+  state.loggedIn = !!state.cfg.accessToken;
+  state.manual = await loadManual();
+  state.repo = createRepo(state.cfg);
+  mountPanel();
+  observe();
+  if (state.loggedIn) await refreshLeads();
+  updateBadge();
+  evaluate(true);
+  // mantem o token vivo em sessoes longas (renova sozinho a cada ~45min)
+  setInterval(keepAlive, 45 * 60 * 1000);
+}
+
+async function keepAlive() {
+  if (!state.cfg.accessToken) return;
+  await ensureFreshToken(state.cfg);
+  state.cfg = await getConfig();
+  state.repo = createRepo(state.cfg);
+}
+
+async function refreshLeads() {
+  try {
+    state.leads = await state.repo.listLeads();
+  } catch (e) {
+    state.leads = [];
+    // token caiu -> volta pro login
+    if (/401|403|jwt|token|expired/i.test(e.message || "")) {
+      await logout();
+      state.cfg = await getConfig();
+      state.loggedIn = false;
+      state.repo = createRepo(state.cfg);
+    }
+    console.warn("[garimpo]", e.message);
+  }
+}
+
+async function loadManual() {
+  if (typeof chrome === "undefined" || !chrome.storage) return {};
+  const { manualMatches } = await chrome.storage.local.get("manualMatches");
+  return manualMatches || {};
+}
+function saveManual() {
+  void setConfig({ manualMatches: state.manual });
+}
+
+// ---- leitura do DOM (defensiva; selectors do WA mudam) ----
+function readConversation() {
+  const header = document.querySelector("#main header") || document.querySelector("header");
+  if (!header) return { name: null, phone: null, rawName: "" };
+  const titleEl = header.querySelector("span[title]") || header.querySelector('span[dir="auto"]');
+  const rawName = titleEl ? (titleEl.getAttribute("title") || titleEl.textContent || "").trim() : "";
+  const phoneFromName = parsePhone(rawName);
+  let phone = phoneFromName || parsePhone(header.textContent);
+  const name = phoneFromName ? null : rawName;
+  // casamento lembrado: se ja colamos o numero desse contato antes, reusa.
+  if (!phone && rawName && state.manual[rawName]) phone = state.manual[rawName];
+  return { name, phone, rawName };
+}
+
+function evaluate(force = false) {
+  if (!state.loggedIn) {
+    // sem login: mostra o formulario de login (sem re-render a cada mutacao,
+    // pra nao apagar o que o usuario esta digitando).
+    if (state.lastKey === "__login__" && !force) return;
+    state.lastKey = "__login__";
+    renderLogin();
+    return;
+  }
+  const parsed = readConversation();
+  state.lastName = parsed.rawName || "";
+  const key = `${parsed.phone || ""}|${parsed.name || ""}`;
+  if (!force && key === state.lastKey) return; // mesma conversa: nao re-renderiza
+  state.lastKey = key;
+  renderBody(parsed, matchLead(parsed, state.leads));
 }
 
 async function doTransition(id, to, label) {
   try {
-    const updated = await repo.transition(id, to);
-    leads = leads.map((l) => (l.id === id ? { ...l, ...updated, status: to } : l));
+    const updated = await state.repo.transition(id, to);
+    state.leads = state.leads.map((l) => (l.id === id ? { ...l, ...updated, status: to } : l));
     toast(`Status: ${label}`);
     evaluate(true);
   } catch (e) {
@@ -86,7 +125,7 @@ async function doTransition(id, to, label) {
   }
 }
 
-// ---- UI ----
+// ---- UI helpers ----
 function el(tag, props = {}, children = []) {
   const node = document.createElement(tag);
   Object.assign(node, props);
@@ -94,20 +133,79 @@ function el(tag, props = {}, children = []) {
   return node;
 }
 
-function mountPanel(source) {
+function field(label, inputEl) {
+  const wrap = el("label", { className: "gp-field" });
+  wrap.append(el("span", { className: "gp-flabel", textContent: label }), inputEl);
+  return wrap;
+}
+
+function mountPanel() {
   if (document.getElementById(PANEL_ID)) return;
   const panel = el("div", { id: PANEL_ID });
   panel.innerHTML = `
     <div class="gp-head">
       <span class="gp-mark">4Y</span>
       <span class="gp-logo">Garimpo</span>
-      <span class="gp-src">${source}</span>
+      <span class="gp-src"></span>
+      <button class="gp-logout" title="Sair" aria-label="Sair" style="display:none">⎋</button>
       <button class="gp-min" title="Minimizar painel" aria-label="Minimizar painel">−</button>
     </div>
     <div class="gp-body"></div>
     <div class="gp-foot">So le seu WhatsApp. Status e edicoes vao pro Garimpo.</div>`;
   document.body.append(panel);
   panel.querySelector(".gp-min").addEventListener("click", () => panel.classList.toggle("gp-collapsed"));
+  panel.querySelector(".gp-logout").addEventListener("click", async () => {
+    await logout();
+    state.cfg = await getConfig();
+    state.loggedIn = false;
+    state.leads = [];
+    state.repo = createRepo(state.cfg);
+    updateBadge();
+    state.lastKey = "";
+    evaluate(true);
+  });
+}
+
+function updateBadge() {
+  const src = document.querySelector(`#${PANEL_ID} .gp-src`);
+  if (src) src.textContent = state.loggedIn ? "SUPABASE" : "LOGIN";
+  const out = document.querySelector(`#${PANEL_ID} .gp-logout`);
+  if (out) out.style.display = state.loggedIn ? "" : "none";
+}
+
+function renderLogin() {
+  const body = document.querySelector(`#${PANEL_ID} .gp-body`);
+  if (!body) return;
+  body.replaceChildren();
+  body.append(el("p", { className: "gp-muted", textContent: "Entre com sua conta Garimpo pra ver e atualizar seus leads aqui na conversa." }));
+  const email = el("input", { className: "gp-input", type: "email", placeholder: "voce@exemplo.com", autocomplete: "username" });
+  const pass = el("input", { className: "gp-input", type: "password", placeholder: "sua senha", autocomplete: "current-password" });
+  const btn = el("button", { className: "gp-save", textContent: "Entrar" });
+  btn.addEventListener("click", async () => {
+    if (!email.value.trim() || !pass.value) return toast("preencha e-mail e senha", true);
+    btn.disabled = true;
+    btn.textContent = "Entrando...";
+    try {
+      await loginWithPassword(state.cfg, email.value.trim(), pass.value);
+      state.cfg = await getConfig();
+      state.loggedIn = true;
+      state.repo = createRepo(state.cfg);
+      await refreshLeads();
+      updateBadge();
+      toast("Logado!");
+      state.lastKey = "";
+      evaluate(true);
+    } catch (e) {
+      toast("Login falhou: " + e.message, true);
+      btn.disabled = false;
+      btn.textContent = "Entrar";
+    }
+  });
+  pass.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") btn.click();
+  });
+  body.append(el("div", { className: "gp-login" }, [field("E-mail", email), field("Senha", pass), btn]));
+  updateBadge();
 }
 
 function renderBody(parsed, result) {
@@ -125,14 +223,21 @@ function renderBody(parsed, result) {
       body.append(el("button", {
         className: "gp-cand",
         textContent: `${c.business_name} · ${STATUS_LABEL[c.status]}`,
-        onclick: () => renderBody(parsed, { lead: c, method: "name" }),
+        onclick: () => {
+          if (state.lastName) {
+            state.manual[state.lastName] = c.phone; // lembra a escolha
+            saveManual();
+          }
+          renderBody(parsed, { lead: c, method: "name" });
+        },
       }));
     }
     return;
   }
-  // nenhum match -> mostra o que leu + fallback manual
+  // nenhum match -> mostra o que leu + colar numero (que fica lembrado)
   const who = parsed.phone ? fmtPhone(parsed.phone) : parsed.name || "conversa";
-  body.append(el("p", { className: "gp-muted", textContent: `Nao achei lead casado para: ${who}` }));
+  body.append(el("p", { className: "gp-muted", textContent: `Nao achei lead pra: ${who}` }));
+  body.append(el("p", { className: "gp-hint", textContent: "Cole o numero do contato uma vez — eu lembro dele nas proximas." }));
   body.append(manualBox());
 }
 
@@ -163,22 +268,9 @@ function leadCard(lead, method) {
     card.append(row);
   }
 
-  // Editar/anotar: expande um mini formulario pra preencher o que a conversa
-  // revela (nome do dono, contato, orcamento) e anotacoes. Escreve so no banco.
-  let form = null;
-  const editToggle = el("button", { className: "gp-edit-toggle", textContent: "✎ Editar / anotar" });
-  editToggle.addEventListener("click", () => {
-    if (form) {
-      form.remove();
-      form = null;
-      editToggle.textContent = "✎ Editar / anotar";
-      return;
-    }
-    form = editForm(lead);
-    card.append(form);
-    editToggle.textContent = "Fechar edicao";
-  });
-  card.append(editToggle);
+  // Edicao sempre aberta: dono, contato, orcamento, reuniao e anotacoes ja
+  // visiveis. Escreve so no nosso banco.
+  card.append(editForm(lead));
   return card;
 }
 
@@ -187,33 +279,23 @@ function editForm(lead) {
   const inputs = {};
 
   for (const f of EDIT_FIELDS) {
-    const wrap = el("label", { className: "gp-field" });
-    wrap.append(el("span", { className: "gp-flabel", textContent: f.label }));
     const inp = el("input", {
       className: "gp-input",
       type: f.type,
       value: lead[f.key] != null ? String(lead[f.key]) : "",
     });
     inputs[f.key] = inp;
-    wrap.append(inp);
-    form.append(wrap);
+    form.append(field(f.label, inp));
   }
 
-  // Reuniao: data/hora (a modalidade sai de ter link ou local preenchido acima).
-  const mWrap = el("label", { className: "gp-field" });
-  mWrap.append(el("span", { className: "gp-flabel", textContent: "Reuniao (data/hora)" }));
   const mAt = el("input", { className: "gp-input", type: "datetime-local", value: toLocalInput(lead.meeting_at) });
   inputs.meeting_at = mAt;
-  mWrap.append(mAt);
-  form.append(mWrap);
+  form.append(field("Reuniao (data/hora)", mAt));
 
-  const notesWrap = el("label", { className: "gp-field" });
-  notesWrap.append(el("span", { className: "gp-flabel", textContent: "Anotacoes" }));
   const notes = el("textarea", { className: "gp-input gp-textarea", rows: 3 });
   notes.value = lead.notes || "";
   inputs.notes = notes;
-  notesWrap.append(notes);
-  form.append(notesWrap);
+  form.append(field("Anotacoes", notes));
 
   const save = el("button", { className: "gp-save", textContent: "Salvar no lead" });
   save.addEventListener("click", async () => {
@@ -225,10 +307,8 @@ function editForm(lead) {
       if (f.type === "number") patch[f.key] = raw === "" ? null : Number(raw);
       else patch[f.key] = raw === "" ? null : raw;
     }
-    // reuniao (data/hora): converte o datetime-local pra ISO e so manda se mudou
     const mIso = inputs.meeting_at.value ? new Date(inputs.meeting_at.value).toISOString() : null;
     if (mIso !== (lead.meeting_at || null)) patch.meeting_at = mIso;
-
     const notesVal = inputs.notes.value;
     if (notesVal !== (lead.notes || "")) patch.notes = notesVal === "" ? null : notesVal;
 
@@ -238,10 +318,10 @@ function editForm(lead) {
     }
     save.disabled = true;
     try {
-      const updated = await repo.updateLead(lead.id, patch);
-      leads = leads.map((l) => (l.id === lead.id ? { ...l, ...patch, ...(updated || {}) } : l));
+      const updated = await state.repo.updateLead(lead.id, patch);
+      state.leads = state.leads.map((l) => (l.id === lead.id ? { ...l, ...patch, ...(updated || {}) } : l));
       toast("Salvo no lead");
-      evaluate(true); // re-renderiza (fecha o form) ja com os dados novos
+      evaluate(true);
     } catch (e) {
       toast(`Erro: ${e.message}`, true);
       save.disabled = false;
@@ -251,16 +331,32 @@ function editForm(lead) {
   return form;
 }
 
+// ISO -> valor do input datetime-local (local, sem timezone).
+function toLocalInput(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
 function manualBox() {
   const box = el("div", { className: "gp-manual" });
-  const input = el("input", { type: "text", placeholder: "Colar numero" });
+  const input = el("input", { className: "gp-input", type: "text", placeholder: "Colar numero do contato" });
   const go = el("button", { className: "gp-btn", textContent: "Buscar" });
-  go.addEventListener("click", () => {
+  const apply = () => {
     const p = parsePhone(input.value);
     if (!p) return toast("numero invalido", true);
-    manualPhone = p;
+    if (state.lastName) {
+      state.manual[state.lastName] = p; // lembra pra sempre nesse contato
+      saveManual();
+    }
+    state.lastKey = "";
     evaluate(true);
-    manualPhone = null; // one-shot; o proximo evaluate volta a ler o DOM
+  };
+  go.addEventListener("click", apply);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") apply();
   });
   box.append(input, go);
   return box;
