@@ -172,6 +172,12 @@
     if (d.startsWith("55") && (d.length === 12 || d.length === 13)) d = d.slice(2);
     return d.length === 10 || d.length === 11 ? d : null;
   }
+  function phoneKey(value) {
+    let d = onlyDigits(value);
+    if (d.startsWith("55") && (d.length === 12 || d.length === 13)) d = d.slice(2);
+    if (d.length === 11 && d[2] === "9") d = d.slice(0, 2) + d.slice(3);
+    return d.length >= 10 ? d : null;
+  }
   function fmtPhone(value) {
     const d = onlyDigits(value);
     if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
@@ -189,9 +195,9 @@
     return (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
   }
   function matchLead(parsed, leads) {
-    const phone = parsed.phone ? normalizePhone(parsed.phone) : null;
-    if (phone) {
-      const byPhone = leads.find((l) => normalizePhone(l.phone) === phone);
+    const key = parsed.phone ? phoneKey(parsed.phone) : null;
+    if (key) {
+      const byPhone = leads.find((l) => phoneKey(l.phone) === key);
       if (byPhone) return { lead: byPhone, method: "phone" };
     }
     const name = norm(parsed.name);
