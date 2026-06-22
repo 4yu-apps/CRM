@@ -109,11 +109,46 @@ def build_prompt(lead: Lead) -> str:
         sinais.append("sem presenca no Instagram")
     if sig.get("has_chat_widget") is False and key == "automacao":
         sinais.append("atende sem chatbot no site (tudo na mao)")
+
+    # angulo condicional 1: ja investe em anuncio mas nao tem site pra reter o cliente
+    if getattr(lead, "ads_active", None) is True and not b["tem_site"]:
+        sinais.append(
+            "ja investe em anuncio mas nao tem site pra reter "
+            "(paga pra trazer cliente e deixa escapar)"
+        )
+
+    # angulo condicional 2: base fiel grande que nao consegue rechamar quem ja foi
+    nota = b["nota"]
+    aval = b["avaliacoes"]
+    if (nota is not None and nota >= 4.5
+            and aval is not None and aval >= 150
+            and (not b["tem_site"] or not b["tem_instagram"])):
+        sinais.append(
+            "base fiel grande (bem avaliado e movimentado) que nao consegue "
+            "rechamar o cliente que ja foi la"
+        )
+
     sinais_txt = "; ".join(sinais) or "poucos sinais publicos"
+
+    # linha de diagnostico do analista (score_reason.summary), quando disponivel
+    reason = getattr(lead, "score_reason", None) or {}
+    diagnostico = reason.get("summary") or ""
+    diag_linha = (
+        f"Diagnostico (base do gancho): {diagnostico}\n\n" if diagnostico else ""
+    )
+
+    ancora = (
+        "Ancora obrigatoria: abra a msg1 com UM fato real e especifico deste negocio "
+        "(a boa reputacao na regiao, o Instagram parado, a falta de site, o que os "
+        "clientes elogiam). NUNCA numero cru. Sem um fato concreto, nao escreva a abertura."
+    )
+
     return (
         f"{SYSTEM_INSTRUCTION}\n\n"
         f"{_SERVICE_BRIEF.get(key, _SERVICE_BRIEF['indefinido'])}\n\n"
+        f"{diag_linha}"
         f"Negocio: {b['nome']} ({b['segmento']}) em {b['cidade']}.\n"
         f"Sinais: {sinais_txt}.\n\n"
+        f"{ancora}\n\n"
         'Responda em JSON: {"msg1": "...", "msg2": "..."}'
     )
