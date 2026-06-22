@@ -5,22 +5,26 @@ import type { LeadStatus } from "./types";
 // Transicoes permitidas. Igual ao seed em supabase/migrations/...04_transitions.sql.
 // Inclui as transicoes "forward" do kanban (arrastar o card pra frente, pulando
 // estagios) e a reativacao pra Novo (rascunho_pronto), visivel no funil.
+// Alvos ativos do kanban (colunas de destino). Qualquer status ativo pode ir
+// pra qualquer um destes — inclui VOLTAR pra tras (corrigir erro de arraste).
+// Espelha a migration 20260622120001_funnel_backward.sql.
 export const TRANSITIONS: Record<LeadStatus, LeadStatus[]> = {
   bruto: ["enriquecido", "descartado"],
   enriquecido: ["qualificado", "descartado"],
   qualificado: ["rascunho_pronto", "descartado"],
-  rascunho_pronto: ["aprovado", "descartado", "enviado", "respondeu", "interessado", "reuniao", "fechado"],
-  aprovado: ["enviado", "respondeu", "interessado", "reuniao", "fechado"],
-  enviado: ["respondeu", "sem_resposta", "descartado", "interessado", "reuniao", "fechado"],
-  sem_resposta: ["enviado", "descartado", "respondeu", "interessado", "reuniao", "fechado"],
-  respondeu: ["interessado", "sem_interesse", "reuniao", "fechado"],
-  interessado: ["reuniao", "proposta", "perdido", "fechado"],
-  reuniao: ["proposta", "perdido", "fechado"],
-  proposta: ["fechado", "perdido"],
+  rascunho_pronto: ["aprovado", "enviado", "respondeu", "interessado", "reuniao", "fechado", "descartado"],
+  aprovado: ["enviado", "respondeu", "interessado", "reuniao", "fechado", "descartado"],
+  enviado: ["aprovado", "respondeu", "interessado", "reuniao", "fechado", "sem_resposta", "descartado"],
+  sem_resposta: ["aprovado", "enviado", "respondeu", "interessado", "reuniao", "fechado", "descartado"],
+  respondeu: ["aprovado", "enviado", "interessado", "reuniao", "fechado", "sem_interesse"],
+  interessado: ["aprovado", "enviado", "respondeu", "reuniao", "fechado", "proposta", "perdido"],
+  reuniao: ["aprovado", "enviado", "respondeu", "interessado", "fechado", "proposta", "perdido"],
+  proposta: ["aprovado", "enviado", "respondeu", "interessado", "reuniao", "fechado", "perdido"],
+  // fechado deixa de ser terminal: pode reabrir se foi fechado por engano.
+  fechado: ["aprovado", "enviado", "respondeu", "interessado", "reuniao"],
   // arquivados (descartado/sem_interesse/perdido) reativam pra Novo (visivel).
   descartado: ["enriquecido", "rascunho_pronto"],
   sem_interesse: ["rascunho_pronto"],
-  fechado: [],
   perdido: ["rascunho_pronto"],
 };
 
