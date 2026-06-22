@@ -14,6 +14,7 @@ import re
 from pathlib import Path
 from typing import Iterable, Protocol, runtime_checkable
 
+from . import geo
 from .models import Finding, Lead
 from .validation import clean
 
@@ -107,7 +108,18 @@ def discover(sink, maps_source: MapsSource, terms: Iterable[str], owner_id: str)
         results = maps_source.search(term)
         term_inserted = 0
         for raw in results:
+            # Trava Brasil: descarta leads estrangeiros antes de inserir.
+            # country vem do Places via addressComponents (quando disponivel).
+            # looks_foreign cobre o caso em que o country nao veio mas o
+            # endereco/estado traia a origem.
+            country = raw.get("country")
+            if country and country != "BR":
+                skipped += 1
+                continue
             lead, findings = result_to_lead(raw, owner_id)
+            if geo.looks_foreign(lead.state, lead.address):
+                skipped += 1
+                continue
             lead_id = sink.insert_lead(lead)
             if not lead_id:  # dedup
                 skipped += 1
@@ -168,7 +180,8 @@ class PlacesMapsSource:
     FIELDS = (
         "places.displayName,places.nationalPhoneNumber,places.rating,"
         "places.userRatingCount,places.formattedAddress,places.id,"
-        "places.websiteUri,places.primaryTypeDisplayName,places.location,nextPageToken"
+        "places.websiteUri,places.primaryTypeDisplayName,places.location,"
+        "places.addressComponents,nextPageToken"
     )
 
     def __init__(
@@ -191,7 +204,11 @@ class PlacesMapsSource:
             "X-Goog-Api-Key": self._key,
             "X-Goog-FieldMask": self.FIELDS,
         }
-        body: dict = {"textQuery": term, "languageCode": self._language}
+        body: dict = {
+            "textQuery": term,
+            "languageCode": self._language,
+            "regionCode": "BR",
+        }
         if page_token:
             body["pageToken"] = page_token
         with httpx.Client(timeout=self._timeout) as client:
@@ -203,6 +220,13 @@ class PlacesMapsSource:
     @staticmethod
     def _to_raw(p: dict) -> dict:
         loc = p.get("location") or {}
+        # Extrai codigo do pais a partir dos addressComponents (shortText do
+        # componente com type "country"). Ex.: "BR", "US", "PT".
+        country: str | None = None
+        for comp in p.get("addressComponents") or []:
+            if "country" in (comp.get("types") or []):
+                country = comp.get("shortText")
+                break
         return {
             "name": (p.get("displayName") or {}).get("text"),
             "formatted_phone_number": p.get("nationalPhoneNumber"),
@@ -214,6 +238,7 @@ class PlacesMapsSource:
             "category": (p.get("primaryTypeDisplayName") or {}).get("text"),
             "lat": loc.get("latitude"),
             "lng": loc.get("longitude"),
+            "country": country,
         }
 
     def search(self, term: str) -> list[dict]:

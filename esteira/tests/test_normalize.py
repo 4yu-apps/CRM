@@ -24,6 +24,24 @@ def test_normalize_phone():
     assert normalize_phone("99") is None
 
 
+def test_normalize_phone_rejeita_eua():
+    # Telefone EUA (DDD 40 nao existe no Brasil) deve virar None
+    assert normalize_phone("4086482555") is None
+
+
+def test_normalize_phone_celular_sp():
+    assert normalize_phone("(11) 99999-0001") == "11999990001"
+
+
+def test_normalize_phone_fixo_maringa():
+    assert normalize_phone("(44) 3025-1234") == "4430251234"
+
+
+def test_normalize_phone_ddd_invalido_vira_none():
+    # DDD 40 nao existe
+    assert normalize_phone("40999990001") is None
+
+
 def test_normalize_instagram():
     assert normalize_instagram("instagram.com/studiobella") == "@studiobella"
     assert normalize_instagram("@StudioBella") == "@StudioBella"

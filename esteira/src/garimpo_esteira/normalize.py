@@ -17,16 +17,24 @@ def normalize_cnpj(value: str | None) -> str | None:
 
 
 def normalize_phone(value: str | None) -> str | None:
-    """Telefone BR só dígitos (com DDD). Remove +55 quando vier com 12/13 díg."""
-    d = only_digits(value)
+    """Telefone BR valido, so digitos (com DDD). Remove +55 quando vier com 12/13 dig.
+
+    Valida DDD (Anatel) e formato movel/fixo via geo.is_br_phone.
+    Retorna None para telefones invalidos ou estrangeiros (ex.: EUA 4086482555).
+    """
+    from .geo import is_br_phone
+
+    if not is_br_phone(value):
+        return None
+    d = _DIGITS.sub("", value or "")
     if d.startswith("55") and len(d) in (12, 13):
         d = d[2:]
-    return d if len(d) in (10, 11) else None
+    return d
 
 
 def normalize_whatsapp(value: str | None) -> str | None:
-    """WhatsApp BR só dígitos (com DDD). Aceita link wa.me/55..., texto livre ou
-    numero; reusa a regra do telefone (tira +55 quando vier 12/13 díg)."""
+    """WhatsApp BR valido, so digitos (com DDD). Aceita link wa.me/55..., texto livre ou
+    numero; reusa a regra do telefone (tira +55 quando vier 12/13 dig)."""
     return normalize_phone(value)
 
 
