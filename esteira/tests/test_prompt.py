@@ -107,3 +107,53 @@ def test_prompt_servico_trafego_food_menciona_ifood():
     from garimpo_esteira.draft.prompt import _SERVICE_BRIEF
     brief = _SERVICE_BRIEF["trafego"]
     assert "iFood" in brief, "brief de trafego deve mencionar iFood como angulo para alimentacao"
+
+
+# --- categoria (tag) dirige a pergunta da copy ---
+
+def test_category_cue_alimentacao():
+    from garimpo_esteira.draft.prompt import _category_cue
+    assert "canal de venda" in _category_cue("Pizzaria")
+
+
+def test_category_cue_barbearia_e_beleza_nao_alimentacao():
+    # 'barbearia' contem 'bar' mas NAO pode cair em alimentacao
+    from garimpo_esteira.draft.prompt import _category_cue
+    assert "beleza" in _category_cue("Barbearia")
+
+
+def test_category_cue_saude_tom_sobrio():
+    from garimpo_esteira.draft.prompt import _category_cue
+    assert "sobrio" in _category_cue("Clinica Odontologica")
+
+
+def test_category_cue_desconhecida_vazia():
+    from garimpo_esteira.draft.prompt import _category_cue
+    assert _category_cue("Coisa Aleatoria XYZ") == ""
+
+
+def test_build_prompt_inclui_cue_da_categoria():
+    lead = _lead(category="Hamburgueria")
+    p = build_prompt(lead)
+    assert "Tipico da categoria:" in p
+
+
+def test_profissao_dirige_brief_design():
+    # service_target=design (derivado da profissao) -> brief de design no prompt
+    lead = _lead(service_target="design", website=None)
+    p = build_prompt(lead)
+    assert "DESIGN / SITE" in p
+
+
+def test_sinal_ja_anuncia_plataforma_aparece():
+    lead = _lead(ads_active=True, website="https://x.com",
+                 site_signals={"ad_platforms": ["meta", "google"]})
+    p = build_prompt(lead)
+    assert "ja investe em anuncio" in p
+    assert "meta" in p and "google" in p
+
+
+def test_sinal_site_lento_pagespeed():
+    lead = _lead(website="https://x.com", site_signals={"perf_score": 22})
+    p = build_prompt(lead)
+    assert "site lento no celular" in p
