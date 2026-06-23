@@ -15,15 +15,31 @@ export function waSend(phone?: string | null, text?: string): string | undefined
   return text && text.trim() ? `${base}&text=${encodeURIComponent(text)}` : base;
 }
 
-// Abre a conversa SEMPRE na mesma aba nomeada (WA_TAB), trocando so a conversa.
-// CRITICO: usar window.open com nome e SEM rel=noopener/noreferrer. Com eles, um
-// target nomeado vira _blank e abre uma aba nova a cada clique (empilha varias
-// abas do WhatsApp). web.whatsapp.com e confiavel, entao dispensar noopener e ok.
-// Retorna true se abriu/reusou, false se nao havia telefone.
+// Referencia viva da aba do WhatsApp que ESTE sistema abriu. Persiste no SPA
+// (modulo nao recarrega entre telas), entao da pra reusar a MESMA aba a cada
+// clique. Mais confiavel que so o target nomeado, porque o WhatsApp Web pode
+// resetar o window.name (o que faria abrir aba nova toda vez).
+let waWin: Window | null = null;
+
+// Abre/atualiza a conversa do WhatsApp reusando UMA aba so. 1o clique abre a aba;
+// os proximos navegam a MESMA aba pra outra conversa (ja com a mensagem), sem
+// empilhar. Limite do navegador: nao da pra mirar uma aba que VOCE abriu na mao
+// (so a que o sistema abriu); por isso ele mantem a propria aba.
+// SEM noopener/noreferrer de proposito (eles fariam virar _blank = aba nova).
 export function openWhatsApp(phone?: string | null, text?: string): boolean {
   const url = waSend(phone, text);
   if (!url || typeof window === "undefined") return false;
-  const win = window.open(url, WA_TAB);
-  win?.focus?.();
+  try {
+    if (waWin && !waWin.closed) {
+      // navega a aba ja aberta pra nova conversa (escrita cross-origin e permitida)
+      waWin.location.href = url;
+      waWin.focus();
+      return true;
+    }
+  } catch {
+    /* se der ruim, abre de novo abaixo */
+  }
+  waWin = window.open(url, WA_TAB);
+  waWin?.focus?.();
   return true;
 }
