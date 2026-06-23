@@ -15,9 +15,14 @@ async function currentUid(): Promise<string> {
 import type { LeadsRepo } from "./index";
 
 async function list(): Promise<Lead[]> {
+  // Escopa ao dono logado. A RLS protege contra acesso indevido, mas admin
+  // enxerga todos os donos pela RLS; sem este filtro a fila/funil mostrariam
+  // leads de OUTROS donos misturados. A visao cross-dono e so na tela Admin
+  // (API propria com service role).
   const { data, error } = await getSupabase()
     .from("leads")
     .select("*")
+    .eq("owner_id", await currentUid())
     .order("updated_at", { ascending: false });
   if (error) throw new Error(error.message);
   return (data ?? []) as Lead[];
@@ -122,8 +127,12 @@ async function saveProfile(input: SearchProfileInput): Promise<SearchProfile> {
 }
 
 async function countByStatus(status?: LeadStatus): Promise<number> {
-  // head:true + count:exact traz so a contagem (sem linhas). RLS escopa ao dono.
-  let q = getSupabase().from("leads").select("id", { count: "exact", head: true });
+  // head:true + count:exact traz so a contagem (sem linhas). Escopa ao dono
+  // logado (admin veria todos pela RLS sem este filtro).
+  let q = getSupabase()
+    .from("leads")
+    .select("id", { count: "exact", head: true })
+    .eq("owner_id", await currentUid());
   if (status) q = q.eq("status", status);
   const { count, error } = await q;
   if (error) throw new Error(error.message);
