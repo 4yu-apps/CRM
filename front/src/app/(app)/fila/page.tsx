@@ -23,6 +23,9 @@ import {
   Barbell,
   Tooth,
   Coffee,
+  GoogleLogo,
+  MapTrifold,
+  Megaphone,
 } from "@phosphor-icons/react";
 import { useLeads } from "@/hooks/use-leads";
 import { SERVICE_META } from "@/lib/service";
@@ -31,6 +34,7 @@ import type { Lead } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Dropdown } from "@/components/dropdown";
 import { waSend, WA_TAB } from "@/lib/whatsapp";
+import { googleSearchUrl, googleMapsUrl, metaAdsUrl } from "@/lib/links";
 
 function LeadIcon({ category, size }: { category: string | null; size: number }) {
   const c = (category ?? "").toLowerCase();
@@ -52,15 +56,41 @@ function siteHref(site?: string | null): string | undefined {
   return /^https?:\/\//i.test(s) ? s : `https://${s}`;
 }
 
+// Ordem pensada pra decisao de gestor de trafego: o que define o match vem
+// primeiro (ja anuncia = angulo; site = destino; contato = consigo falar;
+// instagram = canal atual). Dono e CNPJ ficam por ultimo (pouco decisivos).
 function fichaRows(l: Lead): { k: string; v: string; href?: string }[] {
   return [
-    { k: "Dono / responsável", v: l.owner_name ?? "-" },
+    { k: "Já anuncia?", v: l.ads_active == null ? "Não sei (confira ao lado)" : l.ads_active ? "Sim, já anuncia" : "Ainda não" },
+    { k: "Site", v: l.website ? "Abrir site" : "Não tem", href: siteHref(l.website) },
     { k: "Telefone", v: fmtPhone(l.phone) },
     { k: "Instagram", v: l.instagram ?? "-" },
+    { k: "Dono / responsável", v: l.owner_name ?? "-" },
     { k: "CNPJ", v: l.cnpj ? fmtCnpj(l.cnpj) : "-" },
-    { k: "Site", v: l.website ? "Abrir site" : "Não tem", href: siteHref(l.website) },
-    { k: "Já anuncia?", v: l.ads_active == null ? "Não sei" : l.ads_active ? "Sim" : "Ainda não" },
   ];
+}
+
+// Chip-link pra conferir o negocio em fontes externas (Google, Maps, Meta Ads).
+function ExternalChip({
+  href,
+  icon,
+  children,
+}: {
+  href: string;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-1.5 rounded-full border border-border-2 bg-surface-2 px-2.5 py-1 text-[11.5px] font-semibold text-ink-2 transition-colors hover:border-brand hover:bg-brand-50 hover:text-brand"
+    >
+      {icon}
+      {children}
+    </a>
+  );
 }
 
 const waLink = (phone: string | null, text: string) => waSend(phone, text) ?? "#";
@@ -304,6 +334,21 @@ export default function FilaPage() {
                   <Star size={14} weight="fill" className="text-[#E8A93B]" /> {cur.rating}{" "}
                   <span className="text-faint">({cur.reviews_count})</span>
                 </span>
+              </div>
+
+              {/* Conferir o negocio por fora (puxar info e checar se anuncia) */}
+              <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                <ExternalChip href={googleSearchUrl(cur)} icon={<GoogleLogo size={13} weight="bold" />}>
+                  Ver no Google
+                </ExternalChip>
+                <ExternalChip href={googleMapsUrl(cur)} icon={<MapTrifold size={13} weight="bold" />}>
+                  No Maps
+                </ExternalChip>
+                {metaAdsUrl(cur) && (
+                  <ExternalChip href={metaAdsUrl(cur)!} icon={<Megaphone size={13} weight="bold" />}>
+                    Anúncios (Meta)
+                  </ExternalChip>
+                )}
               </div>
             </div>
           </div>

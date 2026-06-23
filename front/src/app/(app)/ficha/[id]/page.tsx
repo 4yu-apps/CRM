@@ -39,6 +39,7 @@ import { getRepo } from "@/lib/repo";
 import { FollowupCard } from "@/components/followup-card";
 import { LeadFiles } from "@/components/lead-files";
 import { waSend, WA_TAB } from "@/lib/whatsapp";
+import { googleSearchUrl, googleMapsUrl } from "@/lib/links";
 import { useCancelMeeting } from "@/hooks/use-cancel-meeting";
 import { SERVICE_META } from "@/lib/service";
 import { STATUS_META, TONE_CLASSES } from "@/lib/state-machine";
@@ -669,9 +670,12 @@ export default function FichaPage() {
                 <DataRow label="Endereco" value={lead.address ?? "-"} prov={provOf(provenance, "address")} />
                 <DataRow label="Bairro" value={lead.neighborhood ?? "-"} prov={provOf(provenance, "neighborhood")} />
                 <DataRow label="Cidade / UF" value={[lead.city, lead.state].filter(Boolean).join(" / ") || "-"} />
-                {lead.maps_url && (
-                  <DataRow label="No Maps" value="Abrir no Google Maps" href={lead.maps_url} />
-                )}
+                <DataRow label="No Google" value="Pesquisar o negocio" href={googleSearchUrl(lead)} />
+                <DataRow
+                  label="No Maps"
+                  value={lead.maps_url ? "Abrir no Google Maps" : "Procurar no Maps"}
+                  href={googleMapsUrl(lead)}
+                />
                 {lead.meeting_at && !editing && (
                   <div className="flex items-center justify-between">
                     <DataRow label="Reuniao" value={fmtDateTime(lead.meeting_at)} />
