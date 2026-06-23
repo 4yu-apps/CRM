@@ -8,6 +8,7 @@ import {
   Check,
   DownloadSimple,
   GearSix,
+  Globe,
   GoogleLogo,
   HandWaving,
   Info,
@@ -20,6 +21,7 @@ import {
 } from "@phosphor-icons/react";
 import { getRepo } from "@/lib/repo";
 import { useAuth } from "@/lib/auth";
+import { LOCALES, useLocale, useT } from "@/lib/i18n";
 import { fetchEstados, fetchMunicipios, type Municipio, type UF } from "@/lib/ibge";
 import { PROFESSIONS, getProfession, type Profession } from "@/lib/professions";
 import type { SearchProfile, SearchProfileInput, ServiceTarget } from "@/lib/types";
@@ -112,6 +114,8 @@ export default function ConfigPage() {
   const repo = getRepo();
   const { signInWithGoogle, mode, refreshProfile, session } = useAuth();
   const router = useRouter();
+  const { locale, setLocale } = useLocale();
+  const t = useT();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -347,6 +351,28 @@ export default function ConfigPage() {
       )}
 
       <div className="flex flex-col gap-5">
+        {/* ------------------------------------------------------------------ */}
+        {/* Idioma do sistema */}
+        {/* ------------------------------------------------------------------ */}
+        <Section
+          title={t("cfg.lang.title", "Idioma")}
+          sub={t("cfg.lang.sub", "Escolha o idioma do sistema.")}
+          icon={<Globe size={20} />}
+        >
+          <Dropdown
+            value={locale}
+            onChange={(v) => setLocale(v as typeof locale)}
+            ariaLabel={t("cfg.lang.title", "Idioma")}
+            options={LOCALES.map((l) => ({ value: l.value, label: `${l.flag} ${l.label}` }))}
+          />
+          <p className="mt-3 text-[12.5px] leading-relaxed text-muted-foreground">
+            {t(
+              "cfg.lang.note",
+              "Por enquanto traduzo o menu e os titulos. As telas internas seguem em portugues e vao sendo traduzidas aos poucos.",
+            )}
+          </p>
+        </Section>
+
         {/* ------------------------------------------------------------------ */}
         {/* 0. Profissao (vertical) */}
         {/* ------------------------------------------------------------------ */}

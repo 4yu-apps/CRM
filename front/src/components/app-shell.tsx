@@ -25,6 +25,7 @@ import {
   ShieldStar,
 } from "@phosphor-icons/react";
 import { useAuth } from "@/lib/auth";
+import { useT } from "@/lib/i18n";
 import { useLeads } from "@/hooks/use-leads";
 import { STATUS_META } from "@/lib/state-machine";
 import { meetingsWithin, meetingModality, fmtMeetingWhen } from "@/lib/meetings";
@@ -72,7 +73,7 @@ function titleFor(pathname: string): [string, string] {
 
 // Busca rapida no cabecalho: acha um contato por nome/cidade/telefone e abre a
 // ficha na hora. Atalho pra quando voce so quer pular pra um lead especifico.
-function HeaderSearch({ leads }: { leads: Lead[] }) {
+function HeaderSearch({ leads, t }: { leads: Lead[]; t: (key: string, fallback?: string) => string }) {
   const router = useRouter();
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
@@ -121,7 +122,7 @@ function HeaderSearch({ leads }: { leads: Lead[] }) {
           if (e.key === "Enter" && matches[0]) go(matches[0].id);
           if (e.key === "Escape") setOpen(false);
         }}
-        placeholder="Buscar contato..."
+        placeholder={t("topbar.search", "Buscar contato...")}
         className="w-[240px] rounded-full border border-border bg-accent py-2 pl-9 pr-3 text-[13px] text-ink outline-none transition-all focus:w-[300px] focus:border-brand"
       />
       {open && q.trim().length >= 2 && (
@@ -232,6 +233,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, signOut, isAdmin } = useAuth();
   const router = useRouter();
   const { leads } = useLeads();
+  const t = useT();
 
   const navItems: NavItem[] = isAdmin
     ? [...NAV, { href: "/admin", label: "Admin", Icon: ShieldStar }]
@@ -264,7 +266,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     });
 
   const queue = leads.filter((l) => l.status === "rascunho_pronto").length;
-  const [title, sub] = titleFor(pathname);
+  // Normaliza o pathname para chaves de traducao (ficha/123 -> /ficha, etc.)
+  const normPath = pathname.startsWith("/ficha") ? "/ficha" : pathname;
+  const [fallbackTitle, fallbackSub] = titleFor(pathname);
+  const title = t(`title.${normPath}`, fallbackTitle);
+  const sub = t(`sub.${normPath}`, fallbackSub);
   const isDark = mounted && resolvedTheme === "dark";
 
   const nav = (extra?: string) => (
@@ -294,7 +300,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 />
               )}
             </span>
-            {!collapsed && <span className="flex-1">{label}</span>}
+            {!collapsed && <span className="flex-1">{t(`nav.${href}`, label)}</span>}
             {!collapsed && badge && (
               <span
                 className="flex h-[21px] min-w-[21px] items-center justify-center rounded-full px-1.5 text-[11.5px] font-bold text-white"
@@ -423,7 +429,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div className="truncate text-[12.5px] text-muted-foreground">{sub}</div>
           </div>
           <div className="flex items-center gap-3.5">
-            <HeaderSearch leads={leads} />
+            <HeaderSearch leads={leads} t={t} />
             <NotificationBell leads={leads} />
             <div className="hidden items-center gap-2.5 rounded-full border border-border bg-accent px-3.5 py-2 sm:flex">
               <span
