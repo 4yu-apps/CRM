@@ -26,32 +26,31 @@ export async function GET(request: NextRequest): Promise<Response> {
     return Response.json({ error: "erro_ao_listar_perfis" }, { status: 500 });
   }
 
-  // b) Contagem de leads por owner (todas as linhas, so owner_id)
-  const { data: leadsRows, error: leadsErr } = await sb
-    .from("leads")
-    .select("owner_id");
-
+  // b+c) Contagem de leads e ultima atividade POR OWNER, com query propria por
+  // perfil. Antes: select("owner_id") trazia no maximo 1000 linhas do PostgREST e
+  // contava no cliente; com >1000 leads os donos fora das primeiras 1000 linhas
+  // zeravam (ex.: gab.feelix com 905 leads aparecia como 0). count exact + head
+  // nao trunca.
   const leadsByOwner = new Map<string, number>();
-  if (!leadsErr && leadsRows) {
-    for (const row of leadsRows as { owner_id: string }[]) {
-      leadsByOwner.set(row.owner_id, (leadsByOwner.get(row.owner_id) ?? 0) + 1);
-    }
-  }
-
-  // c) Ultima atividade por owner
-  const { data: actRows, error: actErr } = await sb
-    .from("activity_log")
-    .select("owner_id, created_at")
-    .order("created_at", { ascending: false });
-
   const lastActivity = new Map<string, string>();
-  if (!actErr && actRows) {
-    for (const row of actRows as { owner_id: string; created_at: string }[]) {
-      if (!lastActivity.has(row.owner_id)) {
-        lastActivity.set(row.owner_id, row.created_at);
-      }
-    }
-  }
+  await Promise.all(
+    (profiles ?? []).map(async (p) => {
+      const oid = p.owner_id as string;
+      const [cnt, act] = await Promise.all([
+        sb.from("leads").select("id", { count: "exact", head: true }).eq("owner_id", oid),
+        sb
+          .from("activity_log")
+          .select("created_at")
+          .eq("owner_id", oid)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]);
+      leadsByOwner.set(oid, cnt.count ?? 0);
+      const ts = (act.data as { created_at?: string } | null)?.created_at;
+      if (ts) lastActivity.set(oid, ts);
+    }),
+  );
 
   // d) E-mails via Auth Admin API
   const emailById = new Map<string, string>();
