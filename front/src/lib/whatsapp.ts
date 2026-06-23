@@ -15,31 +15,44 @@ export function waSend(phone?: string | null, text?: string): string | undefined
   return text && text.trim() ? `${base}&text=${encodeURIComponent(text)}` : base;
 }
 
-// Referencia viva da aba do WhatsApp que ESTE sistema abriu. Persiste no SPA
-// (modulo nao recarrega entre telas), entao da pra reusar a MESMA aba a cada
-// clique. Mais confiavel que so o target nomeado, porque o WhatsApp Web pode
-// resetar o window.name (o que faria abrir aba nova toda vez).
-let waWin: Window | null = null;
+// Referencia da aba do WhatsApp que ESTE sistema abriu. Guardada no `window`
+// GLOBAL (nao no modulo): o Next pode duplicar o modulo por rota, e ai cada
+// pagina teria sua propria variavel = abriria aba nova por pagina. No global e
+// uma so pra todo o app. Reusar a MESMA aba e mais confiavel que o target
+// nomeado, porque o WhatsApp Web reseta o window.name.
+function waSlot(): { win: Window | null } {
+  const g = window as unknown as { __waWin?: { win: Window | null } };
+  if (!g.__waWin) g.__waWin = { win: null };
+  return g.__waWin;
+}
 
-// Abre/atualiza a conversa do WhatsApp reusando UMA aba so. 1o clique abre a aba;
-// os proximos navegam a MESMA aba pra outra conversa (ja com a mensagem), sem
-// empilhar. Limite do navegador: nao da pra mirar uma aba que VOCE abriu na mao
-// (so a que o sistema abriu); por isso ele mantem a propria aba.
-// SEM noopener/noreferrer de proposito (eles fariam virar _blank = aba nova).
+// Abre/atualiza a conversa reusando UMA aba so. 1o clique abre; os proximos
+// navegam a MESMA aba pra outra conversa (ja com a mensagem), sem empilhar.
+// Limite do navegador: nao da pra mirar uma aba que VOCE abriu na mao (so a que
+// o sistema abriu). SEM noopener/noreferrer (eles virariam _blank = aba nova).
 export function openWhatsApp(phone?: string | null, text?: string): boolean {
   const url = waSend(phone, text);
   if (!url || typeof window === "undefined") return false;
-  try {
-    if (waWin && !waWin.closed) {
-      // navega a aba ja aberta pra nova conversa (escrita cross-origin e permitida)
-      waWin.location.href = url;
-      waWin.focus();
-      return true;
+  const slot = waSlot();
+  let win = slot.win;
+  if (win && !win.closed) {
+    // navega a aba ja aberta pra nova conversa (escrita cross-origin e permitida)
+    try {
+      win.location.href = url;
+    } catch {
+      win = null;
     }
-  } catch {
-    /* se der ruim, abre de novo abaixo */
+  } else {
+    win = null;
   }
-  waWin = window.open(url, WA_TAB);
-  waWin?.focus?.();
+  if (!win) {
+    win = window.open(url, WA_TAB);
+  }
+  slot.win = win;
+  try {
+    win?.focus();
+  } catch {
+    /* focar pode falhar em alguns navegadores; ignora */
+  }
   return true;
 }
