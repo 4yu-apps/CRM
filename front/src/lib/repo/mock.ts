@@ -1,7 +1,7 @@
 // Implementacao mock — em memoria, espelha o comportamento do banco:
 // valida transicoes, aplica guarda LGPD e grava historico (como os triggers).
 import { canTransition, nextStatuses, STATUS_META } from "../state-machine";
-import type { ActivityEvent, ActorType, FieldProvenance, Lead, LeadDetail, LeadEditable, LeadStatus, ScanCoverage, SearchProfile, SearchProfileInput, StatusHistory } from "../types";
+import type { ActivityEvent, ActorType, FieldProvenance, Lead, LeadDetail, LeadEditable, LeadFile, LeadStatus, ScanCoverage, SearchProfile, SearchProfileInput, StatusHistory } from "../types";
 import { buildSeed, DEMO_ACTIVITY, DEMO_COVERAGE, DEMO_OWNER, DEMO_PROFILE } from "./mock-data";
 import type { LeadsRepo } from "./index";
 
@@ -189,6 +189,41 @@ async function listActivity(limit = 20): Promise<ActivityEvent[]> {
   );
 }
 
+// Anexos em memoria (demo): guarda o arquivo como object URL pra abrir na aba.
+// Some ao recarregar a pagina, e o esperado no modo mock.
+const mockFiles = new Map<string, { file: LeadFile; url: string }[]>();
+
+async function listFiles(leadId: string): Promise<LeadFile[]> {
+  return (mockFiles.get(leadId) ?? []).map((x) => clone(x.file));
+}
+
+async function uploadFile(leadId: string, file: File): Promise<void> {
+  const url =
+    typeof URL !== "undefined" && typeof URL.createObjectURL === "function"
+      ? URL.createObjectURL(file)
+      : "#";
+  const path = `demo/${leadId}/${Date.now()}-${file.name}`;
+  const entry = {
+    file: { name: file.name, path, size: file.size, created_at: new Date().toISOString() },
+    url,
+  };
+  mockFiles.set(leadId, [entry, ...(mockFiles.get(leadId) ?? [])]);
+}
+
+async function deleteFile(path: string): Promise<void> {
+  for (const [k, arr] of mockFiles) {
+    mockFiles.set(k, arr.filter((x) => x.file.path !== path));
+  }
+}
+
+async function fileSignedUrl(path: string): Promise<string> {
+  for (const arr of mockFiles.values()) {
+    const hit = arr.find((x) => x.file.path === path);
+    if (hit) return hit.url;
+  }
+  return "#";
+}
+
 export const mockRepo: LeadsRepo = {
   list,
   detail,
@@ -203,4 +238,8 @@ export const mockRepo: LeadsRepo = {
   countByStatus,
   listCoverage,
   listActivity,
+  listFiles,
+  uploadFile,
+  deleteFile,
+  fileSignedUrl,
 };

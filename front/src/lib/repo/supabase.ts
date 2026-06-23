@@ -1,7 +1,17 @@
 // Implementacao supabase — banco real. Inerte ate existir env + sessao logada.
 // A UI nao muda: mesma interface do mock.
 import { getSupabase } from "../supabase/client";
-import type { ActivityEvent, ActorType, Lead, LeadDetail, LeadEditable, LeadStatus, ScanCoverage, SearchProfile, SearchProfileInput } from "../types";
+import type { ActivityEvent, ActorType, Lead, LeadDetail, LeadEditable, LeadFile, LeadStatus, ScanCoverage, SearchProfile, SearchProfileInput } from "../types";
+
+// Bucket PRIVADO dos anexos. Path: <uid>/<leadId>/<arquivo>. RLS no banco garante
+// que cada dono so toca a propria pasta; download sai por URL assinada e curta.
+const ANEXOS_BUCKET = "lead-anexos";
+
+async function currentUid(): Promise<string> {
+  const { data, error } = await getSupabase().auth.getUser();
+  if (error || !data.user) throw new Error("Sessao expirada. Entre de novo.");
+  return data.user.id;
+}
 import type { LeadsRepo } from "./index";
 
 async function list(): Promise<Lead[]> {
@@ -141,6 +151,46 @@ async function listActivity(limit = 20): Promise<ActivityEvent[]> {
   return (data ?? []) as ActivityEvent[];
 }
 
+async function listFiles(leadId: string): Promise<LeadFile[]> {
+  const uid = await currentUid();
+  const prefix = `${uid}/${leadId}`;
+  const { data, error } = await getSupabase()
+    .storage.from(ANEXOS_BUCKET)
+    .list(prefix, { sortBy: { column: "created_at", order: "desc" } });
+  if (error) throw new Error(error.message);
+  return (data ?? [])
+    .filter((o) => o.id !== null) // ignora entradas de "pasta"
+    .map((o) => ({
+      name: o.name,
+      path: `${prefix}/${o.name}`,
+      size: (o.metadata?.size as number | undefined) ?? 0,
+      created_at: o.created_at ?? null,
+    }));
+}
+
+async function uploadFile(leadId: string, file: File): Promise<void> {
+  const uid = await currentUid();
+  const safe = file.name.replace(/[^\w.\-]+/g, "_").slice(-120);
+  const path = `${uid}/${leadId}/${Date.now()}-${safe}`;
+  const { error } = await getSupabase()
+    .storage.from(ANEXOS_BUCKET)
+    .upload(path, file, { upsert: false, contentType: file.type || undefined });
+  if (error) throw new Error(error.message);
+}
+
+async function deleteFile(path: string): Promise<void> {
+  const { error } = await getSupabase().storage.from(ANEXOS_BUCKET).remove([path]);
+  if (error) throw new Error(error.message);
+}
+
+async function fileSignedUrl(path: string): Promise<string> {
+  const { data, error } = await getSupabase()
+    .storage.from(ANEXOS_BUCKET)
+    .createSignedUrl(path, 60);
+  if (error || !data) throw new Error(error?.message ?? "Erro ao gerar o link do arquivo");
+  return data.signedUrl;
+}
+
 export const supabaseRepo: LeadsRepo = {
   list,
   detail,
@@ -155,4 +205,8 @@ export const supabaseRepo: LeadsRepo = {
   countByStatus,
   listCoverage,
   listActivity,
+  listFiles,
+  uploadFile,
+  deleteFile,
+  fileSignedUrl,
 };

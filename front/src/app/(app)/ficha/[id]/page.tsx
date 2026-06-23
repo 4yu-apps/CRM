@@ -37,6 +37,7 @@ import {
 } from "@phosphor-icons/react";
 import { getRepo } from "@/lib/repo";
 import { FollowupCard } from "@/components/followup-card";
+import { LeadFiles } from "@/components/lead-files";
 import { waSend, WA_TAB } from "@/lib/whatsapp";
 import { useCancelMeeting } from "@/hooks/use-cancel-meeting";
 import { SERVICE_META } from "@/lib/service";
@@ -874,6 +875,9 @@ export default function FichaPage() {
             </div>
           )}
         </div>
+
+        {/* Anexos do lead (contrato, etc.) */}
+        <LeadFiles leadId={lead.id} />
 
         {/* Historico do funil */}
         {history.length > 0 && (

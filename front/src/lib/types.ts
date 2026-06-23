@@ -200,6 +200,15 @@ export interface LeadDetail {
   history: StatusHistory[];
 }
 
+// Arquivo anexado a um lead (contrato, etc.). Mora num bucket PRIVADO; o path
+// e sempre <owner_id>/<lead_id>/<arquivo> e o download sai por URL assinada.
+export interface LeadFile {
+  name: string;
+  path: string;
+  size: number;
+  created_at: string | null;
+}
+
 // Perfil de busca do dono (search_profile, 1 linha por owner).
 export interface SearchProfile {
   owner_id: string;

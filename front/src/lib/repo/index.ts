@@ -2,7 +2,7 @@
 //  - mock: em memoria (default, roda sem banco)
 //  - supabase: banco real (quando NEXT_PUBLIC_DATA_SOURCE=supabase + envs)
 // Trocar de uma pra outra nao toca a UI.
-import type { ActivityEvent, ActorType, Lead, LeadDetail, LeadEditable, LeadStatus, ScanCoverage, SearchProfile, SearchProfileInput } from "../types";
+import type { ActivityEvent, ActorType, Lead, LeadDetail, LeadEditable, LeadFile, LeadStatus, ScanCoverage, SearchProfile, SearchProfileInput } from "../types";
 import { mockRepo } from "./mock";
 import { supabaseRepo } from "./supabase";
 
@@ -30,6 +30,14 @@ export interface LeadsRepo {
   listCoverage(niche?: string): Promise<ScanCoverage[]>;
   /** Ultimos N eventos de atividade, mais recentes primeiro. Padrao: 20. */
   listActivity(limit?: number): Promise<ActivityEvent[]>;
+  /** Lista os arquivos anexados a um lead (bucket privado, escopo do dono). */
+  listFiles(leadId: string): Promise<LeadFile[]>;
+  /** Sobe um arquivo pro lead. Lanca erro se falhar. */
+  uploadFile(leadId: string, file: File): Promise<void>;
+  /** Remove um arquivo pelo caminho completo no bucket. */
+  deleteFile(path: string): Promise<void>;
+  /** URL assinada e curta pra abrir/baixar um arquivo do bucket privado. */
+  fileSignedUrl(path: string): Promise<string>;
 }
 
 export type DataSource = "mock" | "supabase";
