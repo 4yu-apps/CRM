@@ -34,7 +34,10 @@ class Config:
     ad_token: str | None = None
     llm: str = "mock"                 # mock | gemini | groq
     gemini_key: str | None = None
-    gemini_model: str = "gemini-flash-latest"
+    # varias chaves Gemini (free tier e POR PROJETO): "k1,k2,k3". A copy tenta
+    # uma, se bater no limite do dia cai na proxima, depois no Groq, depois mock.
+    gemini_keys: str | None = None
+    gemini_model: str = "gemini-2.5-flash"
     groq_key: str | None = None
     groq_model: str = "llama-3.3-70b-versatile"
     # extracao de contato por LLM no enriquecimento (reforca o regex). Usa o Groq
@@ -71,8 +74,9 @@ class Config:
             delay=float(os.getenv("GARIMPO_DELAY", "1.0")),
             ad_token=os.getenv("META_AD_LIBRARY_TOKEN"),
             llm=os.getenv("GARIMPO_LLM", "mock"),
-            gemini_key=os.getenv("GEMINI_API_KEY"),
-            gemini_model=os.getenv("GEMINI_MODEL", "gemini-flash-latest"),
+            gemini_key=os.getenv("GEMINI_API_KEY") or os.getenv("gemini_API"),
+            gemini_keys=os.getenv("GEMINI_API_KEYS"),
+            gemini_model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
             groq_key=os.getenv("GROQ_API_KEY"),
             groq_model=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
             llm_extract=os.getenv("GARIMPO_LLM_EXTRACT", "1") not in ("0", "false", ""),
@@ -163,23 +167,55 @@ def build_sources(cfg: Config) -> list[Source]:
     ]
 
 
+def gemini_keys(cfg: Config) -> list[str]:
+    """Junta as chaves Gemini (GEMINI_API_KEYS separada por virgula + a singular),
+    sem duplicar e na ordem. Cada chave e de um projeto != (free tier por projeto),
+    entao somam cota."""
+    out: list[str] = []
+    for raw in (cfg.gemini_keys, cfg.gemini_key):
+        for k in (raw or "").split(","):
+            k = k.strip()
+            if k and k not in out:
+                out.append(k)
+    return out
+
+
+def _chain_fallback(providers: list[DraftProvider]) -> DraftProvider:
+    """Encadeia provedores: tenta o 1o, se falhar/limite cai no proximo, ate o
+    ultimo (que deve ser o mock, infalivel). Reusa o FallbackDraftProvider."""
+    from .draft.fallback import FallbackDraftProvider
+
+    result = providers[-1]
+    for p in reversed(providers[:-1]):
+        result = FallbackDraftProvider(p, result)
+    return result
+
+
 def build_provider(cfg: Config) -> DraftProvider:
     mock = MockDraftProvider()
     if cfg.llm == "gemini":
-        if not cfg.gemini_key:
-            raise SystemExit("GARIMPO_LLM=gemini exige GEMINI_API_KEY")
-        from .draft.fallback import FallbackDraftProvider
+        keys = gemini_keys(cfg)
+        if not keys:
+            raise SystemExit("GARIMPO_LLM=gemini exige GEMINI_API_KEY ou GEMINI_API_KEYS")
         from .draft.gemini import GeminiDraftProvider
 
-        return FallbackDraftProvider(GeminiDraftProvider(cfg.gemini_key, cfg.gemini_model), mock)
+        # cadeia: gemini(k1) -> gemini(k2) -> ... -> groq (se houver) -> mock.
+        chain: list[DraftProvider] = [GeminiDraftProvider(k, cfg.gemini_model) for k in keys]
+        if cfg.groq_key:
+            from .draft.openai_compat import OpenAICompatDraftProvider
+
+            chain.append(
+                OpenAICompatDraftProvider(cfg.groq_key, "https://api.groq.com/openai/v1", cfg.groq_model)
+            )
+        chain.append(mock)
+        return _chain_fallback(chain)
     if cfg.llm == "groq":
         if not cfg.groq_key:
             raise SystemExit("GARIMPO_LLM=groq exige GROQ_API_KEY (gratis em console.groq.com)")
-        from .draft.fallback import FallbackDraftProvider
         from .draft.openai_compat import OpenAICompatDraftProvider
 
         prov = OpenAICompatDraftProvider(cfg.groq_key, "https://api.groq.com/openai/v1", cfg.groq_model)
-        return FallbackDraftProvider(prov, mock)
+        return _chain_fallback([prov, mock])
     return mock
 
 

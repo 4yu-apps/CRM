@@ -84,6 +84,10 @@ jobs:
           GARIMPO_LLM: ${{ vars.GARIMPO_LLM || 'mock' }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # varias chaves Gemini (free tier por projeto) separadas por virgula;
+          # cadeia gemini->...->groq->mock. GEMINI_MODEL fixa o Flash do free tier.
+          GEMINI_API_KEYS: ${{ secrets.GEMINI_API_KEYS }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-2.5-flash' }}
           # "ja anuncia?" via Meta Ad Library. Sem o secret, a fonte fica inerte.
           META_AD_LIBRARY_TOKEN: ${{ secrets.META_AD_LIBRARY_TOKEN }}
           # PageSpeed Insights (Google, gratis): performance do site no celular.
