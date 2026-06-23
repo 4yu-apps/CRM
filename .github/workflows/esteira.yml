@@ -17,7 +17,7 @@ on:
         description: "Comando da esteira"
         default: "autopilot"
         type: choice
-        options: ["autopilot", "backfill", "search"]
+        options: ["autopilot", "backfill", "search", "redraft"]
       batch:
         description: "Tamanho do lote"
         default: "60"
@@ -100,6 +100,12 @@ jobs:
               --city "${{ github.event.inputs.city }}" \
               --state "${{ github.event.inputs.state }}" \
               --neighborhood "${{ github.event.inputs.neighborhood }}"
+          elif [ "$CMD" = "redraft" ]; then
+            # Re-rascunha os leads ja em rascunho_pronto com o tom novo, via LLM.
+            # Delay gentil: Groq free e ~30 RPM, entao espacar evita 429 (que
+            # cairia no mock). A rotacao (mais antigo primeiro) deixa re-rodar o
+            # que sobrar caso a cota diaria de tokens corte no meio.
+            GARIMPO_DELAY="2.5" python -m garimpo_esteira.run redraft
           else
             python -m garimpo_esteira.run "$CMD"
             if [ "$CMD" = "autopilot" ]; then

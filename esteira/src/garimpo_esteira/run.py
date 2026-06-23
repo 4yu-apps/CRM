@@ -16,7 +16,7 @@ from .autopilot import region_key, run_autopilot, search_term
 from .cascade import enrich_batch, enrich_lead
 from .config import FIXTURES_DIR, Config, build_maps_source, build_provider, build_reviews_source, build_sink, build_sources
 from .discovery import discover
-from .draft_stage import draft_batch
+from .draft_stage import draft_batch, redraft_batch
 from .models import Lead
 from .score_stage import score_batch
 from .validation import is_present
@@ -116,6 +116,19 @@ def cmd_draft(cfg: Config) -> int:
     for lead_id, (msg1, _msg2) in results:
         print(f"  {lead_id}: {msg1[:70]}…")
     print(f"resumo: {len(results)} rascunhos prontos")
+    _print_counts(sink)
+    return 0
+
+
+def cmd_redraft(cfg: Config) -> int:
+    sink = build_sink(cfg)
+    provider = build_provider(cfg)
+    print(f"redraft · sink={cfg.sink} llm={cfg.llm} ({provider.model}) batch={cfg.batch}")
+    total = redraft_batch(sink, provider, batch=cfg.batch, delay=cfg.delay)
+    if not total:
+        print("  nada para re-rascunhar (sem rascunho_pronto pendente)")
+        return 0
+    print(f"redraft: {total} leads re-rascunhados com {provider.model}")
     _print_counts(sink)
     return 0
 
@@ -280,7 +293,7 @@ def _print_counts(sink) -> None:
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="garimpo-esteira")
     sub = p.add_subparsers(dest="cmd", required=True)
-    for name in ("seed-demo", "discover", "enrich", "score", "draft", "pipeline", "autopilot", "backfill", "counts", "search"):
+    for name in ("seed-demo", "discover", "enrich", "score", "draft", "redraft", "pipeline", "autopilot", "backfill", "counts", "search"):
         sp = sub.add_parser(name)
         sp.add_argument("--sink", choices=["jsonfile", "supabase"])
         sp.add_argument("--json")
@@ -313,6 +326,7 @@ def main(argv: list[str] | None = None) -> int:
         "enrich": cmd_enrich,
         "score": cmd_score,
         "draft": cmd_draft,
+        "redraft": cmd_redraft,
         "pipeline": cmd_pipeline,
         "autopilot": cmd_autopilot,
         "backfill": cmd_backfill,

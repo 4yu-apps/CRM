@@ -53,6 +53,16 @@ class JsonFileSink:
         rows.sort(key=lambda r: r.get("created_at", ""))
         return [self._to_lead(r) for r in rows[:limit]]
 
+    def fetch_redraft(self, limit: int, owner_id: str | None = None) -> list[Lead]:
+        """Leads em rascunho_pronto ordenados por draft_generated_at (None primeiro)."""
+        rows = [
+            r for r in self._db["leads"].values()
+            if r.get("status") == "rascunho_pronto"
+            and (owner_id is None or r.get("owner_id") == owner_id)
+        ]
+        rows.sort(key=lambda r: (r.get("draft_generated_at") is not None, r.get("draft_generated_at") or ""))
+        return [self._to_lead(r) for r in rows[:limit]]
+
     def fetch_backfill(self, limit: int, owner_id: str | None = None) -> list[Lead]:
         def falta(r: dict) -> bool:
             return any(r.get(f) in (None, "") for f in ("facebook", "instagram", "whatsapp"))

@@ -44,6 +44,48 @@ def draft_one(
     return msg1, msg2
 
 
+def redraft_batch(
+    sink: LeadSink, provider: DraftProvider, *, batch: int = 30,
+    owner_id: str | None = None, profession: str | None = None,
+    run_start: str | None = None, delay: float = 0.0,
+) -> int:
+    """Re-rascunha leads em rascunho_pronto em lotes, sem alterar o status.
+
+    run_start marca o inicio desta execucao. Para quando todos os leads ja
+    buscados tiverem draft_generated_at >= run_start (ja refeitos nesta execucao).
+
+    Reutiliza draft_one (re-gera copy, atualiza draft_generated_at; o guard de
+    status em draft_one faz set_status virar no-op para rascunho_pronto).
+
+    Opt-out: se draft_one retorna None, carimba draft_generated_at=run_start
+    via sink.update_lead_fields para tirar o lead da fila (evita loop infinito).
+    """
+    import time
+
+    if run_start is None:
+        run_start = datetime.now(timezone.utc).isoformat()
+    total = 0
+    while True:
+        leads = sink.fetch_redraft(batch, owner_id)
+        # so processa leads ainda nao refeitos nesta execucao
+        pend = [l for l in leads if not l.draft_generated_at or l.draft_generated_at < run_start]
+        if not pend:
+            break
+        for i, lead in enumerate(pend):
+            try:
+                result = draft_one(lead, provider, sink, profession)
+                if result is None:
+                    # opt_out: carimba draft_generated_at para tirar da fila
+                    sink.update_lead_fields(lead.id, {"draft_generated_at": run_start})
+                else:
+                    total += 1
+            except Exception:
+                pass
+            if delay and i < len(pend) - 1:
+                time.sleep(delay)
+    return total
+
+
 def draft_batch(
     sink: LeadSink, provider: DraftProvider, *, batch: int = 20, status="qualificado",
     owner_id: str | None = None, profession: str | None = None,

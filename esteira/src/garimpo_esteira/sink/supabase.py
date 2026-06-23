@@ -97,6 +97,19 @@ class SupabaseSink:
         r.raise_for_status()
         return [self._to_lead(row) for row in r.json()]
 
+    def fetch_redraft(self, limit: int, owner_id: str | None = None) -> list[Lead]:
+        """Leads em rascunho_pronto ordenados por draft_generated_at (None primeiro)."""
+        params = {
+            "status": "eq.rascunho_pronto",
+            "order": "draft_generated_at.asc.nullsfirst",
+            "limit": str(limit),
+        }
+        if owner_id:
+            params["owner_id"] = f"eq.{owner_id}"
+        r = self._send("GET", f"{self.base}/leads", params=params)
+        r.raise_for_status()
+        return [self._to_lead(row) for row in r.json()]
+
     def fetch_profile(self, owner_id: str) -> dict | None:
         """Perfil de um dono (pra busca direcionada saber a profissao/lente)."""
         try:
