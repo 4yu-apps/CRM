@@ -4,8 +4,10 @@ import Link from "next/link";
 import { toast } from "sonner";
 import {
   ArrowRight,
+  Archive,
   Check,
   CheckCircle,
+  SkipForward,
   Globe,
   Info,
   MapPin,
@@ -148,8 +150,12 @@ export default function FilaPage() {
   const [sortBy, setSortBy] = useState<SortKey>("recomendados");
   const [ramo, setRamo] = useState("todos");
 
-  // Base: tudo que esta pronto pra revisar. Dela saem o filtro de ramo e a ordem.
-  const baseQueue = useMemo(() => leads.filter((l) => l.status === "rascunho_pronto"), [leads]);
+  // Base: tudo que esta pronto pra revisar (e nao arquivado). Dela saem o filtro
+  // de ramo e a ordem.
+  const baseQueue = useMemo(
+    () => leads.filter((l) => l.status === "rascunho_pronto" && !l.archived),
+    [leads],
+  );
   const ramoOptions = useMemo(() => {
     const set = new Set<string>();
     for (const l of baseQueue) if (l.category) set.add(l.category);
@@ -158,17 +164,26 @@ export default function FilaPage() {
       ...[...set].sort((a, b) => a.localeCompare(b)).map((c) => ({ value: c, label: c })),
     ];
   }, [baseQueue]);
+  // leads "pulados" vao pro fim da fila (revisita depois), sem mexer no banco.
+  const [skipped, setSkipped] = useState<string[]>([]);
   const queue = useMemo(() => {
     const filtrada = ramo === "todos" ? baseQueue : baseQueue.filter((l) => l.category === ramo);
-    return sortQueue(filtrada, sortBy);
-  }, [baseQueue, ramo, sortBy]);
+    const sorted = sortQueue(filtrada, sortBy);
+    if (skipped.length === 0) return sorted;
+    const skipSet = new Set(skipped);
+    const front = sorted.filter((l) => !skipSet.has(l.id));
+    const back = skipped
+      .map((id) => sorted.find((l) => l.id === id))
+      .filter((l): l is Lead => Boolean(l));
+    return [...front, ...back];
+  }, [baseQueue, ramo, sortBy, skipped]);
 
   const [edits, setEdits] = useState<Record<string, { m1: string; m2: string }>>({});
   const [sendLead, setSendLead] = useState<Lead | null>(null);
-  const [tally, setTally] = useState({ approved: 0, discarded: 0 });
+  const [tally, setTally] = useState({ approved: 0, discarded: 0, archived: 0 });
 
   const cur = queue[0];
-  const reviewed = tally.approved + tally.discarded;
+  const reviewed = tally.approved + tally.discarded + tally.archived;
   const total = reviewed + queue.length;
 
   const msgOf = (l: Lead) => edits[l.id] ?? { m1: l.draft_msg1 ?? "", m2: l.draft_msg2 ?? "" };
@@ -225,6 +240,35 @@ export default function FilaPage() {
     }
   }, [sendLead, repo, refresh]);
 
+  const archive = useCallback(async () => {
+    if (!cur) return;
+    const target = cur;
+    try {
+      await repo.setArchived(target.id, true);
+      setTally((t) => ({ ...t, archived: t.archived + 1 }));
+      await refresh();
+      toast.success("Arquivado. Sai da fila, mas nao some.", {
+        action: {
+          label: "Desfazer",
+          onClick: async () => {
+            await repo.setArchived(target.id, false);
+            setTally((t) => ({ ...t, archived: Math.max(0, t.archived - 1) }));
+            await refresh();
+            toast.message("Voltou pra fila.");
+          },
+        },
+      });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao arquivar");
+    }
+  }, [cur, repo, refresh]);
+
+  // Pular: manda o lead atual pro fim da fila (revisita depois), sem mexer no banco.
+  const skip = useCallback(() => {
+    if (!cur) return;
+    setSkipped((s) => [...s.filter((x) => x !== cur.id), cur.id]);
+  }, [cur]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (sendLead) return;
@@ -232,10 +276,15 @@ export default function FilaPage() {
       if (tag === "TEXTAREA" || tag === "INPUT" || tag === "SELECT") return;
       if (e.key === "a" || e.key === "A") void approve();
       if (e.key === "d" || e.key === "D") void discard();
+      if (e.key === "s" || e.key === "S") void archive();
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+        e.preventDefault();
+        skip();
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [approve, discard, sendLead]);
+  }, [approve, discard, archive, skip, sendLead]);
 
   // fila vazia (nada pronto pra revisar, independente de filtro)
   if (baseQueue.length === 0) {
@@ -296,11 +345,15 @@ export default function FilaPage() {
             align="end"
             className="w-[168px]"
           />
-          <span className="hidden items-center gap-2 text-[12.5px] text-faint xl:flex">
+          <span className="hidden items-center gap-1.5 text-[12px] text-faint xl:flex">
             <kbd className="rounded-md border border-border-2 bg-[var(--inset)] px-1.5 py-0.5 font-heading font-semibold text-ink-2">A</kbd>
             aprovar
+            <kbd className="rounded-md border border-border-2 bg-[var(--inset)] px-1.5 py-0.5 font-heading font-semibold text-ink-2">S</kbd>
+            arquivar
             <kbd className="rounded-md border border-border-2 bg-[var(--inset)] px-1.5 py-0.5 font-heading font-semibold text-ink-2">D</kbd>
             descartar
+            <kbd className="rounded-md border border-border-2 bg-[var(--inset)] px-1.5 py-0.5 font-heading font-semibold text-ink-2">→</kbd>
+            pular
           </span>
         </div>
       </div>
@@ -455,20 +508,42 @@ export default function FilaPage() {
               </div>
             </div>
           </div>
-          <div className="flex gap-3">
-            <button
-              onClick={discard}
-              className="flex w-[120px] flex-none items-center justify-center gap-2 rounded-[14px] border border-border-2 bg-card p-4 text-sm font-bold text-danger transition-colors hover:bg-danger-bg"
-            >
-              <X size={17} weight="bold" /> Descartar
-            </button>
-            <button
-              onClick={approve}
-              className="flex flex-1 items-center justify-center gap-2 rounded-[14px] p-4 text-sm font-bold text-white shadow-[0_6px_16px_var(--ring)] transition-transform hover:-translate-y-0.5"
-              style={{ background: "var(--grad)" }}
-            >
-              <Check size={18} weight="bold" /> Aprovar e preparar envio
-            </button>
+          <div className="flex flex-col gap-2.5">
+            {/* linha secundaria: pular (adia) + arquivar (sai da fila) */}
+            <div className="flex gap-2.5">
+              <button
+                onClick={skip}
+                title="Pular pro fim da fila (tecla seta)"
+                className="flex flex-1 items-center justify-center gap-2 rounded-[14px] border border-border-2 bg-card p-3 text-[13.5px] font-semibold text-ink-2 transition-colors hover:bg-surface-2"
+              >
+                <SkipForward size={16} weight="bold" /> Pular
+              </button>
+              <button
+                onClick={() => void archive()}
+                title="Arquivar (tecla S)"
+                className="flex flex-1 items-center justify-center gap-2 rounded-[14px] border border-border-2 bg-card p-3 text-[13.5px] font-semibold text-ink-2 transition-colors hover:bg-surface-2"
+              >
+                <Archive size={16} weight="bold" /> Arquivar
+              </button>
+            </div>
+            {/* linha principal: descartar + aprovar */}
+            <div className="flex gap-3">
+              <button
+                onClick={discard}
+                title="Descartar (tecla D)"
+                className="flex w-[120px] flex-none items-center justify-center gap-2 rounded-[14px] border border-border-2 bg-card p-4 text-sm font-bold text-danger transition-colors hover:bg-danger-bg"
+              >
+                <X size={17} weight="bold" /> Descartar
+              </button>
+              <button
+                onClick={approve}
+                title="Aprovar (tecla A)"
+                className="flex flex-1 items-center justify-center gap-2 rounded-[14px] p-4 text-sm font-bold text-white shadow-[0_6px_16px_var(--ring)] transition-transform hover:-translate-y-0.5"
+                style={{ background: "var(--grad)" }}
+              >
+                <Check size={18} weight="bold" /> Aprovar e preparar envio
+              </button>
+            </div>
           </div>
         </div>
       </div>
