@@ -229,14 +229,19 @@ function statusAgeLabel(days: number | null): string | null {
 // ---------------------------------------------------------------------------
 // Painel de diagnostico do site
 // ---------------------------------------------------------------------------
-function SiteSignalsPanel({ signals }: { signals: SiteSignals }) {
+function SiteSignalsPanel({ signals, since }: { signals: SiteSignals; since?: string | null }) {
   const chips = siteSignalChips(signals);
   if (chips.length === 0) return null;
 
   return (
     <div className="rounded-[14px] border border-border bg-surface-2 p-4">
-      <div className="mb-3 text-[11px] font-bold uppercase tracking-wider text-faint">
-        Diagnostico do site
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-faint">Diagnostico do site</span>
+        {since && (
+          <span className="text-[11px] text-faint" title="Quando o robo conferiu por ultimo">
+            verificado {fmtRelative(since)}
+          </span>
+        )}
       </div>
       <div className="flex flex-wrap gap-2">
         {chips.map((chip, i) => (
@@ -694,7 +699,7 @@ export default function FichaPage() {
 
             {/* Diagnostico do site */}
             {lead.site_signals && (
-              <SiteSignalsPanel signals={lead.site_signals} />
+              <SiteSignalsPanel signals={lead.site_signals} since={lead.updated_at} />
             )}
 
             {/* Valor sugerido pela IA (B8) */}
