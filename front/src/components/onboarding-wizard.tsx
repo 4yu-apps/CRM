@@ -252,19 +252,9 @@ export function OnboardingWizard() {
                     placeholder="Digite a cidade (ex: Maringa, Sao Paulo...)"
                   />
                   <p className="mt-1.5 text-[12px] text-faint">
-                    Comece a digitar e escolha a cidade. O estado e preenchido automaticamente.
+                    Comece a digitar e escolha a cidade. Ja vem com o estado (ex: Maringa - PR).
                   </p>
                 </div>
-                {state && (
-                  <div>
-                    <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-faint">
-                      Estado detectado
-                    </span>
-                    <div className="rounded-xl border border-border-2 bg-surface-2 px-4 py-3 text-[13.5px] font-semibold text-ink-2">
-                      {state}
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           )}
