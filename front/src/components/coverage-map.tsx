@@ -23,6 +23,8 @@ interface CoverageMapProps {
   cityName?: string;
   // Sigla do estado selecionado (para label no mapa)
   stateName?: string;
+  // Bairro/zona selecionado (entra no label e e o centro do raio)
+  neighborhood?: string;
   // Raio de atuacao em km (para desenhar circulo visual)
   radiusKm?: number;
 }
@@ -33,15 +35,32 @@ function MapController({
   lat,
   lng,
   zoom,
+  radiusMeters,
 }: {
   lat: number;
   lng: number;
   zoom: number;
+  radiusMeters: number | null;
 }) {
   const map = useMap();
   useEffect(() => {
-    map.flyTo([lat, lng], zoom, { duration: 0.8 });
-  }, [map, lat, lng, zoom]);
+    // Com raio definido, enquadra o circulo inteiro (zoom automatico, tipo
+    // gerenciador de anuncio): 5km mostra de perto, 50km abre bem mais. Assim
+    // o range do raio sempre aparece certo no mapa.
+    if (radiusMeters && radiusMeters > 0) {
+      const latDelta = radiusMeters / 111320;
+      const lngDelta = radiusMeters / (111320 * Math.cos((lat * Math.PI) / 180));
+      map.flyToBounds(
+        [
+          [lat - latDelta, lng - lngDelta],
+          [lat + latDelta, lng + lngDelta],
+        ],
+        { padding: [40, 40], duration: 0.8, maxZoom: 15 },
+      );
+    } else {
+      map.flyTo([lat, lng], zoom, { duration: 0.8 });
+    }
+  }, [map, lat, lng, zoom, radiusMeters]);
   return null;
 }
 
@@ -59,6 +78,7 @@ export default function CoverageMap({
   zoom,
   cityName,
   stateName,
+  neighborhood,
   radiusKm,
 }: CoverageMapProps) {
   useLeafletIconFix();
@@ -66,11 +86,9 @@ export default function CoverageMap({
   const hasCityCoord = centerLat !== -14.235 || centerLng !== -51.925;
   const radiusMeters = radiusKm != null && radiusKm > 0 ? radiusKm * 1000 : null;
 
-  // Label do mapa: cidade (UF) se tiver cidade, ou so o estado
+  // Label do mapa: "Bairro, Cidade - UF" (com bairro quando houver), ou so o estado.
   const mapLabel = cityName
-    ? stateName
-      ? `${cityName} - ${stateName}`
-      : cityName
+    ? `${neighborhood ? `${neighborhood}, ` : ""}${cityName}${stateName ? ` - ${stateName}` : ""}`
     : stateName
       ? stateName
       : null;
@@ -89,7 +107,7 @@ export default function CoverageMap({
       />
 
       {/* Reage a mudancas de centro/zoom via flyTo */}
-      <MapController lat={centerLat} lng={centerLng} zoom={zoom} />
+      <MapController lat={centerLat} lng={centerLng} zoom={zoom} radiusMeters={radiusMeters} />
 
       {/* Circulo de raio de atuacao centrado na cidade */}
       {hasCityCoord && radiusMeters !== null && (

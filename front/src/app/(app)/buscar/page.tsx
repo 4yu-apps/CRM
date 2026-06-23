@@ -170,6 +170,9 @@ export default function BuscarPage() {
 
   // Ponto geocodificado da regiao escolhida (cidade ou bairro) pra dar zoom.
   const [cityPoint, setCityPoint] = useState<GeoPoint | null>(null);
+  // Coordenada exata do bairro escolhido (vem do autocomplete). Quando setada,
+  // e o centro do raio no mapa, em vez do centro da cidade.
+  const [bairroPoint, setBairroPoint] = useState<GeoPoint | null>(null);
 
   // Opcoes de servico-alvo conforme a profissao configurada no perfil.
   const serviceOpts = useMemo(() => serviceOptionsForProfile(profile), [profile]);
@@ -290,6 +293,9 @@ export default function BuscarPage() {
     ({ cidade, uf: novaUf }: { cidade: string; uf: string }) => {
       setCity(cidade);
       setUf(novaUf);
+      // Trocar de cidade invalida o bairro anterior.
+      setNeighborhood("");
+      setBairroPoint(null);
     },
     [],
   );
@@ -298,6 +304,8 @@ export default function BuscarPage() {
     setCity("");
     setUf("");
     setCityPoint(null);
+    setNeighborhood("");
+    setBairroPoint(null);
   }, []);
 
   // Surpreenda-me: randomiza ramo, estado e cidade
@@ -402,6 +410,7 @@ export default function BuscarPage() {
 
   // Coordenadas para o mapa.
   const mapCenter = (() => {
+    if (bairroPoint) return { lat: bairroPoint.lat, lng: bairroPoint.lng, zoom: 14 };
     if (cityPoint)
       return { lat: cityPoint.lat, lng: cityPoint.lng, zoom: neighborhood.trim() ? 14 : 12 };
     // So o estado escolhido (sem cidade ainda): centra na UF com zoom estadual.
@@ -502,7 +511,14 @@ export default function BuscarPage() {
             </label>
             <BairroAutocomplete
               value={neighborhood}
-              onChange={setNeighborhood}
+              onChange={(v) => {
+                setNeighborhood(v);
+                setBairroPoint(null);
+              }}
+              onPick={(s) => {
+                setNeighborhood(s.name);
+                setBairroPoint({ lat: s.lat, lng: s.lng });
+              }}
               city={city}
               uf={uf}
               placeholder={
@@ -659,6 +675,7 @@ export default function BuscarPage() {
               zoom={mapCenter.zoom}
               cityName={city || undefined}
               stateName={uf || undefined}
+              neighborhood={neighborhood.trim() || undefined}
               radiusKm={radiusKm}
             />
           </div>

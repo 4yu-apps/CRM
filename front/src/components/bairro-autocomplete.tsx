@@ -12,6 +12,9 @@ import { cn } from "@/lib/utils";
 interface BairroAutocompleteProps {
   value: string;
   onChange: (value: string) => void;
+  // Chamado quando o usuario escolhe uma sugestao (traz as coordenadas reais
+  // do bairro). Texto livre cai so no onChange.
+  onPick?: (s: BairroSuggestion) => void;
   city: string;
   uf: string;
   placeholder?: string;
@@ -24,6 +27,7 @@ type Rect = { top: number; left: number; width: number };
 export function BairroAutocomplete({
   value,
   onChange,
+  onPick,
   city,
   uf,
   placeholder = "Comece a digitar o bairro ou zona",
@@ -102,10 +106,11 @@ export function BairroAutocomplete({
 
   const handlePick = useCallback(
     (s: BairroSuggestion) => {
-      onChange(s.name);
+      if (onPick) onPick(s);
+      else onChange(s.name);
       closeMenu();
     },
-    [onChange, closeMenu],
+    [onPick, onChange, closeMenu],
   );
 
   const handleClear = useCallback(() => {
