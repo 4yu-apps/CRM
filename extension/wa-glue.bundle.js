@@ -2,13 +2,30 @@
   // src/content/wa-glue.mjs
   (function() {
     function ready() {
-      return !!(window.WPP && window.WPP.isReady);
+      return !!(window.WPP && (window.WPP.isReady || window.WPP.isFullReady));
     }
     try {
-      if (window.WPP && window.WPP.webpack && !window.WPP.isReady && window.WPP.webpack.injectLoader) {
+      if (window.WPP && window.WPP.webpack && !ready() && window.WPP.webpack.injectLoader) {
         window.WPP.webpack.injectLoader();
       }
     } catch {
+    }
+    function waitReady(ms) {
+      if (ready()) return Promise.resolve(true);
+      return new Promise((resolve) => {
+        let done = false;
+        const finish = (v) => {
+          if (done) return;
+          done = true;
+          clearInterval(iv);
+          clearTimeout(to);
+          resolve(v);
+        };
+        const iv = setInterval(() => {
+          if (ready()) finish(true);
+        }, 150);
+        const to = setTimeout(() => finish(ready()), ms);
+      });
     }
     function brNumber(phone) {
       const d = String(phone || "").replace(/\D/g, "");
@@ -30,32 +47,33 @@
       if (!fn) throw new Error("sem funcao de abrir chat");
       await fn.call(chat, id);
     }
-    function prefill(text) {
-      const box = document.querySelector('footer div[contenteditable="true"]');
-      if (!box) return false;
-      try {
-        box.focus();
-        const sel = window.getSelection();
-        sel.removeAllRanges();
-        const range = document.createRange();
-        range.selectNodeContents(box);
-        sel.addRange(range);
-        document.execCommand("insertText", false, text);
-        return !!(box.textContent && box.textContent.length > 0);
-      } catch {
-        return false;
+    async function prefill(text) {
+      for (let i = 0; i < 12; i++) {
+        const box = document.querySelector('footer div[contenteditable="true"]');
+        if (box) {
+          try {
+            box.focus();
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            const range = document.createRange();
+            range.selectNodeContents(box);
+            sel.addRange(range);
+            document.execCommand("insertText", false, text);
+            if (box.textContent && box.textContent.length > 0) return true;
+          } catch {
+          }
+        }
+        await new Promise((r) => setTimeout(r, 250));
       }
+      return false;
     }
     async function handle(phone, text) {
-      if (!ready()) return false;
+      if (!await waitReady(5e3)) return false;
       const num = brNumber(phone);
       if (!num) return false;
       const id = await resolveChatId(num);
       await openChat(id);
-      if (text && String(text).trim()) {
-        await new Promise((r) => setTimeout(r, 350));
-        if (!prefill(String(text))) return false;
-      }
+      if (text && String(text).trim()) prefill(String(text));
       return true;
     }
     window.addEventListener("message", async (e) => {

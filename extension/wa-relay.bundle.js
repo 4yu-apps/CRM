@@ -13,7 +13,7 @@
     const to = setTimeout(() => {
       cleanup();
       sendResponse({ ok: false });
-    }, 6e3);
+    }, 1e4);
     function cleanup() {
       clearTimeout(to);
       window.removeEventListener("message", onMsg);

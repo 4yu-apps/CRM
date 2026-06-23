@@ -1,20 +1,43 @@
 // Roda no MUNDO DA PAGINA (world: MAIN) junto com o wa-js (WPP), que da acesso a
 // API interna do WhatsApp Web. Abre/troca a conversa SEM reload (ate pra numero
-// novo) e pre-preenche o texto, sem enviar. Se algo falhar, responde ok:false e
-// o background cai no fallback (navegar a aba = reload). Nunca aperta enviar.
+// novo) e pre-preenche o texto, sem enviar. Se NAO conseguir nem ABRIR a conversa,
+// responde ok:false e o background cai no fallback (navegar a aba = reload). O
+// prefill do texto e best-effort: se a conversa abriu sem reload, isso JA e o
+// sucesso — nao vale recarregar so pra inserir o rascunho. Nunca aperta enviar.
 
 (function () {
   function ready() {
-    return !!(window.WPP && window.WPP.isReady);
+    return !!(window.WPP && (window.WPP.isReady || window.WPP.isFullReady));
   }
 
   // wa-js normalmente auto-injeta; garante o loader caso ainda nao esteja pronto.
   try {
-    if (window.WPP && window.WPP.webpack && !window.WPP.isReady && window.WPP.webpack.injectLoader) {
+    if (window.WPP && window.WPP.webpack && !ready() && window.WPP.webpack.injectLoader) {
       window.WPP.webpack.injectLoader();
     }
   } catch {
     /* ignora */
+  }
+
+  // Espera o WPP ficar pronto (ate `ms`). No clique o usuario pode disparar antes
+  // do WhatsApp Web terminar de subir; em vez de desistir na hora (= reload), da
+  // um tempo. Fica abaixo do timeout do relay pra ele ainda receber a resposta.
+  function waitReady(ms) {
+    if (ready()) return Promise.resolve(true);
+    return new Promise((resolve) => {
+      let done = false;
+      const finish = (v) => {
+        if (done) return;
+        done = true;
+        clearInterval(iv);
+        clearTimeout(to);
+        resolve(v);
+      };
+      const iv = setInterval(() => {
+        if (ready()) finish(true);
+      }, 150);
+      const to = setTimeout(() => finish(ready()), ms);
+    });
   }
 
   function brNumber(phone) {
@@ -43,34 +66,40 @@
 
   // Pre-preenche a caixa de mensagem (footer) sem enviar. execCommand dispara os
   // eventos que o WhatsApp escuta pra registrar o rascunho. NUNCA da Enter.
-  function prefill(text) {
-    const box = document.querySelector('footer div[contenteditable="true"]');
-    if (!box) return false;
-    try {
-      box.focus();
-      const sel = window.getSelection();
-      sel.removeAllRanges();
-      const range = document.createRange();
-      range.selectNodeContents(box);
-      sel.addRange(range);
-      document.execCommand("insertText", false, text);
-      return !!(box.textContent && box.textContent.length > 0);
-    } catch {
-      return false;
+  // Best-effort com algumas tentativas: o footer pode demorar a renderizar depois
+  // de trocar de conversa (numero novo, lista grande, etc.).
+  async function prefill(text) {
+    for (let i = 0; i < 12; i++) {
+      const box = document.querySelector('footer div[contenteditable="true"]');
+      if (box) {
+        try {
+          box.focus();
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          const range = document.createRange();
+          range.selectNodeContents(box);
+          sel.addRange(range);
+          document.execCommand("insertText", false, text);
+          if (box.textContent && box.textContent.length > 0) return true;
+        } catch {
+          /* tenta de novo */
+        }
+      }
+      await new Promise((r) => setTimeout(r, 250));
     }
+    return false;
   }
 
   async function handle(phone, text) {
-    if (!ready()) return false;
+    if (!(await waitReady(5000))) return false; // WPP nao subiu a tempo -> fallback
     const num = brNumber(phone);
     if (!num) return false;
     const id = await resolveChatId(num);
     await openChat(id);
-    if (text && String(text).trim()) {
-      // da um tempo pro footer renderizar antes de preencher
-      await new Promise((r) => setTimeout(r, 350));
-      if (!prefill(String(text))) return false; // sem prefill: deixa o fallback cuidar
-    }
+    // Conversa aberta = sucesso. Responde JA (nao segura o ack ate o prefill, senao
+    // o relay/background podem dar timeout e recarregar mesmo com a conversa aberta).
+    // O prefill roda em segundo plano e e best-effort (nao recarrega se falhar).
+    if (text && String(text).trim()) prefill(String(text));
     return true;
   }
 

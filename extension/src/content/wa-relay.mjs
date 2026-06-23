@@ -17,7 +17,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   const to = setTimeout(() => {
     cleanup();
     sendResponse({ ok: false }); // glue nao respondeu (wa-js ainda nao pronto) -> fallback
-  }, 6000);
+  }, 10000);
   function cleanup() {
     clearTimeout(to);
     window.removeEventListener("message", onMsg);
