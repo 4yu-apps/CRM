@@ -412,13 +412,31 @@ export default function ContatosPage() {
         </div>
 
         {filtered.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 py-16 text-center">
-            <AddressBook size={38} className="text-faint" />
-            <div className="text-[15px] font-semibold text-ink">Nenhum contato encontrado</div>
-            <p className="max-w-[320px] text-[13px] text-muted-foreground">
-              Ajuste a busca ou o filtro. Novos contatos chegam pela esteira e pela tela Buscar.
-            </p>
-          </div>
+          leads.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 py-16 text-center">
+              <MagnifyingGlass size={38} className="text-brand" />
+              <div className="text-[15px] font-semibold text-ink">Sua base ainda está vazia</div>
+              <p className="max-w-[340px] text-[13px] text-muted-foreground">
+                Rode sua primeira busca: escolha o ramo e a região, e o robô traz os negócios pra você.
+              </p>
+              <button
+                type="button"
+                onClick={() => router.push("/buscar")}
+                className="mt-2 inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-[13px] font-bold text-white"
+                style={{ background: "var(--grad)" }}
+              >
+                Fazer minha primeira busca
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-3 py-16 text-center">
+              <AddressBook size={38} className="text-faint" />
+              <div className="text-[15px] font-semibold text-ink">Nenhum contato encontrado</div>
+              <p className="max-w-[320px] text-[13px] text-muted-foreground">
+                Ajuste a busca ou o filtro. Novos contatos chegam pela esteira e pela tela Buscar.
+              </p>
+            </div>
+          )
         ) : (
           <div className="divide-y divide-border">
             {paged.map((lead) => (

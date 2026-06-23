@@ -8,6 +8,7 @@ import {
   Check,
   CheckCircle,
   SkipForward,
+  MagnifyingGlass,
   Globe,
   Info,
   MapPin,
@@ -286,25 +287,35 @@ export default function FilaPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [approve, discard, archive, skip, sendLead]);
 
-  // fila vazia (nada pronto pra revisar, independente de filtro)
+  // fila vazia (nada pronto pra revisar, independente de filtro). Distingue o
+  // PRIMEIRO USO (conta sem nenhum lead) de "revisou tudo".
   if (baseQueue.length === 0) {
+    const primeiroUso = leads.length === 0;
     return (
       <div className="mx-auto max-w-[1180px]">
         <div className="fu mx-auto mt-16 max-w-[520px] rounded-[22px] border border-border bg-card p-14 text-center shadow-[var(--shadow)]">
-          <div className="mx-auto mb-5 flex size-18 items-center justify-center rounded-[20px] bg-success-bg text-success">
-            <CheckCircle size={38} weight="fill" />
+          <div
+            className={cn(
+              "mx-auto mb-5 flex size-18 items-center justify-center rounded-[20px]",
+              primeiroUso ? "bg-brand-50 text-brand" : "bg-success-bg text-success",
+            )}
+          >
+            {primeiroUso ? <MagnifyingGlass size={36} weight="bold" /> : <CheckCircle size={38} weight="fill" />}
           </div>
-          <div className="font-heading text-2xl font-bold">Fila zerada, parabens.</div>
+          <div className="font-heading text-2xl font-bold">
+            {primeiroUso ? "Bora encher sua fila" : "Fila zerada, parabens."}
+          </div>
           <p className="mt-2 text-muted-foreground">
-            Voce revisou tudo. Aprovou {tally.approved} e descartou {tally.discarded} agora. Vou continuar
-            buscando e te aviso quando chegar gente nova.
+            {primeiroUso
+              ? "Voce ainda nao tem leads. Rode sua primeira busca: escolha o ramo e a regiao, e o robo traz os negocios pra voce abordar."
+              : `Voce revisou tudo. Aprovou ${tally.approved} e descartou ${tally.discarded} agora. Vou continuar buscando e te aviso quando chegar gente nova.`}
           </p>
           <Link
             href="/buscar"
             className="mt-6 inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-bold text-white"
             style={{ background: "var(--grad)" }}
           >
-            Buscar mais agora <ArrowRight size={16} />
+            {primeiroUso ? "Fazer minha primeira busca" : "Buscar mais agora"} <ArrowRight size={16} />
           </Link>
         </div>
       </div>
