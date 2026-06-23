@@ -154,8 +154,41 @@ def extract_phone(html: str) -> str | None:
 # --- sinais tecnicos do site (de graca, do HTML que ja baixamos) -----------
 # Respondem as perguntas que tarfego/automacao/UX precisam, sem API paga e sem
 # a Biblioteca de Anuncios da Meta. Cada um e um regex barato no HTML.
+#
+# "Ja anuncia?" precisa de PIXEL DE ANUNCIO (Meta/Google Ads/TikTok), nao de
+# analytics. Ter Google Analytics/GTM NAO prova que anuncia (quase todo site tem
+# medicao). Por isso o Google Ads (tag de conversao AW-/googleadservices) fica
+# SEPARADO do analytics generico (has_google_tag).
 _FB_PIXEL_RE = re.compile(r"fbq\(|fbevents\.js|connect\.facebook\.net/[^\"']*fbevents|/tr\?id=\d+", re.I)
-_GOOGLE_TAG_RE = re.compile(r"googletagmanager\.com/gtag|gtag\(|google-analytics\.com|googleadservices\.com|google_conversion", re.I)
+# Google Ads de verdade: tag de conversao/remarketing (AW-...), googleadservices,
+# doubleclick. Isso sim e anuncio pago no Google.
+_GOOGLE_ADS_RE = re.compile(
+    r"googleadservices\.com|google_conversion|googleads\.g\.doubleclick|gtag\([^)]*['\"]AW-|['\"]AW-\d{6,}",
+    re.I,
+)
+# TikTok pixel (events.js / ttq.load).
+_TIKTOK_PIXEL_RE = re.compile(r"analytics\.tiktok\.com|ttq\.load|TiktokAnalyticsObject", re.I)
+# Analytics/medicao generica (GA4/GTM/UA): maturidade digital, NAO anuncio.
+_GOOGLE_TAG_RE = re.compile(
+    r"googletagmanager\.com|gtag\(|google-analytics\.com|['\"]G-[A-Z0-9]{6,}|UA-\d{4,}", re.I
+)
+# Outros canais sociais alem de IG/FB (o gestor quer saber onde o negocio ja esta).
+_TIKTOK_CH_RE = re.compile(r"tiktok\.com/@", re.I)
+_YOUTUBE_CH_RE = re.compile(r"youtube\.com/(?:@|c/|channel/|user/)|youtu\.be/", re.I)
+_LINKEDIN_CH_RE = re.compile(r"linkedin\.com/(?:company|in)/", re.I)
+# Agendamento online (ouro pra automacao: ja tenta agendar, da pra integrar).
+_BOOKING_RE = re.compile(
+    r"calendly\.com|booksy|simplybook|setmore|appointlet|trinks\.com|agendor\.com|"
+    r"agende\s+on\s*-?\s*line|agendamento\s+online|agende\s+online",
+    re.I,
+)
+# E-commerce/checkout (vende online: muda o tipo de campanha do gestor).
+_ECOMM_RE = re.compile(
+    r"cdn\.shopify|myshopify|woocommerce|wp-content/plugins/woocommerce|nuvemshop|"
+    r"tiendanube|vtex|loja\s*integrada|/cart\b|/checkout\b|/carrinho\b|"
+    r"adicionar ao carrinho|finalizar compra",
+    re.I,
+)
 _VIEWPORT_RE = re.compile(r"<meta[^>]+name=[\"']viewport[\"']", re.I)
 _H1_RE = re.compile(r"<h1[\s>]", re.I)
 _TITLE_RE = re.compile(r"<title[\s>][^<]*\S[^<]*</title>", re.I)
@@ -197,12 +230,29 @@ def extract_site_signals(html: str, *, url: str = "") -> dict:
     chat_vendor = next((v for v, rx in _CHAT_VENDORS.items() if re.search(rx, h, re.I)), None)
     stack = next((s for s, rx in _STACKS.items() if re.search(rx, h, re.I)), None)
     page_kb = round(len(h.encode("utf-8", "ignore")) / 1024)
+
+    has_fb_pixel = bool(_FB_PIXEL_RE.search(h))
+    has_google_ads = bool(_GOOGLE_ADS_RE.search(h))
+    has_tiktok_pixel = bool(_TIKTOK_PIXEL_RE.search(h))
+    # plataformas onde o lead JA anuncia (pixel de verdade, nao analytics). Lista
+    # pronta pra ficha/score. Vazia = nao detectamos anuncio.
+    ad_platforms = [
+        p for p, on in (("meta", has_fb_pixel), ("google", has_google_ads), ("tiktok", has_tiktok_pixel)) if on
+    ]
     return {
-        "has_fb_pixel": bool(_FB_PIXEL_RE.search(h)),
+        "has_fb_pixel": has_fb_pixel,
+        "has_google_ads": has_google_ads,
+        "has_tiktok_pixel": has_tiktok_pixel,
+        "ad_platforms": ad_platforms,
         "has_google_tag": bool(_GOOGLE_TAG_RE.search(h)),
         "has_chat_widget": chat_vendor is not None,
         "chat_vendor": chat_vendor,
         "has_form": bool(_FORM_RE.search(h)),
+        "has_online_booking": bool(_BOOKING_RE.search(h)),
+        "has_ecommerce": bool(_ECOMM_RE.search(h)),
+        "has_tiktok": bool(_TIKTOK_CH_RE.search(h)),
+        "has_youtube": bool(_YOUTUBE_CH_RE.search(h)),
+        "has_linkedin": bool(_LINKEDIN_CH_RE.search(h)),
         "mobile_ready": bool(_VIEWPORT_RE.search(h)),
         "page_kb": page_kb,
         "slow": page_kb > 1500,
@@ -223,6 +273,7 @@ class WebsiteSource:
         reachable: ReachFn | None = None,
         fetch_html: FetchHtmlFn | None = None,
         llm_extract=None,
+        pagespeed=None,
     ):
         self._reachable = reachable or http_reachable
         # None = busca real; injetar (ex.: lambda _u: None) deixa offline/deterministico
@@ -230,6 +281,9 @@ class WebsiteSource:
         # extrator LLM opcional (Groq, gratis): reforça o regex quando ele nao
         # acha contato. None = so regex.
         self._llm_extract = llm_extract
+        # probe do PageSpeed (Google, gratis) opcional: url -> dict de performance
+        # (perf_score, perf_slow, lcp_ms...). Mesclado no site_signals. None = off.
+        self._pagespeed = pagespeed
 
     def enrich(self, lead: Lead) -> list[Finding]:
         site = clean("website", lead.website)
@@ -270,11 +324,21 @@ class WebsiteSource:
                 findings.append(Finding("phone", self.name, tel, 0.5))
 
             # Sinais tecnicos do site (de graca). Viram a coluna site_signals
-            # (cascade trata o JSON). Se achar Pixel/tag de anuncio, deriva
-            # ads_active=sim ("ja anuncia?") sem depender da API da Meta.
+            # (cascade trata o JSON). Performance real do PageSpeed (Google,
+            # gratis) entra aqui quando o probe esta ligado.
             sig = extract_site_signals(html, url=site)
+            if self._pagespeed:
+                try:
+                    perf = self._pagespeed(site)
+                except Exception:
+                    perf = None
+                if perf:
+                    sig.update(perf)
             findings.append(Finding("site_signals", self.name, json.dumps(sig), 0.9))
-            if sig["has_fb_pixel"] or sig["has_google_tag"]:
+            # "Ja anuncia?": so PIXEL DE ANUNCIO de verdade (Meta/Google Ads/
+            # TikTok) deriva ads_active=sim. Analytics (GA/GTM) NAO conta: quase
+            # todo site tem medicao e isso geraria falso "ja anuncia".
+            if sig.get("ad_platforms"):
                 findings.append(Finding("ads_active", self.name, "sim", 0.6))
 
             # Reforço por LLM: so quando o regex nao achou nenhuma rede/whatsapp

@@ -49,9 +49,16 @@ class Config:
     ig_token: str | None = None
     ig_stale_days: int = 60
     reviews_enabled: bool = False
+    # PageSpeed Insights (Google, gratis): nota de performance do site. Liga
+    # sozinho quando ha PAGESPEED_API_KEY (chave gratuita, sem cobranca); pode
+    # forcar com GARIMPO_PAGESPEED=1 (modo sem chave, cota baixa).
+    pagespeed_key: str | None = None
+    pagespeed_enabled: bool = False
 
     @classmethod
     def from_env(cls) -> "Config":
+        ps_key = os.getenv("PAGESPEED_API_KEY")
+        ps_flag = os.getenv("GARIMPO_PAGESPEED")
         return cls(
             sink=os.getenv("GARIMPO_SINK", "jsonfile"),
             json_path=Path(os.getenv("GARIMPO_JSON", "garimpo.json")),
@@ -77,6 +84,10 @@ class Config:
             ig_token=os.getenv("INSTAGRAM_TOKEN") or os.getenv("META_AD_LIBRARY_TOKEN"),
             ig_stale_days=int(os.getenv("GARIMPO_IG_STALE_DAYS", "60")),
             reviews_enabled=os.getenv("GARIMPO_REVIEWS", "0") in ("1", "true", "True"),
+            pagespeed_key=ps_key,
+            pagespeed_enabled=(
+                ps_flag in ("1", "true", "True") if ps_flag is not None else bool(ps_key)
+            ),
         )
 
 
@@ -135,10 +146,18 @@ def build_sources(cfg: Config) -> list[Source]:
         else InstagramSource(stale_days=cfg.ig_stale_days)
     )
 
+    # PageSpeed (Google, gratis): performance real do site, mesclada no
+    # site_signals. Liga quando ha chave (ou GARIMPO_PAGESPEED=1).
+    pagespeed = None
+    if cfg.pagespeed_enabled:
+        from .sources.pagespeed import pagespeed_probe
+
+        pagespeed = pagespeed_probe(cfg.pagespeed_key)
+
     return [
         CnpjSource(),
         ig,
-        WebsiteSource(llm_extract=llm_extract),
+        WebsiteSource(llm_extract=llm_extract, pagespeed=pagespeed),
         ad,
     ]
 

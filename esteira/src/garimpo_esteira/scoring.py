@@ -124,10 +124,13 @@ def score_trafego(lead: Lead, signals: dict[str, Any]) -> tuple[int, list[dict[s
     else:
         add("Instagram", (8, "sem presenca no Instagram"))
 
-    # "Ja anuncia?": vem de graca do Pixel no HTML (sources/website.py deriva
-    # ads_active=sim quando acha Pixel do Facebook ou tag do Google Ads).
+    # "Ja anuncia?": vem de graca do PIXEL DE ANUNCIO no HTML (Meta/Google Ads/
+    # TikTok). Analytics (GA/GTM) NAO conta — quase todo site mede e isso daria
+    # falso "ja anuncia". ad_platforms e a lista canonica; os has_* sao fallback
+    # pra sinais antigos ja gravados.
     ads = signals.get("ads_active")
-    pixel = _sig(signals, "has_fb_pixel") or _sig(signals, "has_google_tag")
+    pixel = bool(_sig(signals, "ad_platforms")) or _sig(signals, "has_fb_pixel") \
+        or _sig(signals, "has_google_ads") or _sig(signals, "has_tiktok_pixel")
     if ads is True or pixel:
         add("Anuncia?", (6, "ja tem rastreamento de anuncio (Pixel/tag), aquecido"))
     elif ads is False:
@@ -220,6 +223,11 @@ def score_design(lead: Lead, signals: dict[str, Any]) -> tuple[int, list[dict[st
             add("Mobile", (2, "site responsivo"))
         if _sig(signals, "slow") is True:
             add("Peso", (12, "site pesado/lento"))
+        # performance real do PageSpeed (Google, gratis), quando medida: nota
+        # baixa no celular = argumento de redesign forte e objetivo.
+        ps = _sig(signals, "perf_score")
+        if isinstance(ps, (int, float)) and ps < 50:
+            add("Performance", (12, f"PageSpeed {ps}/100 no celular, lento de verdade"))
         stack = _sig(signals, "stack")
         if stack in ("wix", "wordpress", "squarespace", "loja_integrada"):
             add("Stack", (12, f"feito em {stack}, da pra modernizar"))
@@ -313,7 +321,10 @@ def _summary(lens: str, target: ServiceTarget, lead: Lead, signals: dict[str, An
         defeitos = []
         if _sig(signals, "mobile_ready") is False:
             defeitos.append("nao adaptado pra celular")
-        if _sig(signals, "slow") is True:
+        ps = _sig(signals, "perf_score")
+        if isinstance(ps, (int, float)) and ps < 50:
+            defeitos.append(f"lento no celular (PageSpeed {ps}/100)")
+        elif _sig(signals, "slow") is True:
             defeitos.append("pesado/lento")
         if _sig(signals, "stack") in ("wix", "wordpress", "squarespace", "loja_integrada"):
             defeitos.append(f"feito em {_sig(signals, 'stack')}")

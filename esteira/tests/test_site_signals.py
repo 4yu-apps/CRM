@@ -98,11 +98,74 @@ def test_extract_site_signals_returns_dict_with_all_keys():
     html = '<html></html>'
     signals = extract_site_signals(html, url="https://x.com")
     expected_keys = {
-        "has_fb_pixel", "has_google_tag", "has_chat_widget", "chat_vendor",
-        "has_form", "mobile_ready", "page_kb", "slow", "stack",
+        "has_fb_pixel", "has_google_ads", "has_tiktok_pixel", "ad_platforms",
+        "has_google_tag", "has_chat_widget", "chat_vendor",
+        "has_form", "has_online_booking", "has_ecommerce",
+        "has_tiktok", "has_youtube", "has_linkedin",
+        "mobile_ready", "page_kb", "slow", "stack",
         "https", "has_h1", "has_title", "has_description", "og_image"
     }
     assert set(signals.keys()) == expected_keys
+
+
+# --- anuncio pago vs analytics (precisao do "ja anuncia?") ------------------
+
+def test_extract_site_signals_google_ads_conversion():
+    """Tag de conversao do Google Ads detecta has_google_ads e entra em ad_platforms."""
+    html = '<html><script src="https://www.googleadservices.com/pagead/conversion.js"></script></html>'
+    s = extract_site_signals(html, url="https://x.com")
+    assert s["has_google_ads"] is True
+    assert "google" in s["ad_platforms"]
+
+
+def test_extract_site_signals_analytics_is_not_ads():
+    """Google Analytics/GTM puro NAO e anuncio (so medicao)."""
+    html = '<html><script src="https://www.googletagmanager.com/gtag/js?id=G-ABC123"></script></html>'
+    s = extract_site_signals(html, url="https://x.com")
+    assert s["has_google_tag"] is True
+    assert s["has_google_ads"] is False
+    assert s["ad_platforms"] == []
+
+
+def test_extract_site_signals_tiktok_pixel():
+    html = '<html><script>ttq.load("ABCDEF");</script></html>'
+    s = extract_site_signals(html, url="https://x.com")
+    assert s["has_tiktok_pixel"] is True
+    assert "tiktok" in s["ad_platforms"]
+
+
+def test_extract_site_signals_ad_platforms_meta_only():
+    html = '<html>fbq("init", "1")</html>'
+    s = extract_site_signals(html, url="https://x.com")
+    assert s["ad_platforms"] == ["meta"]
+
+
+# --- canais extras + agendamento + e-commerce ------------------------------
+
+def test_extract_site_signals_extra_channels():
+    html = (
+        '<html>'
+        '<a href="https://www.tiktok.com/@negocio">tt</a>'
+        '<a href="https://youtube.com/@negocio">yt</a>'
+        '<a href="https://www.linkedin.com/company/negocio">li</a>'
+        '</html>'
+    )
+    s = extract_site_signals(html, url="https://x.com")
+    assert s["has_tiktok"] is True
+    assert s["has_youtube"] is True
+    assert s["has_linkedin"] is True
+
+
+def test_extract_site_signals_online_booking():
+    html = '<html><a href="https://calendly.com/negocio">Agende</a></html>'
+    s = extract_site_signals(html, url="https://x.com")
+    assert s["has_online_booking"] is True
+
+
+def test_extract_site_signals_ecommerce():
+    html = '<html><script src="https://cdn.shopify.com/x.js"></script><a href="/checkout">Finalizar compra</a></html>'
+    s = extract_site_signals(html, url="https://x.com")
+    assert s["has_ecommerce"] is True
 
 
 # ============================================================================
@@ -164,6 +227,24 @@ def test_score_lead_with_signals_and_trafego_profession():
     assert r.decision == "qualificado"
 
 
+def test_trafego_analytics_only_nao_conta_como_anuncia():
+    """So GA/GTM (analytics) NAO marca 'ja anuncia': vale a oportunidade (15)."""
+    lead = _lead(website="example.com")
+    so_analytics = score_lead(lead, signals={"site": {"has_google_tag": True}}, profession="trafego")
+    anuncia = next(c for c in so_analytics.reason["trafego"]["criteria"] if c["label"] == "Anuncia?")
+    # sem pixel de anuncio e ads desconhecido => 8 (desconhecido), nunca 6 (aquecido)
+    assert anuncia["points"] == 8
+
+
+def test_score_design_usa_pagespeed_perf():
+    """Lente design usa perf_score do PageSpeed: nota baixa vira criterio Performance."""
+    lead = _lead(website="https://x.com")
+    signals = {"site": {"perf_score": 20, "mobile_ready": True}}
+    r = score_lead(lead, signals=signals, profession="design")
+    labels = [c["label"] for c in r.reason["design"]["criteria"]]
+    assert "Performance" in labels
+
+
 # ============================================================================
 # 3. Testes de WebsiteSource emitindo findings
 # ============================================================================
@@ -197,12 +278,33 @@ def test_website_source_emits_ads_active_when_pixel():
     assert ads_findings[0].value == "sim"
 
 
-def test_website_source_emits_ads_active_when_google_tag():
-    """WebsiteSource emite Finding ads_active='sim' quando acha Google tag."""
-    html = '<html><script src="https://www.googletagmanager.com/gtag/js"></script></html>'
+def test_website_source_no_ads_active_for_analytics_only():
+    """Google Analytics/GTM puro NAO e anuncio: WebsiteSource nao emite ads_active."""
+    html = '<html><script src="https://www.googletagmanager.com/gtag/js?id=G-ABC"></script></html>'
     src = WebsiteSource(fetch_html=lambda _u: html, reachable=lambda _u: True)
     lead = _lead(website="x.com")
     findings = src.enrich(lead)
+
+    ads_findings = [f for f in findings if f.field_name == "ads_active"]
+    assert len(ads_findings) == 0
+
+
+def test_website_source_emits_ads_active_when_google_ads_tag():
+    """Tag de conversao do Google Ads (AW-/googleadservices) emite ads_active='sim'."""
+    html = '<html><script>gtag("config", "AW-123456789");</script></html>'
+    src = WebsiteSource(fetch_html=lambda _u: html, reachable=lambda _u: True)
+    findings = src.enrich(_lead(website="x.com"))
+
+    ads_findings = [f for f in findings if f.field_name == "ads_active"]
+    assert len(ads_findings) == 1
+    assert ads_findings[0].value == "sim"
+
+
+def test_website_source_emits_ads_active_when_tiktok_pixel():
+    """TikTok pixel (ttq.load) emite ads_active='sim'."""
+    html = '<html><script>ttq.load("ABC123");</script></html>'
+    src = WebsiteSource(fetch_html=lambda _u: html, reachable=lambda _u: True)
+    findings = src.enrich(_lead(website="x.com"))
 
     ads_findings = [f for f in findings if f.field_name == "ads_active"]
     assert len(ads_findings) == 1
