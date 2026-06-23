@@ -38,7 +38,7 @@ import {
 import { getRepo } from "@/lib/repo";
 import { FollowupCard } from "@/components/followup-card";
 import { LeadFiles } from "@/components/lead-files";
-import { waSend, WA_TAB } from "@/lib/whatsapp";
+import { waSend, openWhatsApp } from "@/lib/whatsapp";
 import { googleSearchUrl, googleMapsUrl } from "@/lib/links";
 import { siteSignalChips, signalChipClass } from "@/lib/site-signals";
 import { useCancelMeeting } from "@/hooks/use-cancel-meeting";
@@ -452,7 +452,6 @@ export default function FichaPage() {
   const statusMeta = STATUS_META[lead.status];
   const toneClass = TONE_CLASSES[statusMeta.tone];
 
-  const waLink = (text: string) => waSend(lead.whatsapp ?? lead.phone, text) ?? "#";
 
   const statusAgeDays = daysInStatus(history);
   const statusAgeText = statusAgeLabel(statusAgeDays);
@@ -782,15 +781,14 @@ export default function FichaPage() {
                     </div>
                   )}
                   {lead.phone && lead.draft_msg1 && (
-                    <a
-                      href={waLink(lead.draft_msg1)}
-                      target={WA_TAB}
-                      rel="noreferrer"
+                    <button
+                      type="button"
+                      onClick={() => openWhatsApp(lead.whatsapp ?? lead.phone, lead.draft_msg1 ?? undefined)}
                       className="flex items-center justify-center gap-2 rounded-[13px] p-3.5 text-sm font-bold text-white"
                       style={{ background: "var(--wa)" }}
                     >
                       <WhatsappLogo size={18} weight="fill" /> Abrir conversa no WhatsApp
-                    </a>
+                    </button>
                   )}
                 </div>
               </div>

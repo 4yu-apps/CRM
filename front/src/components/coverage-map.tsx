@@ -50,12 +50,15 @@ function MapController({
     if (radiusMeters && radiusMeters > 0) {
       const latDelta = radiusMeters / 111320;
       const lngDelta = radiusMeters / (111320 * Math.cos((lat * Math.PI) / 180));
+      // padding pequeno: o circulo do raio quase preenche o mapa (fica apertado
+      // no bairro, nao mostrando a regiao toda em volta). maxZoom alto pra raios
+      // pequenos (1-2km) poderem chegar perto.
       map.flyToBounds(
         [
           [lat - latDelta, lng - lngDelta],
           [lat + latDelta, lng + lngDelta],
         ],
-        { padding: [40, 40], duration: 0.8, maxZoom: 15 },
+        { padding: [16, 16], duration: 0.8, maxZoom: 17 },
       );
     } else {
       map.flyTo([lat, lng], zoom, { duration: 0.8 });

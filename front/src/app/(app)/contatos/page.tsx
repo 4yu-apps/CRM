@@ -23,7 +23,7 @@ import type { Lead, LeadStatus } from "@/lib/types";
 import { RAMOS_DISPONIVEIS } from "@/lib/ramos";
 import { Dropdown, type DropdownOption } from "@/components/dropdown";
 import { cn } from "@/lib/utils";
-import { waSend, WA_TAB } from "@/lib/whatsapp";
+import { openWhatsApp } from "@/lib/whatsapp";
 import { ListSkeleton } from "@/components/skeleton";
 
 type SortKey = "recent" | "name" | "score";
@@ -62,11 +62,6 @@ function matchesQuery(lead: Lead, q: string): boolean {
   return false;
 }
 
-function waUrl(phone?: string | null): string | undefined {
-  const d = digits(phone);
-  if (!d) return undefined;
-  return waSend(d);
-}
 function igUrl(handle?: string | null): string | undefined {
   const h = (handle ?? "").trim().replace(/^@/, "");
   return h ? `https://instagram.com/${h}` : undefined;
@@ -86,18 +81,41 @@ function StatusBadge({ status }: { status: LeadStatus }) {
   );
 }
 
-// Icone-link de contato; para a propagacao pra nao abrir a ficha ao clicar.
-function ContactIcon({ href, title, children, tabName = "_blank" }: { href?: string; title: string; children: React.ReactNode; tabName?: string }) {
+// Icone de contato; para a propagacao pra nao abrir a ficha ao clicar. Com
+// onClick vira botao (ex.: WhatsApp, que reusa a aba); com href vira link.
+function ContactIcon({
+  href,
+  title,
+  children,
+  tabName = "_blank",
+  onClick,
+}: {
+  href?: string;
+  title: string;
+  children: React.ReactNode;
+  tabName?: string;
+  onClick?: () => void;
+}) {
+  const cls =
+    "flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-brand";
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        title={title}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick();
+        }}
+        className={cls}
+      >
+        {children}
+      </button>
+    );
+  }
   if (!href) return null;
   return (
-    <a
-      href={href}
-      target={tabName}
-      rel="noreferrer"
-      title={title}
-      onClick={(e) => e.stopPropagation()}
-      className="flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-brand"
-    >
+    <a href={href} target={tabName} rel="noreferrer" title={title} onClick={(e) => e.stopPropagation()} className={cls}>
       {children}
     </a>
   );
@@ -485,9 +503,11 @@ export default function ContatosPage() {
 
                 {/* Contato */}
                 <div className="flex items-center gap-1">
-                  <ContactIcon href={waUrl(lead.whatsapp ?? lead.phone)} title="WhatsApp" tabName={WA_TAB}>
-                    <WhatsappLogo size={16} weight="fill" />
-                  </ContactIcon>
+                  {(lead.whatsapp || lead.phone) && (
+                    <ContactIcon onClick={() => openWhatsApp(lead.whatsapp ?? lead.phone)} title="WhatsApp">
+                      <WhatsappLogo size={16} weight="fill" />
+                    </ContactIcon>
+                  )}
                   <ContactIcon href={igUrl(lead.instagram)} title="Instagram">
                     <InstagramLogo size={16} />
                   </ContactIcon>

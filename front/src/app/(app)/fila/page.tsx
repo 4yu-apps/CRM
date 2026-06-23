@@ -36,7 +36,7 @@ import { fmtPhone, fmtCnpj } from "@/lib/format";
 import type { Lead } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Dropdown } from "@/components/dropdown";
-import { waSend, WA_TAB } from "@/lib/whatsapp";
+import { openWhatsApp } from "@/lib/whatsapp";
 import { googleSearchUrl, googleMapsUrl, metaAdsUrl } from "@/lib/links";
 import { siteSignalChips, signalChipClass } from "@/lib/site-signals";
 import { Skeleton } from "@/components/skeleton";
@@ -98,7 +98,6 @@ function ExternalChip({
   );
 }
 
-const waLink = (phone: string | null, text: string) => waSend(phone, text) ?? "#";
 
 // Ordenacao da fila: comecar pelos melhores em vez de ordem aleatoria. Com 800+
 // leads, isso e o que faz a revisao render.
@@ -620,16 +619,20 @@ export default function FilaPage() {
               </div>
             </div>
             <div className="flex flex-col gap-2.5 px-6 pb-6">
-              <a
-                href={waLink(sendLead.whatsapp ?? sendLead.phone, [sendLead.draft_msg1, sendLead.draft_msg2].filter(Boolean).join("\n\n"))}
-                target={WA_TAB}
-                rel="noreferrer"
-                onClick={markSent}
+              <button
+                type="button"
+                onClick={() => {
+                  openWhatsApp(
+                    sendLead.whatsapp ?? sendLead.phone,
+                    [sendLead.draft_msg1, sendLead.draft_msg2].filter(Boolean).join("\n\n"),
+                  );
+                  void markSent();
+                }}
                 className="flex w-full items-center justify-center gap-2 rounded-[14px] p-4 text-sm font-bold text-white"
                 style={{ background: "var(--wa)" }}
               >
                 <WhatsappLogo size={20} weight="fill" /> Abrir conversa e enviar
-              </a>
+              </button>
               <button
                 onClick={markSent}
                 className="w-full rounded-[14px] border border-border-2 bg-card p-3 text-sm font-semibold text-ink-2"

@@ -40,6 +40,9 @@ const CoverageMap = dynamic(() => import("@/components/coverage-map"), {
 const BRASIL_CENTER = { lat: -14.235, lng: -51.925, zoom: 4 };
 
 const RADIUS_OPTIONS = [
+  { value: "1km", label: "Ate 1 km (bairro)" },
+  { value: "2km", label: "Ate 2 km" },
+  { value: "3km", label: "Ate 3 km" },
   { value: "5km", label: "Ate 5 km" },
   { value: "10km", label: "Ate 10 km" },
   { value: "25km", label: "Ate 25 km" },
