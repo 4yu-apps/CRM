@@ -35,6 +35,7 @@ import { cn } from "@/lib/utils";
 import { Dropdown } from "@/components/dropdown";
 import { waSend, WA_TAB } from "@/lib/whatsapp";
 import { googleSearchUrl, googleMapsUrl, metaAdsUrl } from "@/lib/links";
+import { siteSignalChips, signalChipClass } from "@/lib/site-signals";
 
 function LeadIcon({ category, size }: { category: string | null; size: number }) {
   const c = (category ?? "").toLowerCase();
@@ -383,6 +384,25 @@ export default function FilaPage() {
                 </div>
               ))}
             </div>
+
+            {/* diagnostico do site: sinais enriquecidos de graca (anuncio real,
+                PageSpeed, agendamento, e-commerce, canais). Mesmos chips da ficha. */}
+            {(() => {
+              const chips = siteSignalChips(cur.site_signals);
+              if (chips.length === 0) return null;
+              return (
+                <div>
+                  <div className="mb-2 text-xs font-bold uppercase tracking-wider text-faint">Diagnostico do site</div>
+                  <div className="flex flex-wrap gap-2">
+                    {chips.map((chip, i) => (
+                      <span key={i} className={cn("rounded-full px-2.5 py-1 text-[12px]", signalChipClass(chip.variant))}>
+                        {chip.label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* sinais */}
             <div>
