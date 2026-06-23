@@ -40,7 +40,7 @@ const NAV: NavItem[] = [
   { href: "/contatos", label: "Contatos", Icon: AddressBook },
   { href: "/agenda", label: "Agenda", Icon: CalendarBlank },
   { href: "/resultados", label: "Resultados", Icon: ChartLineUp },
-  { href: "/buscar", label: "Buscar", Icon: MagnifyingGlass },
+  { href: "/buscar", label: "Buscar leads", Icon: MagnifyingGlass },
   { href: "/celular", label: "No celular", Icon: DeviceMobile },
   { href: "/config", label: "Configuração", Icon: GearSix },
 ];

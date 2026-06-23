@@ -39,6 +39,8 @@ function getFollowupBadge(lead: Lead): "hoje" | "atrasado" | null {
 interface KanbanColumn {
   id: string;
   label: string;
+  // Frase curta (1 linha) explicando a coluna, abaixo do titulo.
+  hint: string;
   color: string;
   // Status internos que pertencem a essa coluna
   statuses: LeadStatus[];
@@ -52,20 +54,23 @@ const KANBAN_COLUMNS: KanbanColumn[] = [
   {
     id: "novo",
     label: "Novo",
+    hint: "Aprovados, prontos pra abordar",
     color: "#7C3AED",
     statuses: ["rascunho_pronto", "aprovado"],
     targetStatus: "aprovado",
   },
   {
     id: "enviado",
-    label: "Enviado",
+    label: "Abordado",
+    hint: "Mensagem enviada, aguardando retorno",
     color: "#2A8FE0",
     statuses: ["enviado", "sem_resposta"],
     targetStatus: "enviado",
   },
   {
     id: "respondeu",
-    label: "Respondeu",
+    label: "Em contato",
+    hint: "Respondeu, conversa rolando",
     color: "#16A05A",
     statuses: ["respondeu"],
     targetStatus: "respondeu",
@@ -73,6 +78,7 @@ const KANBAN_COLUMNS: KanbanColumn[] = [
   {
     id: "interessado",
     label: "Interessado",
+    hint: "Demonstrou interesse real",
     color: "#C9870F",
     statuses: ["interessado"],
     targetStatus: "interessado",
@@ -80,13 +86,15 @@ const KANBAN_COLUMNS: KanbanColumn[] = [
   {
     id: "reuniao",
     label: "Reunião",
+    hint: "Reunião marcada ou proposta",
     color: "#0891B2",
     statuses: ["reuniao", "proposta"],
     targetStatus: "reuniao",
   },
   {
     id: "fechou",
-    label: "Fechou",
+    label: "Cliente",
+    hint: "Fechou e virou cliente",
     color: "#15A05A",
     statuses: ["fechado"],
     targetStatus: "fechado",
@@ -94,6 +102,7 @@ const KANBAN_COLUMNS: KanbanColumn[] = [
   {
     id: "arquivados",
     label: "Arquivados",
+    hint: "Descartados ou sem interesse",
     color: "#94A3B8",
     statuses: [],
     targetStatus: null,
@@ -553,15 +562,20 @@ function FunnelColumn({
       )}
     >
       {/* Cabecalho da coluna */}
-      <div className="mb-3 flex items-center justify-between px-1">
-        <div className="flex items-center gap-2">
-          <span
-            className="size-2.5 rounded-full"
-            style={{ background: col.color }}
-          />
-          <span className="text-[13px] font-bold text-ink">{col.label}</span>
+      <div className="mb-3 px-1">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span
+              className="size-2.5 rounded-full"
+              style={{ background: col.color }}
+            />
+            <span className="text-[13px] font-bold text-ink">{col.label}</span>
+          </div>
+          <span className="text-[12px] font-bold text-faint">{leads.length}</span>
         </div>
-        <span className="text-[12px] font-bold text-faint">{leads.length}</span>
+        <p className="mt-0.5 truncate text-[11px] text-faint" title={col.hint}>
+          {col.hint}
+        </p>
       </div>
 
       {/* Cards */}
