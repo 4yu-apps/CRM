@@ -31,8 +31,19 @@ function waSlot(): { win: Window | null } {
 // Limite do navegador: nao da pra mirar uma aba que VOCE abriu na mao (so a que
 // o sistema abriu). SEM noopener/noreferrer (eles virariam _blank = aba nova).
 export function openWhatsApp(phone?: string | null, text?: string): boolean {
+  if (typeof window === "undefined") return false;
+  // 1) Extensao Garimpo instalada (marca data-garimpo-ext na pagina): ela REUSA
+  //    a aba do WhatsApp Web de verdade (o site sozinho nao consegue). Delega.
+  if (document.documentElement.getAttribute("data-garimpo-ext") === "1") {
+    window.postMessage(
+      { source: "garimpo-crm", type: "open_whatsapp", phone: phone ?? "", text: text ?? "" },
+      "*",
+    );
+    return true;
+  }
+  // 2) Sem extensao: fallback web (best-effort; pode abrir uma aba propria).
   const url = waSend(phone, text);
-  if (!url || typeof window === "undefined") return false;
+  if (!url) return false;
   const slot = waSlot();
   let win = slot.win;
   if (win && !win.closed) {
