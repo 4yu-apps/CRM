@@ -40,10 +40,23 @@ export type DealBilling = "mensal_fixo" | "por_prazo";
 // Sinais tecnicos capturados do site do lead pelo enriquecedor.
 export interface SiteSignals {
   has_fb_pixel?: boolean;
+  // Google Ads de verdade (tag de conversao AW-/googleadservices), separado do
+  // analytics generico (has_google_tag = GA/GTM, que NAO prova anuncio).
+  has_google_ads?: boolean;
+  has_tiktok_pixel?: boolean;
+  // plataformas onde o lead JA anuncia (pixel de verdade): ["meta","google","tiktok"]
+  ad_platforms?: string[];
   has_google_tag?: boolean;
   has_chat_widget?: boolean;
   chat_vendor?: string | null;
   has_form?: boolean;
+  // agendamento online (Calendly/Booksy...) e e-commerce/checkout
+  has_online_booking?: boolean;
+  has_ecommerce?: boolean;
+  // outros canais sociais alem de IG/FB
+  has_tiktok?: boolean;
+  has_youtube?: boolean;
+  has_linkedin?: boolean;
   mobile_ready?: boolean;
   page_kb?: number;
   slow?: boolean;
@@ -53,6 +66,11 @@ export interface SiteSignals {
   has_title?: boolean;
   has_description?: boolean;
   og_image?: boolean;
+  // performance real do PageSpeed (Google): nota 0-100 no celular + LCP
+  perf_score?: number;
+  perf_slow?: boolean;
+  lcp_ms?: number;
+  speed_category?: string; // FAST | AVERAGE | SLOW (Chrome UX)
 }
 
 // score_reason (jsonb): score explicavel. summary = o "porque" em PT (motivo);
