@@ -24,6 +24,7 @@ import { RAMOS_DISPONIVEIS } from "@/lib/ramos";
 import { Dropdown, type DropdownOption } from "@/components/dropdown";
 import { cn } from "@/lib/utils";
 import { waSend, WA_TAB } from "@/lib/whatsapp";
+import { ListSkeleton } from "@/components/skeleton";
 
 type SortKey = "recent" | "name" | "score";
 
@@ -283,8 +284,8 @@ export default function ContatosPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto flex max-w-[1180px] items-center justify-center py-24">
-        <Spinner size={28} className="animate-spin text-brand" />
+      <div className="mx-auto max-w-[1180px]">
+        <ListSkeleton rows={10} />
       </div>
     );
   }

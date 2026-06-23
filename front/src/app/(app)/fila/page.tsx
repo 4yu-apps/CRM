@@ -39,6 +39,7 @@ import { Dropdown } from "@/components/dropdown";
 import { waSend, WA_TAB } from "@/lib/whatsapp";
 import { googleSearchUrl, googleMapsUrl, metaAdsUrl } from "@/lib/links";
 import { siteSignalChips, signalChipClass } from "@/lib/site-signals";
+import { Skeleton } from "@/components/skeleton";
 
 function LeadIcon({ category, size }: { category: string | null; size: number }) {
   const c = (category ?? "").toLowerCase();
@@ -146,7 +147,7 @@ function sortQueue(leads: Lead[], key: SortKey): Lead[] {
 }
 
 export default function FilaPage() {
-  const { leads, repo, refresh } = useLeads();
+  const { leads, loading, repo, refresh } = useLeads();
 
   const [sortBy, setSortBy] = useState<SortKey>("recomendados");
   const [ramo, setRamo] = useState("todos");
@@ -286,6 +287,33 @@ export default function FilaPage() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [approve, discard, archive, skip, sendLead]);
+
+  // carregando: skeleton (evita piscar o estado de "primeiro uso" antes dos
+  // leads chegarem).
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-[1180px]">
+        <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[1fr_420px]">
+          <div className="space-y-4 rounded-[20px] border border-border bg-card p-6 shadow-[var(--shadow)]">
+            <div className="flex items-center gap-4">
+              <Skeleton className="size-13 rounded-[14px]" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-5 w-1/2" />
+                <Skeleton className="h-3.5 w-1/3" />
+              </div>
+            </div>
+            <Skeleton className="h-16 w-full rounded-[14px]" />
+            <Skeleton className="h-24 w-full rounded-[14px]" />
+          </div>
+          <div className="space-y-3 rounded-[20px] border border-border bg-card p-6 shadow-[var(--shadow)]">
+            <Skeleton className="h-28 w-full rounded-xl" />
+            <Skeleton className="h-20 w-full rounded-xl" />
+            <Skeleton className="h-12 w-full rounded-[14px]" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // fila vazia (nada pronto pra revisar, independente de filtro). Distingue o
   // PRIMEIRO USO (conta sem nenhum lead) de "revisou tudo".
