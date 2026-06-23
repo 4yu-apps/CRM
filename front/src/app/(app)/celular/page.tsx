@@ -307,7 +307,7 @@ export default function CelularPage() {
       {/* rodape de seguranca */}
       <div className="mt-6 flex items-center justify-center gap-2 text-[11.5px] text-faint">
         <ShieldCheck size={15} className="text-success" />
-        Voce manda do seu numero, com a propria mao. O 4YU nunca dispara sozinho.
+        Voce manda do seu numero, com a propria mao. O 4YU CRM nunca dispara sozinho.
       </div>
     </div>
   );

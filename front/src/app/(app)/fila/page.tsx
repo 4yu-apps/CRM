@@ -29,6 +29,7 @@ import { SERVICE_META } from "@/lib/service";
 import { fmtPhone, fmtCnpj } from "@/lib/format";
 import type { Lead } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { Dropdown } from "@/components/dropdown";
 
 function LeadIcon({ category, size }: { category: string | null; size: number }) {
   const c = (category ?? "").toLowerCase();
@@ -67,9 +68,72 @@ const waLink = (phone: string | null, text: string) => {
   return `https://wa.me/${num}?text=${encodeURIComponent(text)}`;
 };
 
+// Ordenacao da fila: comecar pelos melhores em vez de ordem aleatoria. Com 800+
+// leads, isso e o que faz a revisao render.
+type SortKey = "recomendados" | "valor" | "avaliacao" | "avaliacoes" | "completo";
+
+const SORT_OPTIONS = [
+  { value: "recomendados", label: "Recomendados", hint: "(melhor encaixe)" },
+  { value: "valor", label: "Maior valor sugerido" },
+  { value: "avaliacao", label: "Melhor avaliacao" },
+  { value: "avaliacoes", label: "Mais avaliacoes" },
+  { value: "completo", label: "Ficha mais completa" },
+];
+
+// Quao "completa" esta a ficha: mais dados = mais facil de abordar com seguranca.
+function completeness(l: Lead): number {
+  let n = 0;
+  if (l.phone) n++;
+  if (l.instagram) n++;
+  if (l.website) n++;
+  if (l.cnpj) n++;
+  if (l.owner_name) n++;
+  if (l.email) n++;
+  if (l.ads_active != null) n++;
+  if (l.score_reason?.summary) n++;
+  return n;
+}
+
+function sortQueue(leads: Lead[], key: SortKey): Lead[] {
+  const arr = [...leads];
+  const porReviews = (a: Lead, b: Lead) => (b.reviews_count ?? 0) - (a.reviews_count ?? 0);
+  switch (key) {
+    case "valor":
+      return arr.sort(
+        (a, b) => (b.suggested_value ?? -1) - (a.suggested_value ?? -1) || porReviews(a, b),
+      );
+    case "avaliacao":
+      return arr.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0) || porReviews(a, b));
+    case "avaliacoes":
+      return arr.sort(porReviews);
+    case "completo":
+      return arr.sort((a, b) => completeness(b) - completeness(a) || (b.score ?? 0) - (a.score ?? 0));
+    case "recomendados":
+    default:
+      return arr.sort((a, b) => (b.score ?? 0) - (a.score ?? 0) || porReviews(a, b));
+  }
+}
+
 export default function FilaPage() {
   const { leads, repo, refresh } = useLeads();
-  const queue = useMemo(() => leads.filter((l) => l.status === "rascunho_pronto"), [leads]);
+
+  const [sortBy, setSortBy] = useState<SortKey>("recomendados");
+  const [ramo, setRamo] = useState("todos");
+
+  // Base: tudo que esta pronto pra revisar. Dela saem o filtro de ramo e a ordem.
+  const baseQueue = useMemo(() => leads.filter((l) => l.status === "rascunho_pronto"), [leads]);
+  const ramoOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const l of baseQueue) if (l.category) set.add(l.category);
+    return [
+      { value: "todos", label: "Todos os ramos" },
+      ...[...set].sort((a, b) => a.localeCompare(b)).map((c) => ({ value: c, label: c })),
+    ];
+  }, [baseQueue]);
+  const queue = useMemo(() => {
+    const filtrada = ramo === "todos" ? baseQueue : baseQueue.filter((l) => l.category === ramo);
+    return sortQueue(filtrada, sortBy);
+  }, [baseQueue, ramo, sortBy]);
 
   const [edits, setEdits] = useState<Record<string, { m1: string; m2: string }>>({});
   const [sendLead, setSendLead] = useState<Lead | null>(null);
@@ -145,8 +209,8 @@ export default function FilaPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [approve, discard, sendLead]);
 
-  // fila vazia
-  if (queue.length === 0) {
+  // fila vazia (nada pronto pra revisar, independente de filtro)
+  if (baseQueue.length === 0) {
     return (
       <div className="mx-auto max-w-[1180px]">
         <div className="fu mx-auto mt-16 max-w-[520px] rounded-[22px] border border-border bg-card p-14 text-center shadow-[var(--shadow)]">
@@ -170,29 +234,54 @@ export default function FilaPage() {
     );
   }
 
-  const service = SERVICE_META[cur.service_target] ?? SERVICE_META.indefinido;
-  const msg = msgOf(cur);
+  const service = cur ? (SERVICE_META[cur.service_target] ?? SERVICE_META.indefinido) : SERVICE_META.indefinido;
+  const msg = cur ? msgOf(cur) : { m1: "", m2: "" };
   const pct = total ? Math.round((reviewed / total) * 100) : 0;
+  const ramoLabel = ramoOptions.find((o) => o.value === ramo)?.label ?? "esse ramo";
 
   return (
     <div className="mx-auto max-w-[1180px]">
-      <div className="mb-4 flex items-center justify-between gap-3">
+      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-3.5">
           <div className="text-sm text-muted-foreground">
-            Revisando <strong className="text-foreground">{reviewed + 1} de {total}</strong>
+            Revisando <strong className="text-foreground">{cur ? reviewed + 1 : reviewed} de {total}</strong>
           </div>
-          <div className="h-1.5 w-[200px] overflow-hidden rounded-full bg-[var(--inset)]">
+          <div className="h-1.5 w-[160px] overflow-hidden rounded-full bg-[var(--inset)]">
             <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: "var(--grad)" }} />
           </div>
         </div>
-        <div className="hidden items-center gap-2 text-[12.5px] text-faint sm:flex">
-          <kbd className="rounded-md border border-border-2 bg-[var(--inset)] px-1.5 py-0.5 font-heading font-semibold text-ink-2">A</kbd>
-          aprovar
-          <kbd className="rounded-md border border-border-2 bg-[var(--inset)] px-1.5 py-0.5 font-heading font-semibold text-ink-2">D</kbd>
-          descartar
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[12.5px] font-semibold text-faint">Ordenar por</span>
+          <Dropdown
+            value={sortBy}
+            onChange={(v) => setSortBy(v as SortKey)}
+            options={SORT_OPTIONS}
+            ariaLabel="Ordenar a fila"
+            align="end"
+            className="w-[188px]"
+          />
+          <Dropdown
+            value={ramo}
+            onChange={setRamo}
+            options={ramoOptions}
+            ariaLabel="Filtrar por ramo"
+            align="end"
+            className="w-[168px]"
+          />
+          <span className="hidden items-center gap-2 text-[12.5px] text-faint xl:flex">
+            <kbd className="rounded-md border border-border-2 bg-[var(--inset)] px-1.5 py-0.5 font-heading font-semibold text-ink-2">A</kbd>
+            aprovar
+            <kbd className="rounded-md border border-border-2 bg-[var(--inset)] px-1.5 py-0.5 font-heading font-semibold text-ink-2">D</kbd>
+            descartar
+          </span>
         </div>
       </div>
 
+      {!cur ? (
+        <div className="fu mt-2 rounded-[20px] border border-border bg-card p-10 text-center text-muted-foreground shadow-[var(--shadow)]">
+          Nenhum lead pronto em <strong className="text-foreground">{ramoLabel}</strong> agora. Troca o ramo ou volta pra Todos os ramos.
+        </div>
+      ) : (
       <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[1fr_420px]">
         {/* ficha card */}
         <div className="overflow-hidden rounded-[20px] border border-border bg-card shadow-[var(--shadow)]">
@@ -321,6 +410,7 @@ export default function FilaPage() {
           </div>
         </div>
       </div>
+      )}
 
       {/* modal de envio */}
       {sendLead && (
@@ -350,7 +440,7 @@ export default function FilaPage() {
               </div>
               <div className="mt-3 flex items-center gap-2 text-[12.5px] text-faint">
                 <ShieldCheck size={16} className="text-success" /> Voce manda do seu numero, com a propria mao. O
-                4YU nunca dispara sozinho.
+                4YU CRM nunca dispara sozinho.
               </div>
             </div>
             <div className="flex flex-col gap-2.5 px-6 pb-6">

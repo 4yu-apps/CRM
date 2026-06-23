@@ -36,6 +36,11 @@ interface SeedSpec {
   archived?: boolean;
   createdDaysAgo: number;
   updatedHoursAgo: number;
+  // Campos opcionais de demo: valor sugerido/fechado e follow-up.
+  suggestedValue?: number;
+  dealValue?: number;
+  followupInDays?: number;
+  followupNote?: string;
 }
 
 const SPECS: SeedSpec[] = [
@@ -224,6 +229,8 @@ const SPECS: SeedSpec[] = [
     draft2: "Faco um diagnostico rapido do que ta no ar e te mostro onde da pra economizar. Sem compromisso, topa?",
     createdDaysAgo: 4,
     updatedHoursAgo: 5,
+    followupInDays: 0,
+    followupNote: "ver se ele respondeu sobre o diagnostico que ofereci",
   },
   {
     business_name: "Odonto Sorria",
@@ -272,6 +279,8 @@ const SPECS: SeedSpec[] = [
     draft2: "Anuncio pra quem ta perto procurando cafe e um lugar bom pra trabalhar. Te mando um exemplo?",
     createdDaysAgo: 6,
     updatedHoursAgo: 8,
+    followupInDays: -2,
+    followupNote: "retomar a conversa, ele respondeu mas esfriou",
   },
   {
     business_name: "Auto Spa Brilho",
@@ -318,6 +327,7 @@ const SPECS: SeedSpec[] = [
     draft2: "A gente atrai gente da regiao interessada em yoga e enche as turmas novas. Te mostro um exemplo na call?",
     createdDaysAgo: 8,
     updatedHoursAgo: 30,
+    suggestedValue: 1500,
   },
   {
     business_name: "Pilates Corpo Leve",
@@ -340,6 +350,8 @@ const SPECS: SeedSpec[] = [
     draft2: "Mes que vem ajusto a campanha pra focar nas turmas novas. Qualquer coisa, to por aqui.",
     createdDaysAgo: 20,
     updatedHoursAgo: 60,
+    suggestedValue: 1200,
+    dealValue: 1500,
   },
 ];
 
@@ -380,6 +392,14 @@ export function buildSeed(): { leads: Lead[]; provenance: FieldProvenance[]; his
   for (const s of SPECS) {
     const id = uid("lead");
     const website = s.site ? `https://${slug(s.business_name)}.com.br` : null;
+    // Campos opcionais de demo (follow-up e valores de negocio) presentes so em
+    // alguns specs; lidos via cast pra nao quebrar o tipo inferido do array.
+    const extra = s as {
+      suggestedValue?: number;
+      dealValue?: number;
+      followupInDays?: number;
+      followupNote?: string;
+    };
     const score_reason: ScoreReason = {
       total: s.score,
       summary: s.motivo,
@@ -416,6 +436,14 @@ export function buildSeed(): { leads: Lead[]; provenance: FieldProvenance[]; his
       updated_at: hoursAgo(s.updatedHoursAgo),
       draft_msg1: s.draft1,
       draft_msg2: s.draft2,
+      suggested_value: extra.suggestedValue ?? null,
+      deal_value: extra.dealValue ?? null,
+      deal_closed_at: extra.dealValue != null ? daysAgo(2) : null,
+      followup_at:
+        extra.followupInDays != null
+          ? new Date(now() + extra.followupInDays * 86400_000).toISOString()
+          : null,
+      followup_note: extra.followupNote ?? null,
     });
 
     // proveniencia gerada dos campos preenchidos

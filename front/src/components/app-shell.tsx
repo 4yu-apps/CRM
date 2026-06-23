@@ -321,10 +321,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className={cn("flex items-center pb-5.5", collapsed ? "flex-col gap-2.5" : "justify-between px-1")}>
           {!collapsed && (
             <span className="inline-flex items-center gap-2.5">
-              <Image src="/4yu-icon.png" alt="4YUmkt" width={38} height={38} priority className="size-8 object-contain" />
+              <Image src="/4yu-icon.png" alt="4YU CRM" width={38} height={38} priority className="size-8 object-contain" />
               <span className="flex items-baseline gap-[3px] font-heading">
                 <span className="text-[19px] font-bold tracking-tight text-foreground">4YU</span>
-                <span className="text-[11px] font-semibold tracking-[.14em] text-brand">MKT</span>
+                <span className="text-[11px] font-semibold tracking-[.14em] text-brand">CRM</span>
               </span>
             </span>
           )}

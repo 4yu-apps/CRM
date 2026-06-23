@@ -20,7 +20,7 @@ export function NavBar() {
     <header className="border-b border-zinc-800 bg-zinc-950 text-zinc-100">
       <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-2.5 sm:px-6">
         <Link href="/" className="flex items-center gap-2.5">
-          <Image src="/logo.png" alt="4YUmkt" width={1080} height={419} priority className="h-7 w-auto" />
+          <Image src="/logo.png" alt="4YU CRM" width={1080} height={419} priority className="h-7 w-auto" />
         </Link>
 
         {user && (

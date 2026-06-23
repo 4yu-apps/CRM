@@ -17,8 +17,8 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "CRM | 4YUmkt",
-  description: "CRM de prospeccao assistida por IA, com humano no loop. 4YUmkt.",
+  title: "4YU CRM",
+  description: "CRM de prospeccao assistida por IA, com humano no loop. 4YU CRM.",
 };
 
 export default function RootLayout({

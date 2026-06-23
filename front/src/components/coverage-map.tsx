@@ -3,7 +3,6 @@
 // Importado sempre via dynamic(..., { ssr: false }) para evitar quebra no SSR do Next.js.
 import { useEffect } from "react";
 import { MapContainer, TileLayer, CircleMarker, Tooltip, Circle, useMap } from "react-leaflet";
-import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { ScanCoverage } from "@/lib/types";
 
@@ -28,14 +27,6 @@ interface CoverageMapProps {
   radiusKm?: number;
 }
 
-// Converte o valor do campo radius ("10km", "25km", "cidade") para metros.
-function radiusToMeters(r: string | undefined): number | null {
-  if (!r || r === "cidade") return null;
-  const m = /^(\d+)km$/i.exec(r);
-  if (!m) return null;
-  return parseInt(m[1], 10) * 1000;
-}
-
 // Sub-componente que reage a mudancas de centro/zoom sem remontar o MapContainer.
 // O MapContainer usa center/zoom apenas na montagem; para recentrar usamos flyTo.
 function MapController({
@@ -51,42 +42,6 @@ function MapController({
   useEffect(() => {
     map.flyTo([lat, lng], zoom, { duration: 0.8 });
   }, [map, lat, lng, zoom]);
-  return null;
-}
-
-// Marcador de texto (DivIcon) para mostrar o nome da cidade/estado no mapa.
-function CityLabel({
-  lat,
-  lng,
-  label,
-}: {
-  lat: number;
-  lng: number;
-  label: string;
-}) {
-  const map = useMap();
-  useEffect(() => {
-    const icon = L.divIcon({
-      className: "",
-      html: `<div style="
-        background: rgba(255,255,255,0.92);
-        border: 1.5px solid #7C3AED;
-        border-radius: 8px;
-        padding: 3px 8px;
-        font-size: 12px;
-        font-weight: 700;
-        color: #4B2DA0;
-        white-space: nowrap;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.18);
-        pointer-events: none;
-      ">${label}</div>`,
-      iconAnchor: [0, 0],
-    });
-    const marker = L.marker([lat, lng], { icon, interactive: false }).addTo(map);
-    return () => {
-      marker.remove();
-    };
-  }, [map, lat, lng, label]);
   return null;
 }
 
@@ -109,14 +64,12 @@ export default function CoverageMap({
   useLeafletIconFix();
 
   const hasCityCoord = centerLat !== -14.235 || centerLng !== -51.925;
-  const radiusMeters = radiusToMeters(
-    radiusKm !== undefined ? `${radiusKm}km` : undefined,
-  );
+  const radiusMeters = radiusKm != null && radiusKm > 0 ? radiusKm * 1000 : null;
 
   // Label do mapa: cidade (UF) se tiver cidade, ou so o estado
   const mapLabel = cityName
     ? stateName
-      ? `${cityName} (${stateName})`
+      ? `${cityName} - ${stateName}`
       : cityName
     : stateName
       ? stateName
@@ -153,9 +106,19 @@ export default function CoverageMap({
         />
       )}
 
-      {/* Label de cidade/estado no mapa */}
-      {hasCityCoord && mapLabel && (
-        <CityLabel lat={centerLat} lng={centerLng} label={mapLabel} />
+      {/* Pin do centro (cidade/estado) com rotulo legivel acima dele */}
+      {hasCityCoord && (
+        <CircleMarker
+          center={[centerLat, centerLng]}
+          radius={8}
+          pathOptions={{ color: "#ffffff", weight: 3, fillColor: "#7C3AED", fillOpacity: 1 }}
+        >
+          {mapLabel && (
+            <Tooltip permanent direction="top" offset={[0, -10]}>
+              <span style={{ fontSize: "13px", fontWeight: 700, color: "#2A1A5E" }}>{mapLabel}</span>
+            </Tooltip>
+          )}
+        </CircleMarker>
       )}
 
       {zones.map((z) => {

@@ -224,7 +224,7 @@ function LogoBlock() {
   return (
     <div className="flex flex-col items-center gap-3">
       <span className="inline-flex items-center rounded-xl bg-zinc-900 px-5 py-3">
-        <Image src="/logo.png" alt="4YUmkt" width={1080} height={419} priority className="h-8 w-auto" />
+        <Image src="/logo.png" alt="4YU CRM" width={1080} height={419} priority className="h-8 w-auto" />
       </span>
       <p className="text-center text-sm text-muted-foreground">
         CRM de prospeccao com IA

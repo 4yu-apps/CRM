@@ -78,7 +78,7 @@ export function LegalPage({
             >
               <Image
                 src="/4yu-icon.png"
-                alt="4YUmkt"
+                alt="4YU CRM"
                 width={36}
                 height={36}
                 style={{ width: 36, height: 36, objectFit: "contain", filter: "brightness(0) invert(1)" }}

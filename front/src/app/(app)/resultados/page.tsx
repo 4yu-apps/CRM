@@ -178,12 +178,12 @@ function buildFunnelBars(leads: Lead[]): FunnelBar[] {
   const total = stages[0]?.reached ?? 0;
 
   const rows: { label: string; value: number }[] = [
-    { label: "Encontrados", value: total },
-    { label: "Passaram no filtro", value: passaram },
-    { label: "Enviados", value: stages.find((s) => s.status === "enviado")?.reached ?? 0 },
-    { label: "Responderam", value: stages.find((s) => s.status === "respondeu")?.reached ?? 0 },
-    { label: "Reuniões", value: stages.find((s) => s.status === "reuniao")?.reached ?? 0 },
-    { label: "Fecharam", value: stages.find((s) => s.status === "fechado")?.reached ?? 0 },
+    { label: "Leads identificados", value: total },
+    { label: "Leads qualificados", value: passaram },
+    { label: "Leads enviados", value: stages.find((s) => s.status === "enviado")?.reached ?? 0 },
+    { label: "Respostas recebidas", value: stages.find((s) => s.status === "respondeu")?.reached ?? 0 },
+    { label: "Reuniões agendadas", value: stages.find((s) => s.status === "reuniao")?.reached ?? 0 },
+    { label: "Clientes fechados", value: stages.find((s) => s.status === "fechado")?.reached ?? 0 },
   ];
 
   return rows.map((r, i) => ({
@@ -322,7 +322,7 @@ export default function ResultadosPage() {
             <div className="flex flex-col gap-3.5">
               {funnelBars.map((b) => (
                 <div key={b.label} className="flex items-center gap-4">
-                  <div className="w-[104px] flex-none text-right text-[13.5px] font-semibold text-ink-2">
+                  <div className="w-[150px] flex-none text-right text-[13px] font-semibold leading-tight text-ink-2">
                     {b.label}
                   </div>
                   <div className="relative flex-1 overflow-hidden rounded-[8px] bg-[var(--inset)]" style={{ height: 30 }}>

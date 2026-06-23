@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { LegalPage } from "../legal";
 
 export const metadata: Metadata = {
-  title: "Termos de Uso | 4YUmkt",
-  description: "Termos de uso do 4YUmkt.",
+  title: "Termos de Uso | 4YU CRM",
+  description: "Termos de uso do 4YU CRM.",
 };
 
 export default function TermosPage() {
@@ -15,13 +15,13 @@ export default function TermosPage() {
       crossHref="/privacidade"
     >
       <p style={{ fontSize: 16, color: "#3B3354" }}>
-        Estes Termos de Uso são o combinado entre você e o 4YUmkt. Ao criar uma conta ou usar a plataforma,
+        Estes Termos de Uso são o combinado entre você e o 4YU CRM. Ao criar uma conta ou usar a plataforma,
         você concorda com tudo o que está aqui. Leia com calma, foi escrito pra ser entendido.
       </p>
 
-      <h2 id="servico">1. O que o 4YUmkt faz</h2>
+      <h2 id="servico">1. O que o 4YU CRM faz</h2>
       <p>
-        O 4YUmkt é uma ferramenta que ajuda gestores de tráfego a encontrar potenciais clientes. A gente
+        O 4YU CRM é uma ferramenta que ajuda gestores de tráfego a encontrar potenciais clientes. A gente
         busca negócios em fontes públicas, monta fichas com as informações disponíveis e sugere uma
         abordagem. A decisão de contatar e o envio das mensagens são sempre seus.
       </p>
@@ -35,7 +35,7 @@ export default function TermosPage() {
       </ul>
 
       <h2 id="uso-correto">3. Uso correto da plataforma</h2>
-      <p>Ao usar o 4YUmkt, você se compromete a:</p>
+      <p>Ao usar o 4YU CRM, você se compromete a:</p>
       <ul>
         <li>Respeitar a legislação, incluindo a LGPD e as regras de comunicação eletrônica.</li>
         <li>Não usar os dados para spam, fraude, assédio ou qualquer prática abusiva.</li>
@@ -49,13 +49,13 @@ export default function TermosPage() {
 
       <h2 id="terceiros">4. Serviços de terceiros e integrações</h2>
       <p>
-        O 4YUmkt se integra a serviços de terceiros para funcionar. Ao usar essas integrações, você também
+        O 4YU CRM se integra a serviços de terceiros para funcionar. Ao usar essas integrações, você também
         concorda com os termos e as políticas do respectivo serviço:
       </p>
       <ul>
         <li>
           <strong>Login e Google Calendar:</strong> se você entra com a Conta Google e conecta a agenda,
-          autoriza o 4YUmkt a criar, atualizar e remover os eventos das reuniões que você agenda no app. Esse
+          autoriza o 4YU CRM a criar, atualizar e remover os eventos das reuniões que você agenda no app. Esse
           acesso é opcional, usado apenas a seu pedido, e pode ser revogado a qualquer momento na sua Conta
           Google. O tratamento desses dados segue a nossa{" "}
           <a href="/privacidade">Política de Privacidade</a>.
@@ -81,26 +81,26 @@ export default function TermosPage() {
 
       <h2 id="propriedade">6. Propriedade intelectual</h2>
       <p>
-        A marca, o software, o design e os textos do 4YUmkt são nossos. Você recebe o direito de usar a
+        A marca, o software, o design e os textos do 4YU CRM são nossos. Você recebe o direito de usar a
         plataforma enquanto for assinante, mas não pode copiar, revender ou redistribuir a ferramenta sem
         nossa autorização.
       </p>
 
       <h2 id="disponibilidade">7. Disponibilidade</h2>
       <p>
-        A gente trabalha para manter o 4YUmkt no ar e funcionando bem, mas pode haver manutenções e
+        A gente trabalha para manter o 4YU CRM no ar e funcionando bem, mas pode haver manutenções e
         instabilidades pontuais. Não garantimos funcionamento ininterrupto e não nos responsabilizamos por
         perdas decorrentes de indisponibilidade temporária.
       </p>
 
       <h2 id="limite">8. Limite de responsabilidade</h2>
       <p>
-        O 4YUmkt entrega informações e sugestões, mas não garante que cada lead vire cliente. O resultado
+        O 4YU CRM entrega informações e sugestões, mas não garante que cada lead vire cliente. O resultado
         depende do seu trabalho de prospecção e venda. A gente não se responsabiliza pelo uso que você faz
         dos dados nem pelo conteúdo das mensagens que você envia.
       </p>
       <p>
-        Você concorda em manter o 4YUmkt isento de reclamações de terceiros que decorram do uso indevido da
+        Você concorda em manter o 4YU CRM isento de reclamações de terceiros que decorram do uso indevido da
         plataforma por você, em especial quanto à forma como aborda e contata os leads.
       </p>
 

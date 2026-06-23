@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "4YUmkt",
-    short_name: "4YUmkt",
+    name: "4YU CRM",
+    short_name: "4YU CRM",
     description: "Prospeccao inteligente via WhatsApp",
     start_url: "/",
     display: "standalone",

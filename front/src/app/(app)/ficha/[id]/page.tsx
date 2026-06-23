@@ -36,6 +36,7 @@ import {
   X,
 } from "@phosphor-icons/react";
 import { getRepo } from "@/lib/repo";
+import { FollowupCard } from "@/components/followup-card";
 import { useCancelMeeting } from "@/hooks/use-cancel-meeting";
 import { SERVICE_META } from "@/lib/service";
 import { STATUS_META, TONE_CLASSES } from "@/lib/state-machine";
@@ -757,6 +758,11 @@ export default function FichaPage() {
                   )}
                 </div>
               </div>
+            )}
+
+            {/* Follow-up: agendar a re-abordagem quando o lead nao responde */}
+            {["enviado", "sem_resposta", "respondeu", "interessado", "reuniao", "proposta"].includes(lead.status) && (
+              <FollowupCard lead={lead} onSaved={load} />
             )}
 
             {/* Abordagem escrita */}

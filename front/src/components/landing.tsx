@@ -5,7 +5,7 @@ import Link from "next/link";
 import Script from "next/script";
 
 /* =============================================================================
-   Landing page do 4YUmkt — conversao fiel do design Claude (Landing.dc.html).
+   Landing page do 4YU CRM — conversao fiel do design Claude (Landing.dc.html).
    - estilos do design via <style> (CSS vars + classes + keyframes)
    - fontes Google (Plus Jakarta Sans + Space Grotesk) via <link>
    - icones Phosphor WEB (<i class="ph ph-...">) via next/script
@@ -129,7 +129,7 @@ const features: Feature[] = [
   {
     ic: "whatsapp-logo",
     t: "Envio na sua mão",
-    d: "A mensagem sai do seu número, no seu tempo. O 4YUmkt nunca dispara nada sozinho.",
+    d: "A mensagem sai do seu número, no seu tempo. O 4YU CRM nunca dispara nada sozinho.",
     bg: "var(--soft)",
     icBg: "#fff",
     icCol: "var(--wa)",
@@ -193,7 +193,7 @@ const testimonials = [
     cargo: "Freelancer de tráfego, Curitiba",
   },
   {
-    q: "Atendo uns 15 clientes e a parte de achar lead novo era um inferno. Com o 4YUmkt minha equipe parou de garimpar e passou a vender. Mudou o jogo.",
+    q: "Atendo uns 15 clientes e a parte de achar lead novo era um inferno. Com o 4YU CRM minha equipe parou de garimpar e passou a vender. Mudou o jogo.",
     in: "JP",
     nome: "Juliana Prado",
     cargo: "Dona de agência, São Paulo",
@@ -342,7 +342,7 @@ const faqList = [
     a: "A gente varre fontes públicas da internet, como mapas e redes sociais, e junta tudo numa ficha só: dados do negócio, contato, reputação e sinais de que ele precisa de tráfego. Nada de lista comprada ou contato frio sem contexto.",
   },
   {
-    q: "O 4YUmkt manda mensagem sozinho?",
+    q: "O 4YU CRM manda mensagem sozinho?",
     a: "Não, e isso é de propósito. A gente escreve a primeira mensagem pra você, mas quem envia é você, do seu próprio número, na hora que quiser. Você fica no controle do relacionamento o tempo todo.",
   },
   {
@@ -492,7 +492,7 @@ export function Landing() {
           <a href="#topo" style={{ display: "flex", alignItems: "center", gap: 11 }}>
             <Image
               src="/4yu-icon.png"
-              alt="4YUmkt"
+              alt="4YU CRM"
               width={38}
               height={38}
               style={{ width: 38, height: 38, objectFit: "contain" }}
@@ -507,7 +507,7 @@ export function Landing() {
             >
               <span style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-.02em" }}>4YU</span>
               <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: ".14em", color: "var(--brand)" }}>
-                MKT
+                CRM
               </span>
             </div>
           </a>
@@ -595,7 +595,7 @@ export function Landing() {
               </span>
             </h1>
             <p className="reveal lead" style={{ maxWidth: 520, margin: "0 0 32px" }}>
-              O 4YUmkt acha negócios que precisam de você, monta a ficha completa, te diz por que valem a
+              O 4YU CRM acha negócios que precisam de você, monta a ficha completa, te diz por que valem a
               pena e ainda escreve a primeira mensagem. Você só revisa, aprova e manda no WhatsApp.
             </p>
             <div
@@ -997,7 +997,7 @@ export function Landing() {
             </div>
             <h2 className="h2 reveal">Quatro passos. O trabalho pesado é nosso.</h2>
             <p className="lead reveal" style={{ marginTop: 18 }}>
-              Da varredura à conversa, o 4YUmkt entrega tudo pronto. Você entra só onde importa: na decisão
+              Da varredura à conversa, o 4YU CRM entrega tudo pronto. Você entra só onde importa: na decisão
               e no relacionamento.
             </p>
           </div>
@@ -1116,7 +1116,7 @@ export function Landing() {
             </div>
             <h2 className="h2 reveal">Diz a região. A gente varre o mapa inteiro.</h2>
             <p className="lead reveal" style={{ margin: "18px 0 26px" }}>
-              Escolhe o ramo, a cidade e o bairro. O 4YUmkt cobre a área em ordem, sem pular pedaço e sem
+              Escolhe o ramo, a cidade e o bairro. O 4YU CRM cobre a área em ordem, sem pular pedaço e sem
               repetir quem você já viu. Dá pra acompanhar no satélite o que já foi varrido e o que falta.
             </p>
             <div className="reveal" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -1334,7 +1334,7 @@ export function Landing() {
             Tá valendo a pena? Os números dizem que sim.
           </h2>
           <p className="reveal" style={{ fontSize: 17, opacity: 0.9, maxWidth: 560, margin: "0 auto 48px" }}>
-            Gestores que largaram a planilha e deixaram o 4YUmkt garimpar.
+            Gestores que largaram a planilha e deixaram o 4YU CRM garimpar.
           </p>
           <div
             className="grid-4"
@@ -1701,7 +1701,7 @@ export function Landing() {
               <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 16 }}>
                 <Image
                   src="/4yu-icon.png"
-                  alt="4YUmkt"
+                  alt="4YU CRM"
                   width={36}
                   height={36}
                   style={{ width: 36, height: 36, objectFit: "contain" }}
@@ -1717,7 +1717,7 @@ export function Landing() {
                 >
                   <span style={{ fontSize: 21, fontWeight: 700 }}>4YU</span>
                   <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: ".14em", color: "#B98DF0" }}>
-                    MKT
+                    CRM
                   </span>
                 </div>
               </div>
@@ -1862,7 +1862,7 @@ export function Landing() {
             }}
           >
             <span style={{ fontSize: 13, color: "#7E7794" }}>
-              © 2026 4YUmkt. Todos os direitos reservados.
+              © 2026 4YU CRM. Todos os direitos reservados.
             </span>
             <span style={{ fontSize: 13, color: "#7E7794" }}>
               Feito pra quem vende, não pra quem garimpa.

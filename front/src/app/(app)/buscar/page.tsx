@@ -15,12 +15,13 @@ import {
 import { getRepo } from "@/lib/repo";
 import { useAuth } from "@/lib/auth";
 import { fetchEstados, fetchMunicipios } from "@/lib/ibge";
-import { geocodeCity, geocodeNeighborhood, type GeoPoint } from "@/lib/geocode";
+import { geocodeCity, geocodeNeighborhood, stateCenter, type GeoPoint } from "@/lib/geocode";
 import { serviceOptionsForProfile } from "@/lib/professions";
 import { SERVICE_META } from "@/lib/service";
 import { RAMOS_DISPONIVEIS } from "@/lib/ramos";
 import { Dropdown } from "@/components/dropdown";
 import { CityAutocomplete } from "@/components/city-autocomplete";
+import { BairroAutocomplete } from "@/components/bairro-autocomplete";
 import { MultiRamoDropdown } from "@/components/multi-ramo-dropdown";
 import type { ScanCoverage, SearchProfile, ServiceTarget } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -403,6 +404,9 @@ export default function BuscarPage() {
   const mapCenter = (() => {
     if (cityPoint)
       return { lat: cityPoint.lat, lng: cityPoint.lng, zoom: neighborhood.trim() ? 14 : 12 };
+    // So o estado escolhido (sem cidade ainda): centra na UF com zoom estadual.
+    const sc = stateCenter(uf);
+    if (sc) return { lat: sc.lat, lng: sc.lng, zoom: 6 };
     const first = coverage.find((c) => c.center_lat != null && c.center_lng != null);
     if (first) return { lat: first.center_lat!, lng: first.center_lng!, zoom: 12 };
     return BRASIL_CENTER;
@@ -486,48 +490,28 @@ export default function BuscarPage() {
               placeholder="Digite a cidade (ex: Maringa, Sao Paulo...)"
             />
             <p className="mt-1.5 text-[12px] text-faint">
-              Comece a digitar e escolha a cidade. O estado e preenchido automaticamente.
+              Comece a digitar e escolha a cidade. Ja vem com o estado (ex: Maringa - PR).
             </p>
           </div>
 
-          {/* Estado (somente leitura — preenchido pelo autocomplete de cidade) */}
-          {uf && (
-            <div className="mb-4">
-              <label className="mb-1.5 block text-[12px] font-bold uppercase tracking-wider text-faint">
-                Estado
-              </label>
-              <div className="flex items-center justify-between rounded-xl border border-border-2 bg-surface-2 px-4 py-3 text-[13.5px] text-ink-2">
-                <span>{uf}</span>
-                <button
-                  type="button"
-                  onClick={handleCityClear}
-                  className="text-[12px] text-faint hover:text-ink"
-                  aria-label="Limpar estado e cidade"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Bairro ou zona (texto livre, opcional) */}
+          {/* Bairro ou zona (autocomplete + texto livre, opcional) */}
           <div className="mb-4">
-            <label
-              htmlFor="bairro-input"
-              className="mb-1.5 block text-[12px] font-bold uppercase tracking-wider text-faint"
-            >
+            <label className="mb-1.5 block text-[12px] font-bold uppercase tracking-wider text-faint">
               Bairro ou zona{" "}
               <span className="font-medium normal-case text-faint">(opcional)</span>
             </label>
-            <input
-              id="bairro-input"
+            <BairroAutocomplete
               value={neighborhood}
-              onChange={(e) => setNeighborhood(e.target.value)}
-              placeholder="Ex: Zona 7. Em branco = cidade toda."
-              className="w-full rounded-xl border border-border-2 bg-surface-2 px-4 py-3.5 text-[14.5px] text-ink outline-none focus:border-brand"
+              onChange={setNeighborhood}
+              city={city}
+              uf={uf}
+              placeholder={
+                city ? "Comece a digitar o bairro ou zona (em branco = cidade toda)" : "Escolha a cidade primeiro"
+              }
+              disabled={!city}
             />
             <p className="mt-1.5 text-[12px] text-faint">
-              O mapa centra no bairro enquanto voce digita, e o robo foca a busca ali.
+              Comece a digitar e escolha o bairro da cidade. O mapa foca ali e o robo afunila a busca.
             </p>
           </div>
 

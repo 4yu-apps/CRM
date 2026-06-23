@@ -1,59 +1,45 @@
 "use client";
-// Autocomplete de cidade nacional (tipo Uber): o usuario digita o nome da cidade
-// e o sistema sugere "Cidade - UF" buscando em todos os municipios do Brasil via IBGE.
-// Ao selecionar, preenche cidade E estado de uma vez.
+// Autocomplete de bairro/zona, escopado na cidade ja escolhida. Mesma pegada do
+// autocomplete de cidade, mas aceita texto livre tambem (zonas tipo "Zona 7" que
+// nem sempre estao no mapa). Conforme digita, sugere bairros reais da cidade via
+// Nominatim; clicar preenche, mas o usuario pode digitar o que quiser.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { MagnifyingGlass, X } from "@phosphor-icons/react";
-import { searchMunicipios, type MunicipioComUF } from "@/lib/ibge";
+import { MapPin, X } from "@phosphor-icons/react";
+import { suggestBairros, type BairroSuggestion } from "@/lib/geocode";
 import { cn } from "@/lib/utils";
 
-export interface CitySelection {
-  cidade: string;
+interface BairroAutocompleteProps {
+  value: string;
+  onChange: (value: string) => void;
+  city: string;
   uf: string;
-}
-
-interface CityAutocompleteProps {
-  cidade: string;
-  uf: string;
-  onSelect: (sel: CitySelection) => void;
-  onClear?: () => void;
   placeholder?: string;
-  className?: string;
   disabled?: boolean;
+  className?: string;
 }
 
 type Rect = { top: number; left: number; width: number };
 
-export function CityAutocomplete({
-  cidade,
+export function BairroAutocomplete({
+  value,
+  onChange,
+  city,
   uf,
-  onSelect,
-  onClear,
-  placeholder = "Digite a cidade...",
-  className,
+  placeholder = "Comece a digitar o bairro ou zona",
   disabled = false,
-}: CityAutocompleteProps) {
-  // Texto exibido no input: se ha cidade+uf selecionados, mostra "Cidade - UF"
-  const displayValue = cidade ? (uf ? `${cidade} - ${uf}` : cidade) : "";
-
-  const [query, setQuery] = useState(displayValue);
-  const [suggestions, setSuggestions] = useState<MunicipioComUF[]>([]);
+  className,
+}: BairroAutocompleteProps) {
+  const [suggestions, setSuggestions] = useState<BairroSuggestion[]>([]);
   const [open, setOpen] = useState(false);
-  const [rect, setRect] = useState<Rect | null>(null);
   const [loading, setLoading] = useState(false);
+  const [rect, setRect] = useState<Rect | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Contador de requisicoes: so aplica resultado se ainda for a mais recente.
+  // So aplica o resultado se ainda for a requisicao mais recente (anti-corrida).
   const reqSeqRef = useRef(0);
-
-  // Sincroniza o input quando cidade/uf mudam externamente (ex: "Surpreenda-me")
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setQuery(cidade ? (uf ? `${cidade} - ${uf}` : cidade) : "");
-  }, [cidade, uf]);
 
   const measure = useCallback(() => {
     const el = inputRef.current;
@@ -67,7 +53,6 @@ export function CityAutocomplete({
     setSuggestions([]);
   }, []);
 
-  // Fecha ao clicar fora
   useEffect(() => {
     if (!open) return;
     const onDocClick = (e: MouseEvent) => {
@@ -94,58 +79,52 @@ export function CityAutocomplete({
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const val = e.target.value;
-      setQuery(val);
+      onChange(val); // texto livre sempre vale
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      if (!val.trim() || val.trim().length < 2) {
+      if (!city || val.trim().length < 2) {
         setSuggestions([]);
         setOpen(false);
         return;
       }
       measure();
       setLoading(true);
-      // Incrementa o sequencial antes do setTimeout para capturar o valor atual.
       const seq = ++reqSeqRef.current;
       debounceRef.current = setTimeout(async () => {
-        const results = await searchMunicipios(val);
-        // Descarta resultado se uma requisicao mais nova ja foi disparada.
+        const results = await suggestBairros(val, city, uf);
         if (seq !== reqSeqRef.current) return;
         setSuggestions(results);
         setLoading(false);
         setOpen(true);
-      }, 250);
+      }, 450);
     },
-    [measure],
+    [onChange, city, uf, measure],
   );
 
-  const handleSelect = useCallback(
-    (m: MunicipioComUF) => {
-      onSelect({ cidade: m.nome, uf: m.uf });
-      setQuery(`${m.nome} - ${m.uf}`);
+  const handlePick = useCallback(
+    (s: BairroSuggestion) => {
+      onChange(s.name);
       closeMenu();
     },
-    [onSelect, closeMenu],
+    [onChange, closeMenu],
   );
 
   const handleClear = useCallback(() => {
-    setQuery("");
+    onChange("");
     setSuggestions([]);
     setOpen(false);
-    onClear?.();
-  }, [onClear]);
-
-  const hasSelecionado = !!cidade;
+  }, [onChange]);
 
   return (
     <div className={cn("relative", className)}>
       <div className="relative">
-        <MagnifyingGlass
+        <MapPin
           size={15}
           className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-faint"
         />
         <input
           ref={inputRef}
           type="text"
-          value={query}
+          value={value}
           onChange={handleChange}
           onFocus={() => {
             if (suggestions.length > 0) {
@@ -157,27 +136,19 @@ export function CityAutocomplete({
           disabled={disabled}
           autoComplete="off"
           className={cn(
-            "w-full rounded-xl border bg-surface-2 py-3 pl-9 pr-9 text-[13.5px] text-ink outline-none transition-colors disabled:cursor-not-allowed disabled:opacity-60",
+            "w-full rounded-xl border bg-surface-2 py-3.5 pl-9 pr-9 text-[14.5px] text-ink outline-none transition-colors disabled:cursor-not-allowed disabled:opacity-60",
             open ? "border-brand" : "border-border-2 hover:border-brand/50",
           )}
         />
-        {(loading || hasSelecionado || query) && (
+        {(loading || value) && (
           <button
             type="button"
             onClick={loading ? undefined : handleClear}
             className="absolute right-3 top-1/2 -translate-y-1/2 rounded p-0.5 text-faint hover:text-ink"
-            aria-label="Limpar cidade"
+            aria-label="Limpar bairro"
           >
             {loading ? (
-              <svg
-                className="animate-spin"
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
+              <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="10" strokeOpacity="0.2" />
                 <path d="M12 2a10 10 0 0 1 10 10" />
               </svg>
@@ -193,38 +164,29 @@ export function CityAutocomplete({
             <div
               ref={menuRef}
               role="listbox"
-              style={{
-                position: "fixed",
-                top: rect.top,
-                left: rect.left,
-                minWidth: rect.width,
-              }}
+              style={{ position: "fixed", top: rect.top, left: rect.left, minWidth: rect.width }}
               className="z-[200] flex max-h-[280px] min-w-[220px] flex-col overflow-hidden rounded-[14px] border border-border bg-card shadow-xl"
             >
               <div className="min-h-0 flex-1 overflow-y-auto p-1.5">
                 {suggestions.length === 0 && !loading ? (
                   <div className="px-3.5 py-2.5 text-[13px] text-faint">
-                    Nenhuma cidade encontrada
+                    Nenhum bairro encontrado. Pode digitar a zona do seu jeito.
                   </div>
                 ) : (
-                  suggestions.map((m) => (
+                  suggestions.map((s) => (
                     <button
-                      key={m.id}
+                      key={s.name}
                       type="button"
                       role="option"
-                      aria-selected={m.nome === cidade && m.uf === uf}
-                      onClick={() => handleSelect(m)}
+                      aria-selected={s.name === value}
+                      onClick={() => handlePick(s)}
                       className={cn(
-                        "flex w-full items-center gap-3 rounded-[10px] py-2.5 pl-3.5 pr-3 text-left text-[13.5px] transition-colors",
-                        m.nome === cidade && m.uf === uf
-                          ? "bg-brand-50 font-semibold text-brand"
-                          : "text-ink-2 hover:bg-accent",
+                        "flex w-full items-center gap-2.5 rounded-[10px] py-2.5 pl-3.5 pr-3 text-left text-[13.5px] transition-colors",
+                        s.name === value ? "bg-brand-50 font-semibold text-brand" : "text-ink-2 hover:bg-accent",
                       )}
                     >
-                      <span className="flex-1 truncate font-medium text-ink">{m.nome}</span>
-                      <span className="flex-none rounded bg-[var(--inset)] px-1.5 py-0.5 text-[11px] font-bold text-faint">
-                        {m.uf}
-                      </span>
+                      <MapPin size={14} className="flex-none text-faint" />
+                      <span className="flex-1 truncate font-medium text-ink">{s.name}</span>
                     </button>
                   ))
                 )}

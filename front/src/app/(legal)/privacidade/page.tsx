@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { LegalPage } from "../legal";
 
 export const metadata: Metadata = {
-  title: "Política de Privacidade | 4YUmkt",
-  description: "Como o 4YUmkt coleta, usa e protege os dados.",
+  title: "Política de Privacidade | 4YU CRM",
+  description: "Como o 4YU CRM coleta, usa e protege os dados.",
 };
 
 export default function PrivacidadePage() {
@@ -15,14 +15,14 @@ export default function PrivacidadePage() {
       crossHref="/termos"
     >
       <p style={{ fontSize: 16, color: "#3B3354" }}>
-        No 4YUmkt, a gente leva privacidade a sério. Esta política explica, sem juridiquês desnecessário,
+        No 4YU CRM, a gente leva privacidade a sério. Esta política explica, sem juridiquês desnecessário,
         quais dados a gente coleta, por que coleta e o que você pode fazer a respeito. Ao usar a plataforma,
         você concorda com o que está aqui.
       </p>
 
       <h2 id="quem">1. Quem somos</h2>
       <p>
-        O 4YUmkt é uma plataforma de prospecção para gestores de tráfego. A gente encontra negócios em
+        O 4YU CRM é uma plataforma de prospecção para gestores de tráfego. A gente encontra negócios em
         fontes públicas, organiza essas informações e entrega para o profissional de marketing decidir como
         abordar. O contato do nosso encarregado de dados é{" "}
         <a href="mailto:4yumkt@gmail.com">4yumkt@gmail.com</a>.
@@ -60,13 +60,13 @@ export default function PrivacidadePage() {
         <li>Para cumprir obrigações legais.</li>
       </ul>
       <p>
-        O 4YUmkt nunca envia mensagens em seu nome de forma automática. O disparo de qualquer abordagem é
+        O 4YU CRM nunca envia mensagens em seu nome de forma automática. O disparo de qualquer abordagem é
         sempre feito por você, manualmente, do seu próprio número.
       </p>
 
       <h2 id="google">4. Acesso à sua Conta Google e ao Google Calendar</h2>
       <p>
-        Se você entrar com sua Conta do Google e autorizar o acesso à agenda, o 4YUmkt usa a permissão do
+        Se você entrar com sua Conta do Google e autorizar o acesso à agenda, o 4YU CRM usa a permissão do
         Google Calendar (escopo calendar.events) com uma finalidade única e específica:{" "}
         <strong>criar, atualizar e remover os eventos das reuniões que você mesmo agenda dentro do app</strong>.
       </p>
@@ -83,7 +83,7 @@ export default function PrivacidadePage() {
         </li>
       </ul>
       <p>
-        O uso e a transferência, pelo 4YUmkt, de informações recebidas das APIs do Google seguem a{" "}
+        O uso e a transferência, pelo 4YU CRM, de informações recebidas das APIs do Google seguem a{" "}
         <a
           href="https://developers.google.com/terms/api-services-user-data-policy"
           target="_blank"

@@ -97,25 +97,35 @@ let _municipiosFetch: Promise<MunicipioComUF[]> | null = null;
 async function _getAllMunicipios(): Promise<MunicipioComUF[]> {
   if (_municipiosCache) return _municipiosCache;
   if (_municipiosFetch) return _municipiosFetch;
-  _municipiosFetch = (async () => {
-    const res = await fetch(`${BASE}/municipios?orderBy=nome&view=nivelado`);
-    if (!res.ok) return [];
-    const data: unknown = await res.json();
-    if (!Array.isArray(data)) return [];
-    const result: MunicipioComUF[] = [];
-    for (const item of data) {
-      if (typeof item !== "object" || item === null) continue;
-      const m = item as Record<string, unknown>;
-      // view=nivelado expoe campos como "municipio-nome", "UF-sigla", "UF-nome"
-      const municipioNome = typeof m["municipio-nome"] === "string" ? m["municipio-nome"] : "";
-      const ufSigla = typeof m["UF-sigla"] === "string" ? m["UF-sigla"] : "";
-      const ufNome = typeof m["UF-nome"] === "string" ? m["UF-nome"] : "";
-      const id = typeof m["municipio-id"] === "number" ? (m["municipio-id"] as number) : 0;
-      if (!municipioNome || !ufSigla) continue;
-      result.push({ id, nome: municipioNome, uf: ufSigla, nomeUF: ufNome });
+  // Guarda a promessa em variavel local para poder anular o cache em caso de erro.
+  // Dessa forma uma falha de rede nao fica travada para sempre -- a proxima chamada
+  // vai tentar de novo em vez de retornar vazio silenciosamente.
+  const attempt = (async () => {
+    try {
+      const res = await fetch(`${BASE}/municipios?orderBy=nome&view=nivelado`);
+      if (!res.ok) throw new Error(`IBGE retornou ${res.status}`);
+      const data: unknown = await res.json();
+      if (!Array.isArray(data)) throw new Error("Resposta inesperada da API do IBGE");
+      const result: MunicipioComUF[] = [];
+      for (const item of data) {
+        if (typeof item !== "object" || item === null) continue;
+        const m = item as Record<string, unknown>;
+        // view=nivelado expoe campos como "municipio-nome", "UF-sigla", "UF-nome"
+        const municipioNome = typeof m["municipio-nome"] === "string" ? m["municipio-nome"] : "";
+        const ufSigla = typeof m["UF-sigla"] === "string" ? m["UF-sigla"] : "";
+        const ufNome = typeof m["UF-nome"] === "string" ? m["UF-nome"] : "";
+        const id = typeof m["municipio-id"] === "number" ? (m["municipio-id"] as number) : 0;
+        if (!municipioNome || !ufSigla) continue;
+        result.push({ id, nome: municipioNome, uf: ufSigla, nomeUF: ufNome });
+      }
+      _municipiosCache = result;
+      return result;
+    } catch {
+      // Falha: limpa o cache da promessa para que a proxima chamada tente de novo.
+      _municipiosFetch = null;
+      return [];
     }
-    _municipiosCache = result;
-    return result;
   })();
-  return _municipiosFetch;
+  _municipiosFetch = attempt;
+  return attempt;
 }

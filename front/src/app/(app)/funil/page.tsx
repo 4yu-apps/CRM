@@ -20,7 +20,9 @@ function fmtBRL(value: number): string {
 
 function getFollowupBadge(lead: Lead): "hoje" | "atrasado" | null {
   if (!lead.followup_at) return null;
-  if (["fechado", "respondeu", "interessado", "reuniao", "proposta", "perdido", "sem_interesse", "descartado"].includes(lead.status)) return null;
+  // So esconde em estados finais (ganho ou descartado). Lead em conversa
+  // (respondeu, interessado, reuniao, proposta) ainda merece lembrete de follow-up.
+  if (["fechado", "perdido", "sem_interesse", "descartado"].includes(lead.status)) return null;
   const due = new Date(lead.followup_at);
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -77,7 +79,7 @@ const KANBAN_COLUMNS: KanbanColumn[] = [
   },
   {
     id: "reuniao",
-    label: "Reuniao",
+    label: "Reunião",
     color: "#0891B2",
     statuses: ["reuniao", "proposta"],
     targetStatus: "reuniao",
@@ -199,6 +201,7 @@ function FunnelMeetingModal({ lead, onConfirm, onClose }: MeetingModalProps) {
           </div>
           <input
             type="datetime-local"
+            lang="pt-BR"
             value={dateTime}
             onChange={(e) => setDateTime(e.target.value)}
             className="w-full rounded-xl border border-border-2 bg-surface-2 px-3.5 py-3 text-sm outline-none focus:border-brand"
@@ -297,6 +300,14 @@ function FunnelDealModal({ lead, onConfirm, onClose }: DealModalProps) {
   const [billing, setBilling] = useState<DealBilling>("mensal_fixo");
   const [months, setMonths] = useState("");
 
+  // Delta vs sugestao da IA: leitura de poder de preco (fechou acima/abaixo do sugerido).
+  const numAtual = parseFloat(value.replace(",", "."));
+  const sugIA = lead.suggested_value ?? null;
+  const deltaPct =
+    sugIA != null && sugIA > 0 && !isNaN(numAtual) && numAtual > 0
+      ? Math.round(((numAtual - sugIA) / sugIA) * 100)
+      : null;
+
   const handle = () => {
     const num = parseFloat(value.replace(",", "."));
     if (!value || isNaN(num) || num <= 0) {
@@ -357,6 +368,13 @@ function FunnelDealModal({ lead, onConfirm, onClose }: DealModalProps) {
               onChange={(e) => setValue(e.target.value)}
               className="w-full rounded-xl border border-border-2 bg-surface-2 px-3.5 py-3 text-sm outline-none focus:border-brand"
             />
+            {deltaPct != null && deltaPct !== 0 && (
+              <p className={cn("mt-1.5 text-[12px] font-semibold", deltaPct > 0 ? "text-success" : "text-danger")}>
+                {deltaPct > 0
+                  ? `Fechou ${deltaPct}% acima da sugestão da IA`
+                  : `Fechou ${Math.abs(deltaPct)}% abaixo da sugestão da IA`}
+              </p>
+            )}
           </div>
           <div>
             <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-faint">
@@ -935,7 +953,9 @@ export default function FunilPage() {
   const fechadosSummary = useMemo(() => {
     const fechados = localLeads.filter((l) => l.status === "fechado");
     const receita = fechados.reduce((s, l) => s + (l.deal_value ?? 0), 0);
-    return { count: fechados.length, receita };
+    const comValor = fechados.filter((l) => (l.deal_value ?? 0) > 0).length;
+    const ticket = comValor > 0 ? receita / comValor : 0;
+    return { count: fechados.length, receita, ticket };
   }, [localLeads]);
 
   return (
@@ -953,7 +973,7 @@ export default function FunilPage() {
           <div className="flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3.5 py-1.5 text-[12.5px] font-semibold text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-400">
             <CurrencyDollar size={14} weight="bold" />
             {fechadosSummary.receita > 0
-              ? `${fmtBRL(fechadosSummary.receita)} · ${fechadosSummary.count} ${fechadosSummary.count === 1 ? "contrato fechado" : "contratos fechados"}`
+              ? `${fmtBRL(fechadosSummary.receita)} · ${fechadosSummary.count} ${fechadosSummary.count === 1 ? "contrato fechado" : "contratos fechados"}${fechadosSummary.count > 1 ? ` · ${fmtBRL(fechadosSummary.ticket)} médio` : ""}`
               : `${fechadosSummary.count} ${fechadosSummary.count === 1 ? "contrato fechado" : "contratos fechados"}`}
           </div>
         )}
