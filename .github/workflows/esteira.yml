@@ -86,6 +86,9 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           # "ja anuncia?" via Meta Ad Library. Sem o secret, a fonte fica inerte.
           META_AD_LIBRARY_TOKEN: ${{ secrets.META_AD_LIBRARY_TOKEN }}
+          # PageSpeed Insights (Google, gratis): performance do site no celular.
+          # Liga sozinho quando o secret existe (chave gratuita, sem cobranca).
+          PAGESPEED_API_KEY: ${{ secrets.PAGESPEED_API_KEY }}
         # No cron (sem input): autopilot (descobre + pipeline dos novos) E depois
         # um backfill que re-enriquece uma fatia rotativa dos leads antigos
         # incompletos. Tudo autonomo, sem PC ligado. Dispatch manual com

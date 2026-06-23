@@ -57,7 +57,8 @@ class Config:
 
     @classmethod
     def from_env(cls) -> "Config":
-        ps_key = os.getenv("PAGESPEED_API_KEY")
+        # aceita PAGESPEED_API_KEY (padrao) ou PAGESPEED_API (apelido curto)
+        ps_key = os.getenv("PAGESPEED_API_KEY") or os.getenv("PAGESPEED_API")
         ps_flag = os.getenv("GARIMPO_PAGESPEED")
         return cls(
             sink=os.getenv("GARIMPO_SINK", "jsonfile"),
