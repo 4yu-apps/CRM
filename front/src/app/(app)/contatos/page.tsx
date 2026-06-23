@@ -33,6 +33,9 @@ const SORTS: { value: SortKey; label: string }[] = [
   { value: "score", label: "Maior score" },
 ];
 
+// Lista paginada: renderiza um lote por vez (filtro/scroll mais rapidos).
+const PAGE_SIZE = 50;
+
 function digits(s: string | null | undefined): string {
   return (s ?? "").replace(/\D/g, "");
 }
@@ -108,6 +111,7 @@ export default function ContatosPage() {
   const [ramoFilter, setRamoFilter] = useState<string>("");
   const [showArchived, setShowArchived] = useState(false);
   const [sort, setSort] = useState<SortKey>("recent");
+  const [page, setPage] = useState(1);
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -131,6 +135,11 @@ export default function ContatosPage() {
     });
     return out;
   }, [leads, q, statusFilter, ramoFilter, showArchived, sort]);
+
+  // Paginacao da lista filtrada. safePage clampa quando o filtro encurta o total.
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   // Contagem por status (entre os nao-arquivados) pro filtro mostrar so o que existe.
   const statusCounts = useMemo(() => {
@@ -289,7 +298,7 @@ export default function ContatosPage() {
             <MagnifyingGlass size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-faint" />
             <input
               value={q}
-              onChange={(e) => setQ(e.target.value)}
+              onChange={(e) => { setQ(e.target.value); setPage(1); }}
               placeholder="Buscar por nome, cidade, telefone..."
               className="w-full rounded-xl border border-border-2 bg-surface-2 py-3 pl-10 pr-4 text-[14px] text-ink outline-none focus:border-brand"
             />
@@ -297,28 +306,28 @@ export default function ContatosPage() {
           <div className="flex flex-wrap gap-2.5">
             <Dropdown
               value={statusFilter}
-              onChange={(v) => setStatusFilter((v as LeadStatus) || "")}
+              onChange={(v) => { setStatusFilter((v as LeadStatus) || ""); setPage(1); }}
               options={statusOptions}
               ariaLabel="Filtrar por status"
               className="min-w-[170px]"
             />
             <Dropdown
               value={ramoFilter}
-              onChange={setRamoFilter}
+              onChange={(v) => { setRamoFilter(v); setPage(1); }}
               options={ramoOptions}
               ariaLabel="Filtrar por ramo"
               className="min-w-[160px]"
             />
             <Dropdown
               value={sort}
-              onChange={(v) => setSort(v as SortKey)}
+              onChange={(v) => { setSort(v as SortKey); setPage(1); }}
               options={sortOptions}
               ariaLabel="Ordenar"
               className="min-w-[150px]"
             />
             <button
               type="button"
-              onClick={() => setShowArchived((v) => !v)}
+              onClick={() => { setShowArchived((v) => !v); setPage(1); }}
               className={cn(
                 "flex items-center gap-1.5 rounded-xl border px-4 py-3 text-[13px] font-semibold transition-colors",
                 showArchived
@@ -412,7 +421,7 @@ export default function ContatosPage() {
           </div>
         ) : (
           <div className="divide-y divide-border">
-            {filtered.map((lead) => (
+            {paged.map((lead) => (
               <div
                 key={lead.id}
                 className="group grid cursor-pointer grid-cols-1 gap-2 px-5 py-3.5 transition-colors hover:bg-accent/40 lg:grid-cols-[auto_2.4fr_1fr_1.1fr_1fr_0.6fr_0.9fr_auto] lg:items-center lg:gap-3"
@@ -516,6 +525,36 @@ export default function ContatosPage() {
           </div>
         )}
       </div>
+
+      {/* Paginacao */}
+      {totalPages > 1 && (
+        <div className="mt-4 flex flex-col items-center justify-between gap-3 sm:flex-row">
+          <span className="text-[13px] text-muted-foreground">
+            Mostrando {(safePage - 1) * PAGE_SIZE + 1}-{Math.min(safePage * PAGE_SIZE, filtered.length)} de {filtered.length}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={safePage <= 1}
+              onClick={() => setPage(safePage - 1)}
+              className="rounded-lg border border-border-2 bg-surface-2 px-3.5 py-2 text-[13px] font-semibold text-ink-2 transition-colors hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Anterior
+            </button>
+            <span className="px-1 text-[13px] font-semibold text-ink">
+              {safePage} / {totalPages}
+            </span>
+            <button
+              type="button"
+              disabled={safePage >= totalPages}
+              onClick={() => setPage(safePage + 1)}
+              className="rounded-lg border border-border-2 bg-surface-2 px-3.5 py-2 text-[13px] font-semibold text-ink-2 transition-colors hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Proxima
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Modal de confirmacao de exclusao */}
       {confirmDelete && (
