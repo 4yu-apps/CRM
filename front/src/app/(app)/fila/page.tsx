@@ -30,6 +30,7 @@ import { fmtPhone, fmtCnpj } from "@/lib/format";
 import type { Lead } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Dropdown } from "@/components/dropdown";
+import { waSend, WA_TAB } from "@/lib/whatsapp";
 
 function LeadIcon({ category, size }: { category: string | null; size: number }) {
   const c = (category ?? "").toLowerCase();
@@ -62,11 +63,7 @@ function fichaRows(l: Lead): { k: string; v: string; href?: string }[] {
   ];
 }
 
-const waLink = (phone: string | null, text: string) => {
-  const d = (phone ?? "").replace(/\D/g, "");
-  const num = d.length >= 12 ? d : `55${d}`;
-  return `https://wa.me/${num}?text=${encodeURIComponent(text)}`;
-};
+const waLink = (phone: string | null, text: string) => waSend(phone, text) ?? "#";
 
 // Ordenacao da fila: comecar pelos melhores em vez de ordem aleatoria. Com 800+
 // leads, isso e o que faz a revisao render.
@@ -446,7 +443,7 @@ export default function FilaPage() {
             <div className="flex flex-col gap-2.5 px-6 pb-6">
               <a
                 href={waLink(sendLead.whatsapp ?? sendLead.phone, [sendLead.draft_msg1, sendLead.draft_msg2].filter(Boolean).join("\n\n"))}
-                target="_blank"
+                target={WA_TAB}
                 rel="noreferrer"
                 onClick={markSent}
                 className="flex w-full items-center justify-center gap-2 rounded-[14px] p-4 text-sm font-bold text-white"

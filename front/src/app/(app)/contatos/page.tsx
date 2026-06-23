@@ -23,6 +23,7 @@ import type { Lead, LeadStatus } from "@/lib/types";
 import { RAMOS_DISPONIVEIS } from "@/lib/ramos";
 import { Dropdown, type DropdownOption } from "@/components/dropdown";
 import { cn } from "@/lib/utils";
+import { waSend, WA_TAB } from "@/lib/whatsapp";
 
 type SortKey = "recent" | "name" | "score";
 
@@ -60,7 +61,7 @@ function matchesQuery(lead: Lead, q: string): boolean {
 function waUrl(phone?: string | null): string | undefined {
   const d = digits(phone);
   if (!d) return undefined;
-  return `https://wa.me/${d.startsWith("55") ? d : "55" + d}`;
+  return waSend(d);
 }
 function igUrl(handle?: string | null): string | undefined {
   const h = (handle ?? "").trim().replace(/^@/, "");
@@ -82,12 +83,12 @@ function StatusBadge({ status }: { status: LeadStatus }) {
 }
 
 // Icone-link de contato; para a propagacao pra nao abrir a ficha ao clicar.
-function ContactIcon({ href, title, children }: { href?: string; title: string; children: React.ReactNode }) {
+function ContactIcon({ href, title, children, tabName = "_blank" }: { href?: string; title: string; children: React.ReactNode; tabName?: string }) {
   if (!href) return null;
   return (
     <a
       href={href}
-      target="_blank"
+      target={tabName}
       rel="noreferrer"
       title={title}
       onClick={(e) => e.stopPropagation()}
@@ -456,7 +457,7 @@ export default function ContatosPage() {
 
                 {/* Contato */}
                 <div className="flex items-center gap-1">
-                  <ContactIcon href={waUrl(lead.whatsapp ?? lead.phone)} title="WhatsApp">
+                  <ContactIcon href={waUrl(lead.whatsapp ?? lead.phone)} title="WhatsApp" tabName={WA_TAB}>
                     <WhatsappLogo size={16} weight="fill" />
                   </ContactIcon>
                   <ContactIcon href={igUrl(lead.instagram)} title="Instagram">

@@ -37,6 +37,7 @@ import {
 } from "@phosphor-icons/react";
 import { getRepo } from "@/lib/repo";
 import { FollowupCard } from "@/components/followup-card";
+import { waSend, WA_TAB } from "@/lib/whatsapp";
 import { useCancelMeeting } from "@/hooks/use-cancel-meeting";
 import { SERVICE_META } from "@/lib/service";
 import { STATUS_META, TONE_CLASSES } from "@/lib/state-machine";
@@ -171,9 +172,7 @@ function siteUrl(site?: string | null): string | undefined {
   return /^https?:\/\//i.test(s) ? s : `https://${s}`;
 }
 function waUrl(phone?: string | null): string | undefined {
-  const d = (phone ?? "").replace(/\D/g, "");
-  if (!d) return undefined;
-  return `https://wa.me/${d.startsWith("55") ? d : "55" + d}`;
+  return waSend(phone);
 }
 function fbUrl(handle?: string | null): string | undefined {
   const h = (handle ?? "").trim().replace(/^@/, "").replace(/\/+$/, "");
@@ -480,11 +479,7 @@ export default function FichaPage() {
   const statusMeta = STATUS_META[lead.status];
   const toneClass = TONE_CLASSES[statusMeta.tone];
 
-  const waLink = (text: string) => {
-    const d = (lead.whatsapp ?? lead.phone ?? "").replace(/\D/g, "");
-    const num = d.length >= 12 ? d : `55${d}`;
-    return `https://wa.me/${num}?text=${encodeURIComponent(text)}`;
-  };
+  const waLink = (text: string) => waSend(lead.whatsapp ?? lead.phone, text) ?? "#";
 
   const statusAgeDays = daysInStatus(history);
   const statusAgeText = statusAgeLabel(statusAgeDays);
@@ -813,7 +808,7 @@ export default function FichaPage() {
                   {lead.phone && lead.draft_msg1 && (
                     <a
                       href={waLink(lead.draft_msg1)}
-                      target="_blank"
+                      target={WA_TAB}
                       rel="noreferrer"
                       className="flex items-center justify-center gap-2 rounded-[13px] p-3.5 text-sm font-bold text-white"
                       style={{ background: "var(--wa)" }}
