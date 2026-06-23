@@ -11,13 +11,18 @@
     const url = waUrl(phone, text);
     if (!url) return;
     chrome.tabs.query({ url: "https://web.whatsapp.com/*" }, (tabs) => {
-      if (tabs && tabs.length > 0) {
-        const tab = tabs[0];
-        chrome.tabs.update(tab.id, { active: true, url });
-        if (tab.windowId != null) chrome.windows.update(tab.windowId, { focused: true });
-      } else {
+      if (!tabs || tabs.length === 0) {
         chrome.tabs.create({ url });
+        return;
       }
+      const tab = tabs[0];
+      chrome.tabs.update(tab.id, { active: true });
+      if (tab.windowId != null) chrome.windows.update(tab.windowId, { focused: true });
+      chrome.tabs.sendMessage(tab.id, { type: "garimpo_switch_chat", phone, text }, (resp) => {
+        if (chrome.runtime.lastError || !resp || !resp.ok) {
+          chrome.tabs.update(tab.id, { url });
+        }
+      });
     });
   }
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {

@@ -18,15 +18,22 @@ function openWhatsApp(phone, text) {
   const url = waUrl(phone, text);
   if (!url) return;
   chrome.tabs.query({ url: "https://web.whatsapp.com/*" }, (tabs) => {
-    if (tabs && tabs.length > 0) {
-      const tab = tabs[0];
-      // reusa a aba existente: ativa, foca a janela e navega pra conversa
-      chrome.tabs.update(tab.id, { active: true, url });
-      if (tab.windowId != null) chrome.windows.update(tab.windowId, { focused: true });
-    } else {
+    if (!tabs || tabs.length === 0) {
       // nenhuma aba do WhatsApp aberta: abre uma (unica)
       chrome.tabs.create({ url });
+      return;
     }
+    const tab = tabs[0];
+    // foca a aba existente (reusa, nunca abre nova)
+    chrome.tabs.update(tab.id, { active: true });
+    if (tab.windowId != null) chrome.windows.update(tab.windowId, { focused: true });
+    // 1a tentativa: trocar a conversa SEM reload (wa-js, via relay no content script)
+    chrome.tabs.sendMessage(tab.id, { type: "garimpo_switch_chat", phone, text }, (resp) => {
+      // fallback: relay ausente, wa-js nao pronto ou nao conseguiu -> navega (reload)
+      if (chrome.runtime.lastError || !resp || !resp.ok) {
+        chrome.tabs.update(tab.id, { url });
+      }
+    });
   });
 }
 
