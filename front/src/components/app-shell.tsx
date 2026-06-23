@@ -246,14 +246,30 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  // Quando o usuario viu a fila por ultimo (ms). Leads prontos com updated_at
+  // depois disso = "novos chegaram" (sinal cross-pagina apos a busca).
+  const [lastSeenFila, setLastSeenFila] = useState<number | null>(null);
   useEffect(() => {
     setMounted(true);
     try {
       setCollapsed(localStorage.getItem("gp-sidebar-collapsed") === "1");
+      const seen = Number(localStorage.getItem("fila-last-seen"));
+      if (seen) setLastSeenFila(seen);
     } catch {
       /* sem localStorage: fica expandida */
     }
   }, []);
+  // Ao entrar na fila, marca como visto agora (zera os "novos").
+  useEffect(() => {
+    if (!pathname.startsWith("/fila")) return;
+    const now = Date.now();
+    setLastSeenFila(now);
+    try {
+      localStorage.setItem("fila-last-seen", String(now));
+    } catch {
+      /* ignora */
+    }
+  }, [pathname]);
   const toggleCollapsed = () =>
     setCollapsed((c) => {
       const next = !c;
@@ -265,7 +281,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       return next;
     });
 
-  const queue = leads.filter((l) => l.status === "rascunho_pronto").length;
+  const readyLeads = leads.filter((l) => l.status === "rascunho_pronto" && !l.archived);
+  const queue = readyLeads.length;
+  // "novos" = prontos que chegaram desde a ultima visita a fila (so fora da fila).
+  const onFila = pathname.startsWith("/fila");
+  const novos =
+    lastSeenFila && !onFila
+      ? readyLeads.filter((l) => +new Date(l.updated_at) > lastSeenFila).length
+      : 0;
   // Normaliza o pathname para chaves de traducao (ficha/123 -> /ficha, etc.)
   const normPath = pathname.startsWith("/ficha") ? "/ficha" : pathname;
   const [fallbackTitle, fallbackSub] = titleFor(pathname);
@@ -431,15 +454,34 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-3.5">
             <HeaderSearch leads={leads} t={t} />
             <NotificationBell leads={leads} />
-            <div className="hidden items-center gap-2.5 rounded-full border border-border bg-accent px-3.5 py-2 sm:flex">
+            <Link
+              href="/fila"
+              className={cn(
+                "hidden items-center gap-2.5 rounded-full border px-3.5 py-2 transition-colors sm:flex",
+                novos > 0
+                  ? "border-emerald-300 bg-emerald-50 hover:bg-emerald-100"
+                  : "border-border bg-accent hover:bg-accent/70",
+              )}
+            >
               <span
                 className="size-2.5 flex-none rounded-full"
-                style={{ background: "var(--brand)", animation: "pulseDot 1.8s ease-in-out infinite" }}
+                style={{ background: novos > 0 ? "#10b981" : "var(--brand)", animation: "pulseDot 1.8s ease-in-out infinite" }}
               />
-              <span className="hidden text-[13px] font-semibold text-brand-700 sm:inline">
-                {queue > 0 ? `${queue} leads prontos pra você` : "Buscando novos leads"}
+              <span
+                className={cn(
+                  "hidden text-[13px] font-semibold sm:inline",
+                  novos > 0 ? "text-emerald-700" : "text-brand-700",
+                )}
+              >
+                {novos > 0
+                  ? novos === 1
+                    ? "1 novo lead chegou"
+                    : `${novos} novos leads chegaram`
+                  : queue > 0
+                    ? `${queue} leads prontos pra você`
+                    : "Buscando novos leads"}
               </span>
-            </div>
+            </Link>
           </div>
         </header>
 
