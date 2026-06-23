@@ -28,3 +28,15 @@ supabase/.env
 
 # --- vercel (link local) ---
 .vercel/
+
+# --- ferramentas / efemero (superpowers, worktrees de subagent) ---
+.claude/worktrees/
+**/.superpowers/
+docs/superpowers/plans/
+front/docs/superpowers/
+
+# --- prints de verificacao (scratch visual; os .md de docs ficam) ---
+docs/*-prints/
+
+# --- arquivos binarios soltos na raiz (a landing zipada nao vai pro git) ---
+/4YUmkt_landingpage.zip
