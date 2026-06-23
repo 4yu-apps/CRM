@@ -13,7 +13,11 @@ window.addEventListener("message", (e) => {
   if (!d || d.source !== "garimpo-crm" || d.type !== "open_whatsapp") return;
   try {
     chrome.runtime.sendMessage({ type: "garimpo_open_whatsapp", phone: d.phone, text: d.text });
+    // confirma pro front que repassou. Se o content script estiver orfao (extensao
+    // recarregada sem recarregar a aba), o sendMessage acima joga excecao e o ack
+    // NAO sai -> o front cai no fallback web sozinho.
+    window.postMessage({ source: "garimpo-ext", type: "open_ack", reqId: d.reqId }, "*");
   } catch {
-    /* extensao recarregando/sem contexto: ignora */
+    /* sem contexto: nao confirma (front faz fallback) */
   }
 });

@@ -26,28 +26,15 @@ function waSlot(): { win: Window | null } {
   return g.__waWin;
 }
 
-// Abre/atualiza a conversa reusando UMA aba so. 1o clique abre; os proximos
-// navegam a MESMA aba pra outra conversa (ja com a mensagem), sem empilhar.
-// Limite do navegador: nao da pra mirar uma aba que VOCE abriu na mao (so a que
-// o sistema abriu). SEM noopener/noreferrer (eles virariam _blank = aba nova).
-export function openWhatsApp(phone?: string | null, text?: string): boolean {
-  if (typeof window === "undefined") return false;
-  // 1) Extensao Garimpo instalada (marca data-garimpo-ext na pagina): ela REUSA
-  //    a aba do WhatsApp Web de verdade (o site sozinho nao consegue). Delega.
-  if (document.documentElement.getAttribute("data-garimpo-ext") === "1") {
-    window.postMessage(
-      { source: "garimpo-crm", type: "open_whatsapp", phone: phone ?? "", text: text ?? "" },
-      "*",
-    );
-    return true;
-  }
-  // 2) Sem extensao: fallback web (best-effort; pode abrir uma aba propria).
+// Fallback pela web: reusa UMA aba so (window ref global). Pode abrir uma aba
+// propria; e o melhor que o site sozinho consegue (nao mira a aba que voce abriu
+// na mao). SEM noopener/noreferrer (eles virariam _blank = aba nova).
+function openWeb(phone?: string | null, text?: string): boolean {
   const url = waSend(phone, text);
   if (!url) return false;
   const slot = waSlot();
   let win = slot.win;
   if (win && !win.closed) {
-    // navega a aba ja aberta pra nova conversa (escrita cross-origin e permitida)
     try {
       win.location.href = url;
     } catch {
@@ -56,14 +43,43 @@ export function openWhatsApp(phone?: string | null, text?: string): boolean {
   } else {
     win = null;
   }
-  if (!win) {
-    win = window.open(url, WA_TAB);
-  }
+  if (!win) win = window.open(url, WA_TAB);
   slot.win = win;
   try {
     win?.focus();
   } catch {
-    /* focar pode falhar em alguns navegadores; ignora */
+    /* ignora */
   }
+  return true;
+}
+
+// Abre a conversa. Se a extensao Garimpo esta presente (marca data-garimpo-ext),
+// delega pra ela (troca a conversa na MESMA aba, sem reload via wa-js). A
+// extensao confirma com um "ack"; se NAO confirmar em 0,8s (ex: content script
+// orfao depois de recarregar a extensao sem recarregar a aba do CRM), cai no
+// fallback web sozinho — assim NUNCA fica "nada acontecendo".
+export function openWhatsApp(phone?: string | null, text?: string): boolean {
+  if (typeof window === "undefined") return false;
+  if (document.documentElement.getAttribute("data-garimpo-ext") !== "1") {
+    return openWeb(phone, text);
+  }
+  const reqId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  let acked = false;
+  const onAck = (e: MessageEvent) => {
+    if (e.source !== window) return;
+    const d = e.data;
+    if (!d || d.source !== "garimpo-ext" || d.type !== "open_ack" || d.reqId !== reqId) return;
+    acked = true;
+    window.removeEventListener("message", onAck);
+  };
+  window.addEventListener("message", onAck);
+  window.postMessage(
+    { source: "garimpo-crm", type: "open_whatsapp", phone: phone ?? "", text: text ?? "", reqId },
+    "*",
+  );
+  window.setTimeout(() => {
+    window.removeEventListener("message", onAck);
+    if (!acked) openWeb(phone, text);
+  }, 800);
   return true;
 }
