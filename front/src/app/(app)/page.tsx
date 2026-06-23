@@ -11,13 +11,16 @@ import {
   Trash,
   NotePencil,
   ScanSmiley,
+  ChatCircleDots,
+  CalendarCheck,
 } from "@phosphor-icons/react";
 import { useLeads } from "@/hooks/use-leads";
 import { useAuth } from "@/lib/auth";
 import { getRepo } from "@/lib/repo";
 import { fmtRelative } from "@/lib/format";
+import { meetingsWithin, fmtMeetingWhen } from "@/lib/meetings";
 import { cn } from "@/lib/utils";
-import type { ActivityEvent, ActivityType } from "@/lib/types";
+import type { ActivityEvent, ActivityType, Lead } from "@/lib/types";
 
 // ---- helpers ----------------------------------------------------------------
 
@@ -149,6 +152,15 @@ export default function InicioPage() {
       .sort((a, b) => +new Date(a.followup_at!) - +new Date(b.followup_at!));
   }, [leads]);
 
+  // "O que fazer agora": quem respondeu (precisa da sua resposta) e reunioes
+  // proximas. Junto com os follow-ups, formam a fila de acao do login.
+  const precisaResponder = useMemo(
+    () => leads.filter((l) => l.status === "respondeu" || l.status === "interessado"),
+    [leads],
+  );
+  const reunioes = useMemo(() => meetingsWithin(leads, 24), [leads]);
+  const temAcao = precisaResponder.length + followupsDevidos.length + reunioes.length > 0;
+
   return (
     <div className="mx-auto flex max-w-[1100px] flex-col gap-6">
       {/* ---- HERO ---- */}
@@ -206,6 +218,46 @@ export default function InicioPage() {
           </div>
         </div>
       </div>
+
+      {/* ---- O QUE FAZER AGORA ---- */}
+      {!leadsLoading && temAcao && (
+        <div className="fu rounded-[18px] border border-border bg-card p-6 shadow-[var(--shadow)]">
+          <div className="mb-4 flex items-center gap-2 text-base font-bold">
+            <BellRinging size={18} weight="fill" className="text-brand" /> O que fazer agora
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <ActionBucket
+              icon={<ChatCircleDots size={15} weight="fill" />}
+              title="Responderam"
+              tone="green"
+              leads={precisaResponder}
+              labelOf={(l) => (l.status === "interessado" ? "interessado" : "respondeu")}
+            />
+            <ActionBucket
+              icon={<BellRinging size={15} weight="fill" />}
+              title="Follow-ups"
+              tone="amber"
+              leads={followupsDevidos}
+              labelOf={(l) => {
+                const due = new Date(l.followup_at!);
+                const hoje = new Date();
+                const inicioHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+                return due < inicioHoje ? "atrasado" : "hoje";
+              }}
+            />
+            <ActionBucket
+              icon={<CalendarCheck size={15} weight="fill" />}
+              title="Reunioes (24h)"
+              tone="brand"
+              leads={reunioes.map((r) => r.lead)}
+              labelOf={(l) => {
+                const r = reunioes.find((x) => x.lead.id === l.id);
+                return r ? fmtMeetingWhen(r.at) : "";
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* ---- GRID: feed + resumo ---- */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.6fr_1fr]">
@@ -272,47 +324,6 @@ export default function InicioPage() {
 
         {/* ---- RESUMO DA SEMANA ---- */}
         <div className="flex flex-col gap-6">
-          {/* follow-ups pra hoje: lembrete no topo do login */}
-          {!leadsLoading && followupsDevidos.length > 0 && (
-            <div className="fu rounded-[18px] border border-amber-200 bg-amber-50 p-6 shadow-[var(--shadow)] dark:border-amber-900/40 dark:bg-amber-950/20">
-              <div className="mb-3 flex items-center gap-2 text-[13px] font-bold text-amber-700 dark:text-amber-400">
-                <BellRinging size={16} weight="fill" /> Follow-ups pra hoje
-              </div>
-              <div className="flex flex-col gap-1.5">
-                {followupsDevidos.slice(0, 6).map((l) => {
-                  const due = new Date(l.followup_at!);
-                  const hoje = new Date();
-                  const inicioHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
-                  const atrasado = due < inicioHoje;
-                  return (
-                    <Link
-                      key={l.id}
-                      href={`/ficha/${l.id}`}
-                      className="flex items-center justify-between gap-2 rounded-[10px] border border-amber-200/60 bg-card px-3 py-2 text-[13.5px] font-semibold transition-colors hover:border-brand dark:border-amber-900/30"
-                    >
-                      <span className="truncate">{l.business_name ?? "Sem nome"}</span>
-                      <span
-                        className={cn(
-                          "flex-none rounded-full px-2 py-0.5 text-[11px] font-bold",
-                          atrasado
-                            ? "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400"
-                            : "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400",
-                        )}
-                      >
-                        {atrasado ? "atrasado" : "hoje"}
-                      </span>
-                    </Link>
-                  );
-                })}
-              </div>
-              {followupsDevidos.length > 6 && (
-                <Link href="/funil" className="mt-2.5 block text-[12.5px] font-semibold text-brand hover:underline">
-                  +{followupsDevidos.length - 6} no funil
-                </Link>
-              )}
-            </div>
-          )}
-
           {/* card semana */}
           <div className="fu rounded-[18px] border border-border bg-card p-6 shadow-[var(--shadow)]">
             <div className="mb-4 text-[13px] font-semibold text-muted-foreground">
@@ -359,6 +370,61 @@ export default function InicioPage() {
 }
 
 // ---- sub-componentes --------------------------------------------------------
+
+// Um balde do painel "o que fazer agora": titulo + contagem + ate 4 leads
+// clicaveis. Some quando vazio.
+function ActionBucket({
+  icon,
+  title,
+  tone,
+  leads,
+  labelOf,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  tone: "green" | "amber" | "brand";
+  leads: Lead[];
+  labelOf: (l: Lead) => string;
+}) {
+  if (leads.length === 0) return null;
+  const headClass =
+    tone === "green"
+      ? "text-emerald-700 dark:text-emerald-400"
+      : tone === "amber"
+        ? "text-amber-700 dark:text-amber-400"
+        : "text-brand";
+  const pillClass =
+    tone === "green"
+      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
+      : tone === "amber"
+        ? "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400"
+        : "bg-brand-50 text-brand";
+  return (
+    <div className="rounded-[14px] border border-border bg-surface-2 p-4">
+      <div className={cn("mb-2.5 flex items-center gap-1.5 text-[13px] font-bold", headClass)}>
+        {icon} {title}
+        <span className={cn("ml-auto rounded-full px-2 py-0.5 text-[11px] font-bold", pillClass)}>
+          {leads.length}
+        </span>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        {leads.slice(0, 4).map((l) => (
+          <Link
+            key={l.id}
+            href={`/ficha/${l.id}`}
+            className="flex items-center justify-between gap-2 rounded-[10px] border border-border bg-card px-3 py-2 text-[13px] font-semibold transition-colors hover:border-brand"
+          >
+            <span className="truncate">{l.business_name ?? "Sem nome"}</span>
+            <span className={cn("flex-none rounded-full px-2 py-0.5 text-[10.5px] font-bold", pillClass)}>
+              {labelOf(l)}
+            </span>
+          </Link>
+        ))}
+      </div>
+      {leads.length > 4 && <div className="mt-2 text-[12px] text-faint">+{leads.length - 4} mais</div>}
+    </div>
+  );
+}
 
 function StatRow({ label, value }: { label: string; value: string }) {
   return (
