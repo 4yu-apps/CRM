@@ -77,6 +77,15 @@
   ];
 
   // src/lib/repo.mjs
+  function noWhatsappFields(lead, nowIso) {
+    const tags = Array.isArray(lead?.tags) ? lead.tags : [];
+    const next = tags.includes("sem-whatsapp") ? tags : [...tags, "sem-whatsapp"];
+    return { archived: true, tags: next, whatsapp_checked_at: nowIso };
+  }
+  function undoFields(lead) {
+    const tags = (Array.isArray(lead?.tags) ? lead.tags : []).filter((t) => t !== "sem-whatsapp");
+    return { archived: false, tags, whatsapp_checked_at: null };
+  }
   function mockRepo() {
     const leads = MOCK_LEADS.map((l) => ({ ...l }));
     return {
@@ -141,6 +150,15 @@
         if (!r.ok) throw new Error(`updateLead: ${r.status} ${await r.text()}`);
         const data = await r.json();
         return Array.isArray(data) ? data[0] : data;
+      },
+      async markNoWhatsapp(lead) {
+        return this.updateLead(lead.id, noWhatsappFields(lead, (/* @__PURE__ */ new Date()).toISOString()));
+      },
+      async markChecked(id) {
+        return this.updateLead(id, { whatsapp_checked_at: (/* @__PURE__ */ new Date()).toISOString() });
+      },
+      async undoNoWhatsapp(lead) {
+        return this.updateLead(lead.id, undoFields(lead));
       },
       // Insere um lead bruto vindo do Google Maps. owner_id cai no default
       // do banco (auth.uid() via RLS). Retorna o id do registro criado,
@@ -293,6 +311,37 @@
     }));
   }
 
+  // src/lib/wa-quota.mjs
+  var SWEEP_DAILY_CAP = 150;
+  var SWEEP_MIN_INTERVAL_MS = 4e3;
+  var PREFIX = "wa-check-";
+  function dayKey(ms) {
+    return PREFIX + new Date(ms).toISOString().slice(0, 10);
+  }
+  function makeQuota({ storage, now, cap } = {}) {
+    const store = storage ?? chrome.storage.local;
+    const clock = now ?? (() => Date.now());
+    const limit = cap ?? SWEEP_DAILY_CAP;
+    async function count() {
+      const key = dayKey(clock());
+      const got = await store.get(key);
+      return Number(got?.[key] ?? 0);
+    }
+    return {
+      async canCheck() {
+        return await count() < limit;
+      },
+      async remaining() {
+        return Math.max(0, limit - await count());
+      },
+      async record() {
+        const key = dayKey(clock());
+        const c = await count();
+        await store.set({ [key]: c + 1 });
+      }
+    };
+  }
+
   // src/content/main.mjs
   var PANEL_ID = "garimpo-panel";
   var LAUNCHER_ID = "garimpo-launcher";
@@ -318,6 +367,74 @@
     { key: "meeting_link", label: "Link da reuniao (online)", type: "text" },
     { key: "meeting_location", label: "Local (presencial)", type: "text" }
   ];
+  function waCheck(phone) {
+    return new Promise((resolve) => {
+      const reqId = `chk-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const onMsg = (e) => {
+        if (e.source !== window) return;
+        const d = e.data;
+        if (!d || d.source !== "garimpo-page" || d.type !== "check_result" || d.reqId !== reqId) return;
+        window.removeEventListener("message", onMsg);
+        resolve(d.verdict || "unknown");
+      };
+      window.addEventListener("message", onMsg);
+      window.postMessage({ source: "garimpo-sw", type: "check_whatsapp", phone, reqId }, "*");
+      setTimeout(() => {
+        window.removeEventListener("message", onMsg);
+        resolve("unknown");
+      }, 8e3);
+    });
+  }
+  var quota = makeQuota({});
+  var sweeping = false;
+  function updateSweepIndicator() {
+  }
+  function jitter() {
+    return SWEEP_MIN_INTERVAL_MS + Math.floor(Math.random() * 2e3);
+  }
+  var sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  function sweepTargets(leads) {
+    return leads.filter((l) => (l.status === "rascunho_pronto" || l.status === "aprovado") && !l.archived && !l.whatsapp_checked_at).filter((l) => l.whatsapp || l.phone).sort((a, b) => new Date(a.updated_at) - new Date(b.updated_at));
+  }
+  async function runSweep() {
+    if (sweeping) return;
+    sweeping = true;
+    try {
+      for (const lead of sweepTargets(state.leads)) {
+        if (document.hidden) break;
+        if (!await quota.canCheck()) break;
+        const verdict = await waCheck(lead.whatsapp || lead.phone);
+        await quota.record();
+        if (verdict === "none") {
+          const updated = await state.repo.markNoWhatsapp(lead);
+          state.leads = state.leads.map((l) => l.id === lead.id ? { ...l, ...updated } : l);
+        } else if (verdict === "has") {
+          const updated = await state.repo.markChecked(lead.id);
+          state.leads = state.leads.map((l) => l.id === lead.id ? { ...l, ...updated } : l);
+        }
+        updateSweepIndicator();
+        await sleep(jitter());
+      }
+    } finally {
+      sweeping = false;
+      updateSweepIndicator();
+    }
+  }
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) void runSweep();
+  });
+  window.addEventListener("message", async (e) => {
+    if (e.source !== window) return;
+    const d = e.data;
+    if (!d || d.source !== "garimpo-page" || d.type !== "no_whatsapp") return;
+    const key = phoneKey(d.phone);
+    const lead = state.leads.find((l) => phoneKey(l.whatsapp || l.phone) === key);
+    if (!lead || lead.archived) return;
+    const updated = await state.repo.markNoWhatsapp(lead);
+    state.leads = state.leads.map((l) => l.id === lead.id ? { ...l, ...updated } : l);
+    toast("N\xFAmero sem WhatsApp. Arquivei e marquei sem-whatsapp.");
+    evaluate(true);
+  });
   async function init() {
     state.cfg = await getConfig();
     const fresh = await ensureFreshToken(state.cfg);
@@ -327,7 +444,10 @@
     state.repo = createRepo(state.cfg);
     mountPanel();
     observe();
-    if (state.loggedIn) await refreshLeads();
+    if (state.loggedIn) {
+      await refreshLeads();
+      void runSweep();
+    }
     updateBadge();
     evaluate(true);
     setInterval(keepAlive, 45 * 60 * 1e3);

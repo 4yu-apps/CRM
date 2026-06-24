@@ -11,7 +11,8 @@ import { ensureFreshToken, loginWithPassword, logout } from "../lib/auth.mjs";
 import { createRepo } from "../lib/repo.mjs";
 import { matchLead, parsePhone } from "../lib/match.mjs";
 import { contextualButtons, STATUS_LABEL } from "../lib/state-machine.mjs";
-import { fmtPhone, normalizePhone } from "../lib/normalize.mjs";
+import { fmtPhone, normalizePhone, phoneKey } from "../lib/normalize.mjs";
+import { makeQuota, SWEEP_MIN_INTERVAL_MS } from "../lib/wa-quota.mjs";
 
 const PANEL_ID = "garimpo-panel";
 const LAUNCHER_ID = "garimpo-launcher";
@@ -39,6 +40,85 @@ const EDIT_FIELDS = [
   { key: "meeting_location", label: "Local (presencial)", type: "text" },
 ];
 
+// ---- waCheck: consulta o glue (mundo MAIN) sobre existencia no WhatsApp ----
+function waCheck(phone) {
+  return new Promise((resolve) => {
+    const reqId = `chk-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const onMsg = (e) => {
+      if (e.source !== window) return;
+      const d = e.data;
+      if (!d || d.source !== "garimpo-page" || d.type !== "check_result" || d.reqId !== reqId) return;
+      window.removeEventListener("message", onMsg);
+      resolve(d.verdict || "unknown");
+    };
+    window.addEventListener("message", onMsg);
+    window.postMessage({ source: "garimpo-sw", type: "check_whatsapp", phone, reqId }, "*");
+    setTimeout(() => { window.removeEventListener("message", onMsg); resolve("unknown"); }, 8000);
+  });
+}
+
+// ---- varredura proativa throttled ----
+const quota = makeQuota({});
+let sweeping = false;
+
+// Stub: a versao real (com o elemento de indicador) entra na Task 6.
+// Definir aqui evita ReferenceError quando o loop chama durante a Task 5.
+function updateSweepIndicator() {}
+
+function jitter() { return SWEEP_MIN_INTERVAL_MS + Math.floor(Math.random() * 2000); }
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Alvos: na fila, nao arquivados, ainda nao checados. Mais antigos primeiro.
+function sweepTargets(leads) {
+  return leads
+    .filter((l) => (l.status === "rascunho_pronto" || l.status === "aprovado") && !l.archived && !l.whatsapp_checked_at)
+    .filter((l) => l.whatsapp || l.phone)
+    .sort((a, b) => new Date(a.updated_at) - new Date(b.updated_at));
+}
+
+async function runSweep() {
+  if (sweeping) return;
+  sweeping = true;
+  try {
+    for (const lead of sweepTargets(state.leads)) {
+      if (document.hidden) break;            // so com a aba visivel
+      if (!(await quota.canCheck())) break;  // respeita o teto diario
+      const verdict = await waCheck(lead.whatsapp || lead.phone);
+      await quota.record();
+      if (verdict === "none") {
+        const updated = await state.repo.markNoWhatsapp(lead);
+        state.leads = state.leads.map((l) => (l.id === lead.id ? { ...l, ...updated } : l));
+      } else if (verdict === "has") {
+        const updated = await state.repo.markChecked(lead.id);
+        state.leads = state.leads.map((l) => (l.id === lead.id ? { ...l, ...updated } : l));
+      }
+      // unknown: nao mexe, tenta na proxima rodada
+      updateSweepIndicator();
+      await sleep(jitter());
+    }
+  } finally {
+    sweeping = false;
+    updateSweepIndicator();
+  }
+}
+
+// Dispara varredura ao voltar o foco da aba
+document.addEventListener("visibilitychange", () => { if (!document.hidden) void runSweep(); });
+
+// ---- rede no clique: reage ao evento no_whatsapp emitido pelo glue ----
+window.addEventListener("message", async (e) => {
+  if (e.source !== window) return;
+  const d = e.data;
+  if (!d || d.source !== "garimpo-page" || d.type !== "no_whatsapp") return;
+  const key = phoneKey(d.phone);
+  const lead = state.leads.find((l) => phoneKey(l.whatsapp || l.phone) === key);
+  if (!lead || lead.archived) return;
+  const updated = await state.repo.markNoWhatsapp(lead);
+  state.leads = state.leads.map((l) => (l.id === lead.id ? { ...l, ...updated } : l));
+  toast("Número sem WhatsApp. Arquivei e marquei sem-whatsapp.");
+  evaluate(true);
+});
+
 async function init() {
   state.cfg = await getConfig();
   const fresh = await ensureFreshToken(state.cfg);
@@ -48,7 +128,10 @@ async function init() {
   state.repo = createRepo(state.cfg);
   mountPanel();
   observe();
-  if (state.loggedIn) await refreshLeads();
+  if (state.loggedIn) {
+    await refreshLeads();
+    void runSweep();
+  }
   updateBadge();
   evaluate(true);
   // mantem o token vivo em sessoes longas (renova sozinho a cada ~45min)
