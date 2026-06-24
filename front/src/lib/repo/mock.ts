@@ -1,7 +1,7 @@
 // Implementacao mock — em memoria, espelha o comportamento do banco:
 // valida transicoes, aplica guarda LGPD e grava historico (como os triggers).
 import { canTransition, nextStatuses, STATUS_META } from "../state-machine";
-import type { ActivityEvent, ActorType, FieldProvenance, Lead, LeadDetail, LeadEditable, LeadFile, LeadStatus, ScanCoverage, SearchPreset, SearchPresetInput, SearchProfile, SearchProfileInput, StatusHistory } from "../types";
+import type { ActivityEvent, ActorType, FieldProvenance, Lead, LeadDetail, LeadEditable, LeadFile, LeadStatus, MessageTemplate, MessageTemplateInput, ScanCoverage, SearchPreset, SearchPresetInput, SearchProfile, SearchProfileInput, StatusHistory } from "../types";
 import { buildSeed, DEMO_ACTIVITY, DEMO_COVERAGE, DEMO_OWNER, DEMO_PROFILE } from "./mock-data";
 import type { LeadsRepo } from "./index";
 
@@ -215,6 +215,45 @@ async function deletePreset(id: string): Promise<void> {
   if (i >= 0) mockPresets.splice(i, 1);
 }
 
+// Templates de mensagem em memoria (demo).
+const mockTemplates: MessageTemplate[] = [];
+
+async function listTemplates(): Promise<MessageTemplate[]> {
+  return clone(
+    [...mockTemplates].sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at)),
+  );
+}
+
+async function saveTemplate(input: MessageTemplateInput): Promise<MessageTemplate> {
+  const now = new Date().toISOString();
+  const t: MessageTemplate = {
+    id: `tpl-${Date.now()}`,
+    owner_id: DEMO_OWNER,
+    name: input.name,
+    body: input.body,
+    kind: input.kind,
+    created_at: now,
+    updated_at: now,
+  };
+  mockTemplates.unshift(t);
+  return clone(t);
+}
+
+async function updateTemplate(id: string, input: MessageTemplateInput): Promise<MessageTemplate> {
+  const t = mockTemplates.find((x) => x.id === id);
+  if (!t) throw new Error("Template nao encontrado");
+  t.name = input.name;
+  t.body = input.body;
+  t.kind = input.kind;
+  t.updated_at = new Date().toISOString();
+  return clone(t);
+}
+
+async function deleteTemplate(id: string): Promise<void> {
+  const i = mockTemplates.findIndex((x) => x.id === id);
+  if (i >= 0) mockTemplates.splice(i, 1);
+}
+
 // Anexos em memoria (demo): guarda o arquivo como object URL pra abrir na aba.
 // Some ao recarregar a pagina, e o esperado no modo mock.
 const mockFiles = new Map<string, { file: LeadFile; url: string }[]>();
@@ -266,6 +305,10 @@ export const mockRepo: LeadsRepo = {
   listPresets,
   savePreset,
   deletePreset,
+  listTemplates,
+  saveTemplate,
+  updateTemplate,
+  deleteTemplate,
   listActivity,
   listFiles,
   uploadFile,

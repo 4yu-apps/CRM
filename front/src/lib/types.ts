@@ -160,6 +160,9 @@ export interface Lead {
   // Sinais do site e taxa de correspondencia de contatos (enriquecedor).
   site_signals?: SiteSignals | null;
   match_rate?: number | null;
+
+  // Tags manuais (#20): etiquetas livres pra segmentar.
+  tags?: string[] | null;
 }
 
 export interface FieldProvenance {
@@ -218,6 +221,7 @@ export type LeadEditable = Partial<
     | "followup_at"
     | "followup_note"
     | "cadence_step"
+    | "tags"
   >
 >;
 
@@ -248,6 +252,8 @@ export interface SearchProfile {
   radius: string;                 // "5km" | "10km" | "25km" | "50km" | "cidade"
   default_service_target: ServiceTarget;
   autopilot: boolean;
+  // Score minimo pra entrar na fila (#19). A esteira le e descarta abaixo.
+  min_score?: number;
   is_admin?: boolean;
   // Profissao/vertical do usuario (catalogo em lib/professions). Define os
   // nichos sugeridos e o servico-alvo padrao no onboarding. Coluna criada por
@@ -257,7 +263,24 @@ export interface SearchProfile {
   updated_at: string;
 }
 export type SearchProfileInput = Partial<Pick<SearchProfile,
-  "niches" | "city" | "state" | "neighborhood" | "radius" | "default_service_target" | "autopilot" | "profession">>;
+  "niches" | "city" | "state" | "neighborhood" | "radius" | "default_service_target" | "autopilot" | "profession" | "min_score">>;
+
+// Template de mensagem (#18).
+export type MessageTemplateKind = "abertura" | "follow_up" | "objecao" | "reativacao";
+export interface MessageTemplate {
+  id: string;
+  owner_id: string;
+  name: string;
+  body: string;
+  kind: MessageTemplateKind;
+  created_at: string;
+  updated_at: string;
+}
+export interface MessageTemplateInput {
+  name: string;
+  body: string;
+  kind: MessageTemplateKind;
+}
 
 // Preset de busca salvo (#8): combinacao nomeada pra re-rodar com 1 clique.
 export interface SearchPresetParams {

@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -14,12 +14,13 @@ import {
   Globe,
   X,
   Download,
+  UploadSimple,
 } from "@phosphor-icons/react";
 import { useLeads } from "@/hooks/use-leads";
 import { STATUS_META, STATUS_ORDER, TONE_CLASSES } from "@/lib/state-machine";
 import { SERVICE_META } from "@/lib/service";
 import { fmtRelative } from "@/lib/format";
-import type { Lead, LeadStatus } from "@/lib/types";
+import type { Lead, LeadStatus, LeadEditable } from "@/lib/types";
 import { RAMOS_DISPONIVEIS } from "@/lib/ramos";
 import { Dropdown, type DropdownOption } from "@/components/dropdown";
 import { matchesSignal, SIGNAL_FILTER_OPTIONS, type SignalFilter } from "@/lib/quality-signals";
@@ -41,6 +42,42 @@ const PAGE_SIZE = 50;
 function digits(s: string | null | undefined): string {
   return (s ?? "").replace(/\D/g, "");
 }
+
+// #20 — parser de CSV (suporta campos com aspas e virgulas internas).
+function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cur = "";
+  let inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQ) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { cur += '"'; i++; }
+        else inQ = false;
+      } else cur += c;
+    } else if (c === '"') inQ = true;
+    else if (c === ",") { row.push(cur); cur = ""; }
+    else if (c === "\n") { row.push(cur); rows.push(row); row = []; cur = ""; }
+    else if (c !== "\r") cur += c;
+  }
+  if (cur.length || row.length) { row.push(cur); rows.push(row); }
+  return rows.filter((r) => r.some((c) => c.trim() !== ""));
+}
+
+// Mapeia cabecalhos comuns (pt/en) -> campos do lead.
+const CSV_COL_MAP: Record<string, keyof LeadEditable> = {
+  negocio: "business_name", "negócio": "business_name", nome: "business_name", empresa: "business_name", business_name: "business_name",
+  telefone: "phone", phone: "phone", fone: "phone",
+  whatsapp: "whatsapp", zap: "whatsapp",
+  email: "email", "e-mail": "email",
+  instagram: "instagram", insta: "instagram",
+  site: "website", website: "website", url: "website",
+  cidade: "city", city: "city",
+  estado: "state", uf: "state",
+  bairro: "neighborhood",
+  categoria: "category", ramo: "category", category: "category",
+};
 
 // Casa a busca por nome, cidade, telefone/whatsapp, dono ou categoria.
 function matchesQuery(lead: Lead, q: string): boolean {
@@ -130,6 +167,9 @@ export default function ContatosPage() {
   const [statusFilter, setStatusFilter] = useState<LeadStatus | "">("");
   const [ramoFilter, setRamoFilter] = useState<string>("");
   const [sinalFilter, setSinalFilter] = useState<SignalFilter>(""); // #9
+  const [tagFilter, setTagFilter] = useState<string>(""); // #20
+  const [importing, setImporting] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [sort, setSort] = useState<SortKey>("recent");
   const [page, setPage] = useState(1);
@@ -150,6 +190,7 @@ export default function ContatosPage() {
       .filter((l) => (statusFilter ? l.status === statusFilter : true))
       .filter((l) => (ramoFilter ? l.category === ramoFilter : true))
       .filter((l) => (sinalFilter ? matchesSignal(l, sinalFilter) : true))
+      .filter((l) => (tagFilter ? (l.tags ?? []).includes(tagFilter) : true))
       .filter((l) => matchesQuery(l, q));
     out.sort((a, b) => {
       if (sort === "name") return (a.business_name ?? "").localeCompare(b.business_name ?? "");
@@ -157,7 +198,17 @@ export default function ContatosPage() {
       return +new Date(b.updated_at) - +new Date(a.updated_at);
     });
     return out;
-  }, [leads, q, statusFilter, ramoFilter, sinalFilter, showArchived, sort]);
+  }, [leads, q, statusFilter, ramoFilter, sinalFilter, tagFilter, showArchived, sort]);
+
+  // tags distintas pro filtro (#20)
+  const tagOptions: DropdownOption[] = useMemo(() => {
+    const set = new Set<string>();
+    for (const l of leads) for (const t of l.tags ?? []) set.add(t);
+    return [
+      { value: "", label: "Todas as tags" },
+      ...[...set].sort((a, b) => a.localeCompare(b)).map((t) => ({ value: t, label: t })),
+    ];
+  }, [leads]);
 
   // Paginacao da lista filtrada. safePage clampa quando o filtro encurta o total.
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -237,6 +288,52 @@ export default function ContatosPage() {
     link.click();
     toast.success(`Exportados ${selected.size} contatos`);
   }, [filtered, selected]);
+
+  // #20 — importar leads de um CSV (mapeia cabecalhos comuns -> campos).
+  const handleImportFile = useCallback(
+    async (file: File) => {
+      setImporting(true);
+      try {
+        const rows = parseCsv(await file.text());
+        if (rows.length < 2) {
+          toast.error("CSV vazio ou sem linhas de dados.");
+          return;
+        }
+        const header = rows[0].map((h) => h.trim().toLowerCase());
+        const fields = header.map((h) => CSV_COL_MAP[h]);
+        if (!fields.some(Boolean)) {
+          toast.error("Nenhuma coluna reconhecida. Use cabeçalhos como Negócio, Telefone, Cidade, Ramo.");
+          return;
+        }
+        let ok = 0;
+        let fail = 0;
+        for (const r of rows.slice(1)) {
+          const patch: LeadEditable = {};
+          fields.forEach((field, i) => {
+            const val = r[i]?.trim();
+            if (field && val) (patch as Record<string, unknown>)[field] = val;
+          });
+          if (!patch.business_name && !patch.phone) {
+            fail++;
+            continue;
+          }
+          try {
+            await repo.create(patch);
+            ok++;
+          } catch {
+            fail++;
+          }
+        }
+        await refresh();
+        toast.success(`Importei ${ok} contato${ok === 1 ? "" : "s"}${fail ? ` · ${fail} ignorado${fail === 1 ? "" : "s"}` : ""}.`);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Erro ao importar CSV");
+      } finally {
+        setImporting(false);
+      }
+    },
+    [repo, refresh],
+  );
 
   const toggleArchive = useCallback(
     async (lead: Lead) => {
@@ -376,6 +473,15 @@ export default function ContatosPage() {
               ariaLabel="Filtrar por sinal de qualidade"
               className="min-w-[170px]"
             />
+            {tagOptions.length > 1 && (
+              <Dropdown
+                value={tagFilter}
+                onChange={(v) => { setTagFilter(v); setPage(1); }}
+                options={tagOptions}
+                ariaLabel="Filtrar por tag"
+                className="min-w-[150px]"
+              />
+            )}
             <Dropdown
               value={sort}
               onChange={(v) => { setSort(v as SortKey); setPage(1); }}
@@ -383,6 +489,27 @@ export default function ContatosPage() {
               ariaLabel="Ordenar"
               className="min-w-[150px]"
             />
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void handleImportFile(f);
+                e.target.value = "";
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={importing}
+              className="flex items-center gap-1.5 rounded-xl border border-border-2 bg-surface-2 px-4 py-3 text-[13px] font-semibold text-muted-foreground transition-colors hover:text-ink disabled:opacity-50"
+              title="Importar contatos de um CSV"
+            >
+              <UploadSimple size={15} />
+              <span className="hidden sm:inline">{importing ? "Importando..." : "Importar CSV"}</span>
+            </button>
             <button
               type="button"
               onClick={() => { setShowArchived((v) => !v); setPage(1); }}

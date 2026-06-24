@@ -192,9 +192,12 @@ def cmd_search(
     term = search_term(niche, city, state, neighborhood)
 
     profession = None
+    min_score = 0
     if hasattr(sink, "fetch_profile"):
         try:
-            profession = (sink.fetch_profile(owner_id) or {}).get("profession")
+            prof = sink.fetch_profile(owner_id) or {}
+            profession = prof.get("profession")
+            min_score = int(prof.get("min_score") or 0)
         except Exception:
             profession = None
 
@@ -205,7 +208,7 @@ def cmd_search(
 
     # pipeline so deste dono (enrich -> score na lente da profissao -> draft)
     enrich_batch(sink, sources, batch=cfg.batch, delay=cfg.delay, owner_id=owner_id)
-    score_batch(sink, batch=cfg.batch, owner_id=owner_id, profession=profession)
+    score_batch(sink, batch=cfg.batch, owner_id=owner_id, profession=profession, min_score=min_score)
     draft_batch(sink, provider, batch=cfg.batch, owner_id=owner_id, profession=profession, reviews_source=reviews_source)
 
     # memoria de cobertura + feed de atividade do dono

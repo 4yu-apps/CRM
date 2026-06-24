@@ -102,6 +102,7 @@ def run_autopilot(
         city, state = prof.get("city"), prof.get("state")
         neighborhood = prof.get("neighborhood")
         profession = prof.get("profession")  # define a lente do score e a copy
+        min_score = int(prof.get("min_score") or 0)  # #19 piso de score por dono
         rkey = region_key(city, state)
         covered = (
             {(rk, slug(nn)) for rk, nn in sink.fetch_covered_keys(owner)}
@@ -175,7 +176,7 @@ def run_autopilot(
         # erro de um dono nao bloqueia os proximos donos.
         for stage in (
             lambda: enrich_batch(sink, sources, batch=batch, delay=delay, owner_id=owner),
-            lambda: score_batch(sink, batch=batch, owner_id=owner, profession=profession),
+            lambda: score_batch(sink, batch=batch, owner_id=owner, profession=profession, min_score=min_score),
             lambda: draft_batch(sink, provider, batch=batch, owner_id=owner, profession=profession, reviews_source=reviews_source),
         ):
             try:

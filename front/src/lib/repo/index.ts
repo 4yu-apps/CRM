@@ -2,7 +2,7 @@
 //  - mock: em memoria (default, roda sem banco)
 //  - supabase: banco real (quando NEXT_PUBLIC_DATA_SOURCE=supabase + envs)
 // Trocar de uma pra outra nao toca a UI.
-import type { ActivityEvent, ActorType, Lead, LeadDetail, LeadEditable, LeadFile, LeadStatus, ScanCoverage, SearchPreset, SearchPresetInput, SearchProfile, SearchProfileInput } from "../types";
+import type { ActivityEvent, ActorType, Lead, LeadDetail, LeadEditable, LeadFile, LeadStatus, MessageTemplate, MessageTemplateInput, ScanCoverage, SearchPreset, SearchPresetInput, SearchProfile, SearchProfileInput } from "../types";
 import { mockRepo } from "./mock";
 import { supabaseRepo } from "./supabase";
 
@@ -34,6 +34,14 @@ export interface LeadsRepo {
   savePreset(input: SearchPresetInput): Promise<SearchPreset>;
   /** Remove um preset de busca pelo id. */
   deletePreset(id: string): Promise<void>;
+  /** Templates de mensagem do dono, mais recentes primeiro (#18). */
+  listTemplates(): Promise<MessageTemplate[]>;
+  /** Cria um template de mensagem. */
+  saveTemplate(input: MessageTemplateInput): Promise<MessageTemplate>;
+  /** Atualiza um template existente. */
+  updateTemplate(id: string, input: MessageTemplateInput): Promise<MessageTemplate>;
+  /** Remove um template pelo id. */
+  deleteTemplate(id: string): Promise<void>;
   /** Ultimos N eventos de atividade, mais recentes primeiro. Padrao: 20. */
   listActivity(limit?: number): Promise<ActivityEvent[]>;
   /** Lista os arquivos anexados a um lead (bucket privado, escopo do dono). */
