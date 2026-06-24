@@ -60,6 +60,10 @@ class Config:
     # forcar com GARIMPO_PAGESPEED=1 (modo sem chave, cota baixa).
     pagespeed_key: str | None = None
     pagespeed_enabled: bool = False
+    # Places Details (telefone/site das capturas via place_id). Custa (SKU
+    # Enterprise: 1.000 gratis/mes ~= 30/dia), entao limita por DIA e bloqueia ao
+    # bater. Usa a GOOGLE_MAPS_API_KEY. 0 = desligado.
+    places_daily_limit: int = 30
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -97,6 +101,7 @@ class Config:
             pagespeed_enabled=(
                 ps_flag in ("1", "true", "True") if ps_flag is not None else bool(ps_key)
             ),
+            places_daily_limit=int(os.getenv("GARIMPO_PLACES_DAILY_LIMIT", "30")),
         )
 
 
@@ -221,6 +226,23 @@ def build_provider(cfg: Config) -> DraftProvider:
         prov = OpenAICompatDraftProvider(cfg.groq_key, "https://api.groq.com/openai/v1", cfg.groq_model)
         return _chain_fallback([prov, mock])
     return mock
+
+
+def build_places_source(cfg: Config, sink):
+    """Fonte Places Details (telefone/site via place_id), com cota diaria. Retorna
+    None se nao ha chave do Maps, se o limite e 0, ou se o sink nao sabe contar a
+    cota. So vale com banco real (o contador da cota vive no banco)."""
+    if not cfg.maps_key or cfg.places_daily_limit <= 0:
+        return None
+    if not hasattr(sink, "count_places_detailed_today"):
+        return None
+    from .sources.places_details import PlacesDetailsSource, place_details_fetch
+
+    return PlacesDetailsSource(
+        place_details_fetch(cfg.maps_key),
+        daily_limit=cfg.places_daily_limit,
+        count_today=sink.count_places_detailed_today,
+    )
 
 
 def build_reviews_source(cfg: Config):

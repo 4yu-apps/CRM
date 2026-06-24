@@ -79,6 +79,10 @@ jobs:
           GARIMPO_MAPS: places
           GARIMPO_MAPS_PAGES: ${{ vars.GARIMPO_MAPS_PAGES || '1' }}
           GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+          # Places Details (telefone/site das capturas via place_id). SKU Enterprise
+          # = 1.000 gratis/mes (~30/dia). Limite diario bloqueia antes de virar cobranca;
+          # ajuste a var GARIMPO_PLACES_DAILY_LIMIT (0 desliga).
+          GARIMPO_PLACES_DAILY_LIMIT: ${{ vars.GARIMPO_PLACES_DAILY_LIMIT || '30' }}
           # Nichos extras aleatorios por run (variedade sem o dono pedir). Como
           # agora roda a cada 2h, 1 basta — descoberta gentil pra nao atropelar
           # o processamento e deixar a fila drenar.

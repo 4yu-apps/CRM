@@ -23,7 +23,7 @@ ServiceTarget = Literal["trafego", "automacao", "ambos", "design", "marketing", 
 # Campos do lead que as fontes podem preencher (proveniência por campo).
 ENRICHABLE_FIELDS = (
     "phone", "whatsapp", "email", "instagram", "facebook", "website",
-    "owner_name", "cnpj",
+    "owner_name", "cnpj", "places_detailed_at",
 )
 
 
@@ -63,6 +63,8 @@ class Lead:
 
     owner_name: str | None = None
     opt_out: bool = False
+    # carimbo do enriquecimento via Google Places Details (contador da cota diaria)
+    places_detailed_at: str | None = None
 
     # qualificação (Fase 3 + B1)
     score: int | None = None

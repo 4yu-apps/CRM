@@ -14,7 +14,7 @@ from pathlib import Path
 
 from .autopilot import region_key, run_autopilot, run_drain, search_term
 from .cascade import enrich_batch, enrich_lead
-from .config import FIXTURES_DIR, Config, build_maps_source, build_provider, build_reviews_source, build_sink, build_sources
+from .config import FIXTURES_DIR, Config, build_maps_source, build_places_source, build_provider, build_reviews_source, build_sink, build_sources
 from .discovery import discover
 from .draft_stage import draft_batch, redraft_batch
 from .models import Lead
@@ -155,6 +155,9 @@ def cmd_autopilot(cfg: Config) -> int:
     maps = build_maps_source(cfg)
     provider = build_provider(cfg)
     sources = build_sources(cfg)
+    ps = build_places_source(cfg, sink)
+    if ps:
+        sources = [*sources, ps]
     reviews_source = build_reviews_source(cfg)
     print(f"autopilot · sink={cfg.sink} maps={cfg.maps_mode} llm={cfg.llm}")
     # concorrencia so com o banco real (SupabaseSink e thread-safe); JsonFileSink
@@ -192,6 +195,9 @@ def cmd_search(
     maps = build_maps_source(cfg)
     provider = build_provider(cfg)
     sources = build_sources(cfg)
+    ps = build_places_source(cfg, sink)
+    if ps:
+        sources = [*sources, ps]
     reviews_source = build_reviews_source(cfg)
     term = search_term(niche, city, state, neighborhood)
 
@@ -261,6 +267,9 @@ def cmd_drain(cfg: Config) -> int:
     parado) virar rascunho mesmo pra quem nao tem autopilot ligado."""
     sink = build_sink(cfg)
     sources = build_sources(cfg)
+    ps = build_places_source(cfg, sink)
+    if ps:
+        sources = [*sources, ps]
     provider = build_provider(cfg)
     reviews_source = build_reviews_source(cfg)
     workers = cfg.workers if cfg.sink == "supabase" else 1

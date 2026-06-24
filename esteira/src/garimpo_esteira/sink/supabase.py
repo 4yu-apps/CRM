@@ -23,7 +23,7 @@ _LEAD_COLS = (
     "site_signals", "match_rate",
     "suggested_value", "suggested_value_reason",
     "draft_msg1", "draft_msg2", "draft_model", "draft_generated_at",
-    "backfilled_at",
+    "backfilled_at", "places_detailed_at",
 )
 
 
@@ -142,6 +142,25 @@ class SupabaseSink:
             return r.json()
         except Exception:
             return []
+
+    def count_places_detailed_today(self) -> int:
+        """Conta leads detalhados pelo Places hoje (UTC) — contador da cota diaria
+        do Maps (global). Usa o header count=exact do PostgREST."""
+        from datetime import datetime, timezone
+
+        start = datetime.now(timezone.utc).strftime("%Y-%m-%dT00:00:00Z")
+        try:
+            r = self._send(
+                "GET",
+                f"{self.base}/leads",
+                params={"places_detailed_at": f"gte.{start}", "select": "id"},
+                headers={"Prefer": "count=exact", "Range": "0-0"},
+            )
+            cr = r.headers.get("content-range", "")
+            total = cr.split("/")[-1] if "/" in cr else ""
+            return int(total) if total.isdigit() else len(r.json())
+        except Exception:
+            return 0
 
     def fetch_pending_owners(self) -> list[str]:
         """Donos com leads ainda no meio do funil (bruto/enriquecido/qualificado).
