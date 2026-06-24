@@ -109,10 +109,24 @@
       }
       return false;
     }
+    async function checkWhatsapp(num) {
+      try {
+        if (!window.WPP?.contact?.queryExists) return "unknown";
+        const r = await window.WPP.contact.queryExists(num);
+        if (r && r.wid) return "has";
+        return "none";
+      } catch {
+        return "unknown";
+      }
+    }
     async function handle(phone, text) {
       if (!await waitReady(5e3)) return false;
       const num = brNumber(phone);
       if (!num) return false;
+      if (await checkWhatsapp(num) === "none") {
+        window.postMessage({ source: "garimpo-page", type: "no_whatsapp", phone }, "*");
+        return false;
+      }
       const id = await resolveChatId(num);
       await openChat(id, num);
       if (text && String(text).trim()) prefill(String(text));
@@ -121,14 +135,28 @@
     window.addEventListener("message", async (e) => {
       if (e.source !== window) return;
       const d = e.data;
-      if (!d || d.source !== "garimpo-sw" || d.type !== "open_chat") return;
-      let ok = false;
-      try {
-        ok = await handle(d.phone, d.text);
-      } catch {
-        ok = false;
+      if (!d || d.source !== "garimpo-sw") return;
+      if (d.type === "check_whatsapp") {
+        let verdict = "unknown";
+        try {
+          const num = brNumber(d.phone);
+          verdict = num ? await checkWhatsapp(num) : "unknown";
+        } catch {
+          verdict = "unknown";
+        }
+        window.postMessage({ source: "garimpo-page", type: "check_result", verdict, reqId: d.reqId }, "*");
+        return;
       }
-      window.postMessage({ source: "garimpo-page", type: "open_result", ok, reqId: d.reqId }, "*");
+      if (d.type === "open_chat") {
+        let ok = false;
+        try {
+          ok = await handle(d.phone, d.text);
+        } catch {
+          ok = false;
+        }
+        window.postMessage({ source: "garimpo-page", type: "open_result", ok, reqId: d.reqId }, "*");
+        return;
+      }
     });
   })();
 })();
