@@ -10,7 +10,9 @@ import {
   Trash,
   X,
   UserCircle,
+  ClockCounterClockwise,
 } from "@phosphor-icons/react";
+import Link from "next/link";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
@@ -164,8 +166,14 @@ export default function AdminPage() {
             Gerencie todos os perfis do sistema
           </div>
         </div>
+        <Link
+          href="/admin/logs"
+          className="ml-auto flex items-center gap-1.5 rounded-[12px] border border-border-2 bg-card px-3 py-2 text-[13px] font-semibold text-ink-2 hover:bg-accent"
+        >
+          <ClockCounterClockwise size={15} /> Logs da esteira
+        </Link>
         {!loading && profiles.length > 0 && (
-          <span className="ml-auto rounded-full border border-border bg-accent px-3 py-1 text-[13px] font-semibold text-ink-2">
+          <span className="rounded-full border border-border bg-accent px-3 py-1 text-[13px] font-semibold text-ink-2">
             {profiles.length} {profiles.length === 1 ? "perfil" : "perfis"}
           </span>
         )}
