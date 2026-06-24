@@ -32,10 +32,10 @@ import { cn } from "@/lib/utils";
 
 
 const RAIOS: { value: string; label: string }[] = [
-  { value: "5km", label: "Ate 5 km" },
-  { value: "10km", label: "Ate 10 km" },
-  { value: "25km", label: "Ate 25 km" },
-  { value: "50km", label: "Ate 50 km" },
+  { value: "5km", label: "Até 5 km" },
+  { value: "10km", label: "Até 10 km" },
+  { value: "25km", label: "Até 25 km" },
+  { value: "50km", label: "Até 50 km" },
   { value: "cidade", label: "Cidade toda" },
 ];
 
@@ -45,13 +45,13 @@ const RAIOS: { value: string; label: string }[] = [
 function serviceFocusText(p: Profession): string {
   switch (p.defaultService) {
     case "trafego":
-      return "Foco em Trafego: a busca mira negocios que precisam de anuncio.";
+      return "Foco em Tráfego: a busca mira negócios que precisam de anúncio.";
     case "automacao":
-      return "Foco em Automacao: a busca mira quem atende muito no manual.";
+      return "Foco em Automação: a busca mira quem atende muito no manual.";
     case "ambos":
-      return "Trafego + Automacao: na tela Buscar voce escolhe o foco a cada busca.";
+      return "Tráfego + Automação: na tela Buscar você escolhe o foco a cada busca.";
     default:
-      return "Voce capta pelos nichos da sua area — sem alvo de trafego/automacao.";
+      return "Você capta pelos nichos da sua área — sem alvo de tráfego/automação.";
   }
 }
 
@@ -254,7 +254,7 @@ export default function ConfigPage() {
       await refreshProfile();
       const wasOnboarding = isOnboarding;
       setIsOnboarding(false);
-      toast.success("Tudo salvo. Ja estou rodando pra voce.");
+      toast.success("Tudo salvo. Já estou rodando pra você.");
       // No primeiro acesso, manda pro Inicio depois de salvar o perfil.
       if (wasOnboarding) router.push("/");
     } catch (e) {
@@ -288,7 +288,7 @@ export default function ConfigPage() {
         msg.toLowerCase().includes("disabled")
       ) {
         setGoogleError(
-          "O login com Google ainda nao esta habilitado nesta instalacao. Peca ao administrador ativar o provider Google no painel do Supabase.",
+          "O login com Google ainda não está habilitado nesta instalação. Peça ao administrador ativar o provider Google no painel do Supabase.",
         );
       } else {
         setGoogleError(msg);
@@ -306,7 +306,7 @@ export default function ConfigPage() {
       <div className="mx-auto max-w-[760px]">
         <div className="mt-20 flex flex-col items-center gap-4 text-center text-muted-foreground">
           <div className="size-8 animate-spin rounded-full border-2 border-brand border-t-transparent" />
-          <span className="text-sm">Carregando configuracoes...</span>
+          <span className="text-sm">Carregando configurações...</span>
         </div>
       </div>
     );
@@ -332,8 +332,8 @@ export default function ConfigPage() {
                   Bem-vindo! Vamos deixar o sistema com a sua cara.
                 </h1>
                 <p className="mt-1 text-[14px] leading-relaxed text-white/85">
-                  Sao dois minutinhos. Voce me conta o que faz e onde atua, e eu ja saio
-                  garimpando os clientes certos pra voce. Pode ajustar tudo quando quiser.
+                  São dois minutinhos. Você me conta o que faz e onde atua, e eu já saio
+                  garimpando os clientes certos pra você. Pode ajustar tudo quando quiser.
                 </p>
               </div>
             </div>
@@ -346,9 +346,9 @@ export default function ConfigPage() {
               <GearSix size={24} weight="duotone" />
             </div>
             <div>
-              <h1 className="font-heading text-2xl font-bold tracking-tight">Configuracao</h1>
+              <h1 className="font-heading text-2xl font-bold tracking-tight">Configuração</h1>
               <p className="mt-0.5 text-[14px] text-muted-foreground">
-                Voce ajusta isso uma vez. Depois eu trabalho sozinho no dia a dia.
+                Você ajusta isso uma vez. Depois eu trabalho sozinho no dia a dia.
               </p>
             </div>
           </div>
@@ -383,8 +383,8 @@ export default function ConfigPage() {
         {/* ------------------------------------------------------------------ */}
         {isOnboarding ? (
           <Section
-            title="Pra que voce usa o sistema?"
-            sub="Escolha a sua area. Eu uso isso pra sugerir os nichos certos e mirar o servico que voce vende."
+            title="Pra que você usa o sistema?"
+            sub="Escolha a sua área. Eu uso isso pra sugerir os nichos certos e mirar o serviço que você vende."
             icon={<Briefcase size={20} />}
           >
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -401,8 +401,8 @@ export default function ConfigPage() {
               <div className="mt-4 flex items-start gap-2.5 rounded-[14px] border border-brand/20 bg-brand-50/70 px-4 py-3 text-[13px] leading-relaxed text-ink-2">
                 <Target size={16} className="mt-0.5 flex-none text-brand" />
                 <span>
-                  Boa. Voce mira em: <strong className="font-bold text-brand">{selectedProfession.mira}</strong>{" "}
-                  Ja deixei os nichos dessa area sugeridos abaixo, mas pode mexer a vontade.
+                  Boa. Você mira em: <strong className="font-bold text-brand">{selectedProfession.mira}</strong>{" "}
+                  Já deixei os nichos dessa área sugeridos abaixo, mas pode mexer à vontade.
                   <span className="mt-1 block text-faint">{serviceFocusText(selectedProfession)}</span>
                 </span>
               </div>
@@ -410,8 +410,8 @@ export default function ConfigPage() {
           </Section>
         ) : (
           <Section
-            title="Sua area"
-            sub="A area define os nichos sugeridos e o servico-alvo. Pode trocar quando quiser."
+            title="Sua área"
+            sub="A área define os nichos sugeridos e o serviço-alvo. Pode trocar quando quiser."
             icon={<Briefcase size={20} />}
           >
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -432,7 +432,7 @@ export default function ConfigPage() {
             ) : (
               <div className="mt-4 flex items-center gap-2 text-[12.5px] text-faint">
                 <Info size={14} />
-                Voce ainda nao escolheu uma area. Escolha uma pra eu afinar as sugestoes.
+                Você ainda não escolheu uma área. Escolha uma pra eu afinar as sugestões.
               </div>
             )}
           </Section>
@@ -442,8 +442,8 @@ export default function ConfigPage() {
         {/* 1. Ramos */}
         {/* ------------------------------------------------------------------ */}
         <Section
-          title="Ramos que voce atende"
-          sub="Vou priorizar esses tipos de negocio na busca automatica."
+          title="Ramos que você atende"
+          sub="Vou priorizar esses tipos de negócio na busca automática."
           icon={<Storefront size={20} />}
         >
           {/* Chips selecionados */}
@@ -470,7 +470,7 @@ export default function ConfigPage() {
 
           {/* Ramos disponiveis */}
           <div>
-            <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-faint">Ramos disponiveis</div>
+            <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-faint">Ramos disponíveis</div>
             <div className="flex flex-wrap gap-2">
               {RAMOS_DISPONIVEIS.filter((r) => !niches.map((n) => n.toLowerCase()).includes(r.toLowerCase())).map((r) => (
                 <button
@@ -483,7 +483,7 @@ export default function ConfigPage() {
                 </button>
               ))}
               {RAMOS_DISPONIVEIS.filter((r) => !niches.map((n) => n.toLowerCase()).includes(r.toLowerCase())).length === 0 && (
-                <span className="text-[13px] text-faint">Voce ja selecionou todos.</span>
+                <span className="text-[13px] text-faint">Você já selecionou todos.</span>
               )}
             </div>
           </div>
@@ -494,7 +494,7 @@ export default function ConfigPage() {
         {/* ------------------------------------------------------------------ */}
         <Section
           title="Onde buscar"
-          sub="Defina a regiao principal. Posso buscar mais largo se quiser."
+          sub="Defina a região principal. Posso buscar mais largo se quiser."
           icon={<MapPin size={20} />}
         >
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -532,9 +532,9 @@ export default function ConfigPage() {
             {/* Raio */}
             <div>
               <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-faint">
-                Raio de atuacao
+                Raio de atuação
               </span>
-              <Dropdown value={radius} onChange={setRadius} ariaLabel="Raio de atuacao" options={RAIOS} />
+              <Dropdown value={radius} onChange={setRadius} ariaLabel="Raio de atuação" options={RAIOS} />
             </div>
           </div>
         </Section>
@@ -550,7 +550,7 @@ export default function ConfigPage() {
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <div className="text-[15px] font-bold">Busca no piloto automatico</div>
+                  <div className="text-[15px] font-bold">Busca no piloto automático</div>
                   <span
                     className={cn(
                       "rounded-full px-2 py-0.5 text-[11px] font-bold",
@@ -562,16 +562,16 @@ export default function ConfigPage() {
                 </div>
                 <div className="mt-0.5 text-[13px] text-muted-foreground">
                   {autopilot
-                    ? "Eu cubro o mapa em ordem e encho a fila sem voce precisar pedir."
-                    : "Esta desligado. Voce so recebe leads quando clicar em Buscar."}
+                    ? "Eu cubro o mapa em ordem e encho a fila sem você precisar pedir."
+                    : "Está desligado. Você só recebe leads quando clicar em Buscar."}
                 </div>
               </div>
             </div>
-            <Toggle on={autopilot} onChange={setAutopilot} label="Busca no piloto automatico" />
+            <Toggle on={autopilot} onChange={setAutopilot} label="Busca no piloto automático" />
           </div>
           {autopilot !== savedAutopilot && (
             <div className="border-t border-border bg-warn-bg px-6 py-2.5 text-[12.5px] font-semibold text-warn">
-              Alteracao nao salva. Clique em Salvar configuracoes la embaixo pra valer.
+              Alteração não salva. Clique em Salvar configurações lá embaixo pra valer.
             </div>
           )}
         </div>
@@ -580,8 +580,8 @@ export default function ConfigPage() {
         {/* 5. Extensao Chrome */}
         {/* ------------------------------------------------------------------ */}
         <Section
-          title="Extensao Chrome"
-          sub="Uma extensao so. Ela aparece no Google Maps para capturar e no WhatsApp Web para atualizar o funil."
+          title="Extensão Chrome"
+          sub="Uma extensão só. Ela aparece no Google Maps para capturar e no WhatsApp Web para atualizar o funil."
           icon={<PuzzlePiece size={20} />}
         >
           <div className="rounded-[16px] border border-brand/20 bg-brand-50/70 p-4">
@@ -613,10 +613,10 @@ export default function ConfigPage() {
                 style={{ background: "var(--grad)" }}
               >
                 <DownloadSimple size={18} weight="bold" />
-                Baixar extensao
+                Baixar extensão
               </a>
               <div className="text-[12.5px] leading-relaxed text-muted-foreground">
-                No modo real, abra as Opcoes da extensao e entre com sua conta para ela gravar no seu CRM.
+                No modo real, abra as Opções da extensão e entre com sua conta para ela gravar no seu CRM.
               </div>
             </div>
           </div>
@@ -627,17 +627,17 @@ export default function ConfigPage() {
         {/* ------------------------------------------------------------------ */}
         <Section
           title="Google Calendar"
-          sub="Opcional. Quando voce entra com o Google, a agenda conecta automaticamente."
+          sub="Opcional. Quando você entra com o Google, a agenda conecta automaticamente."
           icon={<Calendar size={20} />}
         >
           <div className="rounded-[14px] border border-border bg-surface-2 p-4">
             <div className="mb-3 text-[13.5px] leading-relaxed text-ink-2">
-              A conexao com o Calendar permite marcar reunioes direto pelo sistema sem sair do app.
-              Nao e obrigatorio para usar o 4YU CRM, mas facilita bastante quando as conversas evoluem.
+              A conexão com o Calendar permite marcar reuniões direto pelo sistema sem sair do app.
+              Não é obrigatório para usar o 4YU CRM, mas facilita bastante quando as conversas evoluem.
             </div>
             <div className="mb-4 flex items-center gap-2 text-[12.5px] text-faint">
               <Info size={14} />
-              O dono da conta habilita o provider Google no console do Supabase. Se o botao nao funcionar, avisa quem cuida da infra.
+              O dono da conta habilita o provider Google no console do Supabase. Se o botão não funcionar, avisa quem cuida da infra.
             </div>
 
             {googleError && (
@@ -666,7 +666,7 @@ export default function ConfigPage() {
             {mode === "mock" && (
               <div className="mt-2.5 flex items-center gap-2 text-[12px] text-faint">
                 <Info size={13} />
-                Em modo demo, o login nao redireciona de verdade.
+                Em modo demo, o login não redireciona de verdade.
               </div>
             )}
           </div>
@@ -684,7 +684,7 @@ export default function ConfigPage() {
             style={{ background: "var(--grad)" }}
           >
             <Check size={18} weight="bold" />
-            {saving ? "Salvando..." : isOnboarding ? "Salvar e comecar" : "Salvar configuracoes"}
+            {saving ? "Salvando..." : isOnboarding ? "Salvar e começar" : "Salvar configurações"}
           </button>
         </div>
       </div>

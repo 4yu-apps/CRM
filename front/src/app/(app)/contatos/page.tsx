@@ -213,7 +213,7 @@ export default function ContatosPage() {
       return;
     }
     const toExport = filtered.filter((l) => selected.has(l.id));
-    const headers = ["Negocio", "Status", "Categoria", "Cidade/Estado", "Telefone", "WhatsApp", "Instagram", "Site", "Score"];
+    const headers = ["Negócio", "Status", "Categoria", "Cidade/Estado", "Telefone", "WhatsApp", "Instagram", "Site", "Score"];
     const rows = toExport.map((l) => [
       l.business_name ?? "",
       STATUS_META[l.status].label,
@@ -275,7 +275,7 @@ export default function ContatosPage() {
     try {
       await Promise.all(ids.map((id) => repo.remove(id)));
       await refresh();
-      toast.success(`${ids.length} ${ids.length === 1 ? "contato excluido" : "contatos excluidos"}`);
+      toast.success(`${ids.length} ${ids.length === 1 ? "contato excluído" : "contatos excluídos"}`);
       setSelected(new Set());
       setConfirmBulkDelete(false);
     } catch (e) {
@@ -291,7 +291,7 @@ export default function ContatosPage() {
     try {
       await repo.remove(confirmDelete.id);
       await refresh();
-      toast.success("Contato excluido");
+      toast.success("Contato excluído");
       setConfirmDelete(null);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao excluir");
@@ -421,13 +421,13 @@ export default function ContatosPage() {
             onChange={selectAll}
             className="h-4 w-4 cursor-pointer rounded"
           />
-          <span>Negocio</span>
+          <span>Negócio</span>
           <span>Status</span>
           <span>Local</span>
           <span>Contato</span>
           <span>Score</span>
           <span>Atualizado</span>
-          <span className="text-right">Acoes</span>
+          <span className="text-right">Ações</span>
         </div>
 
         {filtered.length === 0 ? (
@@ -589,7 +589,7 @@ export default function ContatosPage() {
               onClick={() => setPage(safePage + 1)}
               className="rounded-lg border border-border-2 bg-surface-2 px-3.5 py-2 text-[13px] font-semibold text-ink-2 transition-colors hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
             >
-              Proxima
+              Próxima
             </button>
           </div>
         </div>
@@ -610,7 +610,7 @@ export default function ContatosPage() {
             </div>
             <p className="mb-5 text-[13.5px] text-muted-foreground">
               <strong className="text-ink">{confirmDelete.business_name ?? "Este contato"}</strong> e todo o
-              historico/proveniencia serao apagados de vez. Se quiser so tirar da lista, prefira{" "}
+              histórico/proveniência serão apagados de vez. Se quiser só tirar da lista, prefira{" "}
               <strong>arquivar</strong>.
             </p>
             <div className="flex gap-2.5">
@@ -658,7 +658,7 @@ export default function ContatosPage() {
               </button>
             </div>
             <p className="mb-5 text-[13.5px] text-muted-foreground">
-              Todos os selecionados e seu historico/proveniencia serao apagados de vez. Se quiser so
+              Todos os selecionados e seu histórico/proveniência serão apagados de vez. Se quiser só
               tirar da lista, use <strong>Arquivar</strong>.
             </p>
             <div className="flex gap-2.5">

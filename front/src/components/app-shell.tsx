@@ -164,7 +164,7 @@ function NotificationBell({ leads }: { leads: Lead[] }) {
     <div className="relative">
       <button
         type="button"
-        aria-label="Notificacoes"
+        aria-label="Notificações"
         onClick={() => setOpen((o) => !o)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         className="relative flex size-9 items-center justify-center rounded-full border border-border bg-accent text-ink-2 transition-colors hover:text-brand"
@@ -182,11 +182,11 @@ function NotificationBell({ leads }: { leads: Lead[] }) {
       {open && (
         <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-[360px] max-w-[80vw] overflow-hidden rounded-[14px] border border-border bg-card shadow-xl">
           <div className="border-b border-border px-4 py-2.5 text-[12px] font-bold uppercase tracking-wider text-faint">
-            Proximas reunioes
+            Próximas reuniões
           </div>
           {items.length === 0 ? (
             <div className="px-4 py-4 text-[13px] text-muted-foreground">
-              Nada nas proximas 48h.
+              Nada nas próximas 48h.
             </div>
           ) : (
             items.map(({ lead, at }) => {

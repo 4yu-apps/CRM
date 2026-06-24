@@ -100,8 +100,8 @@ function MeetingRow({
         type="button"
         onClick={() => onCancel(lead)}
         disabled={cancelling}
-        title="Cancelar reuniao"
-        aria-label="Cancelar reuniao"
+        title="Cancelar reunião"
+        aria-label="Cancelar reunião"
         className="flex flex-none items-center gap-1 rounded-[8px] px-2.5 py-1.5 text-[12px] font-semibold text-rose-500 transition-colors hover:bg-rose-50 disabled:opacity-50"
       >
         <CalendarX size={14} weight="bold" />
@@ -140,10 +140,10 @@ export default function AgendaPage() {
       <div className="mx-auto max-w-[760px]">
         <div className="flex flex-col items-center gap-3 rounded-[18px] border border-dashed border-border-2 bg-card py-16 text-center">
           <CalendarBlank size={40} className="text-faint" />
-          <div className="text-[15px] font-semibold text-ink">Nenhuma reuniao marcada</div>
+          <div className="text-[15px] font-semibold text-ink">Nenhuma reunião marcada</div>
           <p className="max-w-[340px] text-[13px] text-muted-foreground">
-            Quando voce marcar uma reuniao (no funil ou pela extensao), ela aparece aqui — com
-            horario, link e endereco.
+            Quando você marcar uma reunião (no funil ou pela extensão), ela aparece aqui — com
+            horário, link e endereço.
           </p>
         </div>
       </div>
@@ -153,7 +153,7 @@ export default function AgendaPage() {
   return (
     <div className="mx-auto max-w-[760px]">
       <div className="mb-5 text-[13px] text-muted-foreground">
-        {total} {total === 1 ? "reuniao marcada" : "reunioes marcadas"} daqui pra frente.
+        {total} {total === 1 ? "reunião marcada" : "reuniões marcadas"} daqui pra frente.
       </div>
       <div className="flex flex-col gap-7">
         {ORDER.filter((b) => grouped.has(b)).map((b) => (

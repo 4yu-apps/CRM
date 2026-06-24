@@ -152,7 +152,7 @@ function FunnelMeetingModal({ lead, onConfirm, onClose }: MeetingModalProps) {
   }
 
   const QUICK_OPTIONS = [
-    { label: "Amanha 10h", hours: () => { const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(10, 0, 0, 0); const p = (n: number) => String(n).padStart(2, "0"); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T10:00`; } },
+    { label: "Amanhã 10h", hours: () => { const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(10, 0, 0, 0); const p = (n: number) => String(n).padStart(2, "0"); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T10:00`; } },
     { label: "Em 2h", hours: () => quickDate(2) },
     { label: "Em 24h", hours: () => quickDate(24) },
     { label: "Em 48h", hours: () => quickDate(48) },
@@ -174,7 +174,7 @@ function FunnelMeetingModal({ lead, onConfirm, onClose }: MeetingModalProps) {
               <CalendarBlank size={20} weight="fill" />
             </div>
             <div>
-              <div className="text-base font-bold">Marcar reuniao</div>
+              <div className="text-base font-bold">Marcar reunião</div>
               <div className="text-[12.5px] text-muted-foreground">{lead.business_name}</div>
             </div>
           </div>
@@ -184,7 +184,7 @@ function FunnelMeetingModal({ lead, onConfirm, onClose }: MeetingModalProps) {
         </div>
         <div className="px-6 py-5">
           <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-faint">
-            Data e hora da reuniao
+            Data e hora da reunião
           </label>
           {/* Sugestoes rapidas */}
           <div className="mb-2.5 flex flex-wrap gap-1.5">
@@ -246,7 +246,7 @@ function FunnelMeetingModal({ lead, onConfirm, onClose }: MeetingModalProps) {
               type="url"
               value={link}
               onChange={(e) => setLink(e.target.value)}
-              placeholder="Link da reuniao (Meet, Zoom, Teams...) — opcional"
+              placeholder="Link da reunião (Meet, Zoom, Teams...) — opcional"
               className="mt-3 w-full rounded-xl border border-border-2 bg-surface-2 px-3.5 py-3 text-sm outline-none focus:border-brand"
             />
           ) : (
@@ -254,13 +254,13 @@ function FunnelMeetingModal({ lead, onConfirm, onClose }: MeetingModalProps) {
               type="text"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
-              placeholder="Endereco do encontro — opcional"
+              placeholder="Endereço do encontro — opcional"
               className="mt-3 w-full rounded-xl border border-border-2 bg-surface-2 px-3.5 py-3 text-sm outline-none focus:border-brand"
             />
           )}
 
           <p className="mt-3 text-[12px] text-muted-foreground">
-            Fica salvo no lead e aparece na Agenda. Com o Google Calendar conectado, o evento e
+            Fica salvo no lead e aparece na Agenda. Com o Google Calendar conectado, o evento é
             criado automaticamente.
           </p>
         </div>
@@ -286,7 +286,7 @@ function FunnelMeetingModal({ lead, onConfirm, onClose }: MeetingModalProps) {
             className="flex-1 rounded-[14px] p-3.5 text-sm font-bold text-white"
             style={{ background: "var(--grad)" }}
           >
-            Confirmar reuniao
+            Confirmar reunião
           </button>
         </div>
       </div>
@@ -351,7 +351,7 @@ function FunnelDealModal({ lead, onConfirm, onClose }: DealModalProps) {
               <CurrencyDollar size={20} weight="fill" />
             </div>
             <div>
-              <div className="text-base font-bold">Registrar negocio fechado</div>
+              <div className="text-base font-bold">Registrar negócio fechado</div>
               <div className="text-[12.5px] text-muted-foreground">{lead.business_name}</div>
             </div>
           </div>
@@ -387,7 +387,7 @@ function FunnelDealModal({ lead, onConfirm, onClose }: DealModalProps) {
           </div>
           <div>
             <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-faint">
-              Tipo de cobranca
+              Tipo de cobrança
             </label>
             <div className="flex gap-2">
               {(["mensal_fixo", "por_prazo"] as DealBilling[]).map((opt) => (
@@ -485,7 +485,7 @@ function FunnelCard({ lead, onDragStart, onMove }: FunnelCardProps) {
             e.stopPropagation();
             onMove(lead);
           }}
-          aria-label="Mover este lead pra outro estagio"
+          aria-label="Mover este lead pra outro estágio"
           title="Mover"
           className="-mr-1 -mt-1 flex-none rounded-md p-1 text-faint transition-colors hover:bg-surface-2 hover:text-brand"
         >
@@ -639,7 +639,7 @@ function MoveSheet({
         <div className="flex flex-col gap-1.5 p-3">
           {targets.length === 0 && (
             <div className="px-3 py-4 text-center text-[13px] text-faint">
-              Nenhum estagio disponivel a partir daqui.
+              Nenhum estágio disponível a partir daqui.
             </div>
           )}
           {targets.map((col) => (
@@ -807,7 +807,7 @@ export default function FunilPage() {
         const msg = e instanceof Error ? e.message : "Erro ao mover lead";
         toast.error(
           msg.toLowerCase().includes("invalid") || msg.toLowerCase().includes("invalida")
-            ? "Esse passo nao e valido a partir do estagio atual."
+            ? "Esse passo não é válido a partir do estágio atual."
             : msg
         );
       }
@@ -873,10 +873,10 @@ export default function FunilPage() {
       const iso = new Date(data.dateTime).toISOString();
       const quando = new Date(data.dateTime).toLocaleString("pt-BR");
       const note = data.link
-        ? `Reuniao online · ${quando}`
+        ? `Reunião online · ${quando}`
         : data.location
-          ? `Reuniao presencial (${data.location}) · ${quando}`
-          : `Reuniao · ${quando}`;
+          ? `Reunião presencial (${data.location}) · ${quando}`
+          : `Reunião · ${quando}`;
       setModal({ type: "none" });
 
       // 1) Salva os campos de reuniao no lead (Agenda e sininho leem daqui).
@@ -919,15 +919,15 @@ export default function FunilPage() {
         toast.success("Evento criado no seu Google Calendar.");
       } else if (result.reason === "token_expirado") {
         toast.message(
-          "Sua conexao com o Google expirou. Entre de novo com o Google na Configuracao pra criar o evento automaticamente."
+          "Sua conexão com o Google expirou. Entre de novo com o Google na Configuração pra criar o evento automaticamente."
         );
       } else if (result.reason === "sem_token") {
         toast.message(
-          "Reuniao salva na Agenda. Conecte o Google Calendar na Configuracao pra criar o evento automaticamente."
+          "Reunião salva na Agenda. Conecte o Google Calendar na Configuração pra criar o evento automaticamente."
         );
       } else {
         toast.message(
-          "Reuniao salva na Agenda. Nao consegui criar o evento no Google Calendar agora; tente de novo mais tarde."
+          "Reunião salva na Agenda. Não consegui criar o evento no Google Calendar agora; tente de novo mais tarde."
         );
       }
     },

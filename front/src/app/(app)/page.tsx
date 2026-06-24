@@ -182,7 +182,7 @@ export default function InicioPage() {
               "Carregando seus leads..."
             ) : prontos > 0 ? (
               <>
-                Ja tem {prontos} {prontos === 1 ? "lead bom" : "leads bons"}
+                Já tem {prontos} {prontos === 1 ? "lead bom" : "leads bons"}
                 <br />
                 te esperando.
               </>
@@ -197,8 +197,8 @@ export default function InicioPage() {
 
           <p className="mt-2 max-w-[520px] text-[15.5px] opacity-90">
             {prontos > 0
-              ? "O garimpo do dia ja foi feito. Cada um chega com a ficha completa e a primeira mensagem pronta. E so revisar e aprovar."
-              : "Quando chegar gente nova eu te aviso. Por enquanto voce pode buscar mais ou checar o que rolou."}
+              ? "O garimpo do dia já foi feito. Cada um chega com a ficha completa e a primeira mensagem pronta. É só revisar e aprovar."
+              : "Quando chegar gente nova eu te aviso. Por enquanto você pode buscar mais ou checar o que rolou."}
           </p>
 
           <div className="mt-6 flex flex-wrap gap-3">
@@ -247,7 +247,7 @@ export default function InicioPage() {
             />
             <ActionBucket
               icon={<CalendarCheck size={15} weight="fill" />}
-              title="Reunioes (24h)"
+              title="Reuniões (24h)"
               tone="brand"
               leads={reunioes.map((r) => r.lead)}
               labelOf={(l) => {
@@ -264,7 +264,7 @@ export default function InicioPage() {
         {/* ---- FEED DE ATIVIDADE ---- */}
         <div className="fu rounded-[18px] border border-border bg-card p-6 shadow-[var(--shadow)]">
           <div className="mb-5 flex items-center justify-between">
-            <div className="text-base font-bold">O que rolou enquanto voce nao tava</div>
+            <div className="text-base font-bold">O que rolou enquanto você não tava</div>
             <span className="text-[12px] font-semibold uppercase tracking-[.1em] text-faint">
               Recente
             </span>
@@ -286,7 +286,7 @@ export default function InicioPage() {
             <div className="flex flex-col items-center gap-3 py-10 text-center">
               <Sparkle size={32} className="text-faint" />
               <div className="text-sm text-muted-foreground">
-                Ainda nao tem nada registrado. Quando o garimpo comecar, tudo aparece aqui.
+                Ainda não tem nada registrado. Quando o garimpo começar, tudo aparece aqui.
               </div>
             </div>
           ) : (
@@ -340,11 +340,11 @@ export default function InicioPage() {
                 value={leadsLoading ? "..." : String(prontosPraRevisar)}
               />
               <StatRow
-                label="Fechados no mes"
+                label="Fechados no mês"
                 value={leadsLoading ? "..." : String(fechadosMes)}
               />
               <div className="flex items-center justify-between py-3.5 [&:not(:last-child)]:border-b [&:not(:last-child)]:border-border">
-                <span className="text-[13.5px] text-muted-foreground">Nunca repetiu ninguem</span>
+                <span className="text-[13.5px] text-muted-foreground">Nunca repetiu ninguém</span>
                 <span className="flex items-center gap-1.5 text-[13px] font-bold text-success">
                   <CheckCircle size={15} weight="fill" /> garantido
                 </span>
@@ -358,7 +358,7 @@ export default function InicioPage() {
               Atalhos
             </div>
             <div className="flex flex-col gap-2">
-              <ShortcutLink href="/fila" label="Ver a fila de aprovacao" />
+              <ShortcutLink href="/fila" label="Ver a fila de aprovação" />
               <ShortcutLink href="/buscar" label="Iniciar nova busca" />
               <ShortcutLink href="/funil" label="Ver funil completo" />
             </div>

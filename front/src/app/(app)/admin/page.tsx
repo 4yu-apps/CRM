@@ -128,13 +128,13 @@ export default function AdminPage() {
       const msgs: Record<string, string> = {
         password: "Senha alterada",
         email: "E-mail atualizado",
-        delete: "Perfil excluido",
+        delete: "Perfil excluído",
       };
       toast.success(msgs[modal.type ?? "delete"]);
       setModal(null);
       await loadRef.current?.();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erro na operacao");
+      toast.error(e instanceof Error ? e.message : "Erro na operação");
     } finally {
       setActionBusy(false);
     }
@@ -147,7 +147,7 @@ export default function AdminPage() {
         <ShieldStar size={40} className="text-faint" />
         <div className="text-[17px] font-bold text-ink">Sem acesso</div>
         <p className="text-[14px] text-muted-foreground">
-          Esta area e restrita a administradores do sistema.
+          Esta área é restrita a administradores do sistema.
         </p>
       </div>
     );
@@ -198,13 +198,13 @@ export default function AdminPage() {
           {/* Cabecalho da tabela (desktop) */}
           <div className="hidden grid-cols-[2fr_1.2fr_1fr_0.6fr_1.2fr_0.5fr_0.5fr_120px] gap-3 border-b border-border bg-surface-2 px-5 py-3 text-[11.5px] font-bold uppercase tracking-wider text-faint lg:grid lg:items-center">
             <span>E-mail</span>
-            <span>Area</span>
+            <span>Área</span>
             <span>Local</span>
             <span>Leads</span>
-            <span>Ultima atividade</span>
+            <span>Última atividade</span>
             <span>Piloto</span>
             <span>Admin</span>
-            <span className="text-right">Acoes</span>
+            <span className="text-right">Ações</span>
           </div>
 
           <div className="divide-y divide-border">
@@ -225,7 +225,7 @@ export default function AdminPage() {
                       {p.email ?? "(sem e-mail)"}
                       {isSelf && (
                         <span className="ml-2 text-[11px] font-semibold text-brand">
-                          (voce)
+                          (você)
                         </span>
                       )}
                     </span>
@@ -300,7 +300,7 @@ export default function AdminPage() {
                     </button>
                     <button
                       type="button"
-                      title={isSelf ? "Nao e possivel excluir a propria conta" : "Excluir perfil"}
+                      title={isSelf ? "Não é possível excluir a própria conta" : "Excluir perfil"}
                       disabled={isSelf}
                       onClick={() => !isSelf && openModal("delete", p)}
                       className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-rose-500/10 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40"
@@ -333,7 +333,7 @@ export default function AdminPage() {
             type="password"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            placeholder="Nova senha (minimo 6 caracteres)"
+            placeholder="Nova senha (mínimo 6 caracteres)"
             className="mb-5 w-full rounded-xl border border-border-2 bg-surface-2 px-4 py-3 text-[14px] text-ink outline-none focus:border-brand"
           />
           <div className="flex gap-2.5">
@@ -397,10 +397,10 @@ export default function AdminPage() {
       {modal?.type === "delete" && (
         <ModalWrapper title="Excluir perfil?" onClose={closeModal}>
           <p className="mb-5 text-[13.5px] text-muted-foreground">
-            Voce esta prestes a excluir <strong className="text-ink">{modal.profile.email ?? modal.profile.owner_id}</strong>.
+            Você está prestes a excluir <strong className="text-ink">{modal.profile.email ?? modal.profile.owner_id}</strong>.
             Isso apaga permanentemente <strong className="text-ink">todos os leads</strong>, o log de
-            atividade, a cobertura de varredura e o perfil de configuracao do usuario. A conta de
-            acesso tambem sera removida. Esta acao nao tem desfazer.
+            atividade, a cobertura de varredura e o perfil de configuração do usuário. A conta de
+            acesso também será removida. Esta ação não tem desfazer.
           </p>
           <div className="flex gap-2.5">
             <button

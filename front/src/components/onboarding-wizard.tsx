@@ -30,7 +30,7 @@ import { cn } from "@/lib/utils";
 // So aparece quando o gate de auth detecta perfil sem profissao (hasProfile false).
 
 const STEPS = [
-  { key: "profissao", label: "Sua area" },
+  { key: "profissao", label: "Sua área" },
   { key: "regiao", label: "Onde atua" },
   { key: "resumo", label: "Tudo pronto" },
 ] as const;
@@ -39,13 +39,13 @@ const STEPS = [
 function focoText(p: Profession): string {
   switch (p.defaultService) {
     case "trafego":
-      return "Vou mirar negocios que precisam de anuncio.";
+      return "Vou mirar negócios que precisam de anúncio.";
     case "automacao":
       return "Vou mirar quem atende muito no manual.";
     case "ambos":
-      return "Voce escolhe trafego ou automacao a cada busca.";
+      return "Você escolhe tráfego ou automação a cada busca.";
     default:
-      return "Vou captar pelos nichos da sua area.";
+      return "Vou captar pelos nichos da sua área.";
   }
 }
 
@@ -190,10 +190,10 @@ export function OnboardingWizard() {
                 </div>
                 <div>
                   <h1 className="font-heading text-2xl font-bold tracking-tight">
-                    Pra que voce usa o sistema?
+                    Pra que você usa o sistema?
                   </h1>
                   <p className="mt-1 text-[14px] leading-relaxed text-muted-foreground">
-                    Escolha a sua area. Eu uso isso pra sugerir os nichos certos, pontuar
+                    Escolha a sua área. Eu uso isso pra sugerir os nichos certos, pontuar
                     os leads e escrever a primeira mensagem do seu jeito.
                   </p>
                 </div>
@@ -214,10 +214,10 @@ export function OnboardingWizard() {
                 <div className="mt-4 flex items-start gap-2.5 rounded-[14px] border border-brand/20 bg-brand-50/70 px-4 py-3 text-[13px] leading-relaxed text-ink-2">
                   <Target size={16} className="mt-0.5 flex-none text-brand" />
                   <span>
-                    Boa. Voce mira em:{" "}
+                    Boa. Você mira em:{" "}
                     <strong className="font-bold text-brand">{selectedProfession.mira}</strong>{" "}
-                    {focoText(selectedProfession)} Ja deixei os nichos dessa area sugeridos,
-                    da pra ajustar tudo depois na Configuracao.
+                    {focoText(selectedProfession)} Já deixei os nichos dessa área sugeridos,
+                    dá pra ajustar tudo depois na Configuração.
                   </span>
                 </div>
               )}
@@ -233,10 +233,10 @@ export function OnboardingWizard() {
                 </div>
                 <div>
                   <h1 className="font-heading text-2xl font-bold tracking-tight">
-                    Onde voce quer atuar?
+                    Onde você quer atuar?
                   </h1>
                   <p className="mt-1 text-[14px] leading-relaxed text-muted-foreground">
-                    Opcional. Se voce escolher uma regiao, eu ja comeco a busca por perto.
+                    Opcional. Se você escolher uma região, eu já começo a busca por perto.
                     Pode deixar em branco e definir depois.
                   </p>
                 </div>
@@ -252,10 +252,10 @@ export function OnboardingWizard() {
                     uf={state}
                     onSelect={handleCitySelect}
                     onClear={handleCityClear}
-                    placeholder="Digite a cidade (ex: Maringa, Sao Paulo...)"
+                    placeholder="Digite a cidade (ex: Maringá, São Paulo...)"
                   />
                   <p className="mt-1.5 text-[12px] text-faint">
-                    Comece a digitar e escolha a cidade. Ja vem com o estado (ex: Maringa - PR).
+                    Comece a digitar e escolha a cidade. Já vem com o estado (ex: Maringá - PR).
                   </p>
                 </div>
               </div>
@@ -279,7 +279,7 @@ export function OnboardingWizard() {
                   <p className="mt-1 text-[14px] leading-relaxed text-muted-foreground">
                     {selectedProfession
                       ? `Configurado pra ${selectedProfession.label}.`
-                      : "Tudo certo pra comecar."}{" "}
+                      : "Tudo certo pra começar."}{" "}
                     Veja como funciona o dia a dia.
                   </p>
                 </div>
@@ -290,7 +290,7 @@ export function OnboardingWizard() {
                   {
                     icon: MagnifyingGlass,
                     titulo: "Eu garimpo",
-                    texto: "Encontro negocios com a sua cara e enriqueco com os dados que importam.",
+                    texto: "Encontro negócios com a sua cara e enriqueço com os dados que importam.",
                   },
                   {
                     icon: PencilSimpleLine,
@@ -299,8 +299,8 @@ export function OnboardingWizard() {
                   },
                   {
                     icon: PaperPlaneTilt,
-                    titulo: "Voce conversa",
-                    texto: "Voce aprova, manda e fecha. O sistema cuida do resto.",
+                    titulo: "Você conversa",
+                    texto: "Você aprova, manda e fecha. O sistema cuida do resto.",
                   },
                 ].map(({ icon: Icon, titulo, texto }) => (
                   <div
@@ -321,16 +321,16 @@ export function OnboardingWizard() {
                 <div className="flex items-center gap-2">
                   <Briefcase size={15} className="flex-none text-brand" />
                   <span>
-                    Area:{" "}
+                    Área:{" "}
                     <strong className="font-bold text-ink">
-                      {selectedProfession?.label ?? "nao escolhida"}
+                      {selectedProfession?.label ?? "não escolhida"}
                     </strong>
                   </span>
                 </div>
                 <div className="mt-2 flex items-center gap-2">
                   <MapPin size={15} className="flex-none text-brand" />
                   <span>
-                    Regiao:{" "}
+                    Região:{" "}
                     <strong className="font-bold text-ink">
                       {[city, state].filter(Boolean).join(" / ") || "qualquer lugar (defina depois)"}
                     </strong>
@@ -379,7 +379,7 @@ export function OnboardingWizard() {
                 className="flex items-center gap-2 rounded-[14px] px-7 py-3 text-[14px] font-bold text-white shadow-[0_6px_16px_var(--ring)] transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
                 style={{ background: "var(--grad)" }}
               >
-                {step === 0 && !profession ? "Escolha uma area" : "Continuar"}
+                {step === 0 && !profession ? "Escolha uma área" : "Continuar"}
                 <ArrowRight size={17} weight="bold" />
               </button>
             ) : (
@@ -391,7 +391,7 @@ export function OnboardingWizard() {
                 style={{ background: "var(--grad)" }}
               >
                 <Check size={17} weight="bold" />
-                {saving ? "Preparando..." : "Comecar"}
+                {saving ? "Preparando..." : "Começar"}
               </button>
             )}
           </div>

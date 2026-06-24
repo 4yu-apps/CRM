@@ -222,8 +222,8 @@ function daysInStatus(history: { changed_at: string }[]): number | null {
 function statusAgeLabel(days: number | null): string | null {
   if (days === null) return null;
   if (days === 0) return "hoje neste status";
-  if (days === 1) return "ha 1 dia neste status";
-  return `ha ${days} dias neste status`;
+  if (days === 1) return "há 1 dia neste status";
+  return `há ${days} dias neste status`;
 }
 
 // ---------------------------------------------------------------------------
@@ -236,9 +236,9 @@ function SiteSignalsPanel({ signals, since }: { signals: SiteSignals; since?: st
   return (
     <div className="rounded-[14px] border border-border bg-surface-2 p-4">
       <div className="mb-3 flex items-center justify-between gap-2">
-        <span className="text-[11px] font-bold uppercase tracking-wider text-faint">Diagnostico do site</span>
+        <span className="text-[11px] font-bold uppercase tracking-wider text-faint">Diagnóstico do site</span>
         {since && (
-          <span className="text-[11px] text-faint" title="Quando o robo conferiu por ultimo">
+          <span className="text-[11px] text-faint" title="Quando o robô conferiu por último">
             verificado {fmtRelative(since)}
           </span>
         )}
@@ -363,9 +363,9 @@ export default function FichaPage() {
       const updated = await repo.update(detail.lead.id, { notes: notesVal });
       setDetail((prev) => prev ? { ...prev, lead: updated } : prev);
       setNotesEdit(false);
-      toast.success("Anotacao salva.");
+      toast.success("Anotação salva.");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erro ao salvar anotacao");
+      toast.error(e instanceof Error ? e.message : "Erro ao salvar anotação");
     } finally {
       setSavingNotes(false);
     }
@@ -411,7 +411,7 @@ export default function FichaPage() {
     setDeleting(true);
     try {
       await repo.remove(detail.lead.id);
-      toast.success("Lead excluido.");
+      toast.success("Lead excluído.");
       router.push("/fila");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao excluir");
@@ -435,8 +435,8 @@ export default function FichaPage() {
       <div className="mx-auto max-w-[880px]">
         <StateScreen
           icon={<Warning size={30} />}
-          title="Lead nao encontrado"
-          sub="O id informado nao existe ou ja foi excluido."
+          title="Lead não encontrado"
+          sub="O id informado não existe ou já foi excluído."
         />
         <div className="mt-6 text-center">
           <Link href="/fila" className="text-sm font-semibold text-brand hover:underline">
@@ -526,7 +526,7 @@ export default function FichaPage() {
           <div className="flex items-center gap-3 border-b border-danger-bg bg-danger-bg px-6 py-3.5 text-[13.5px] text-danger">
             <ShieldWarning size={18} weight="fill" />
             <span>
-              <strong>Opt-out ativo.</strong> Este contato pediu pra nao ser abordado (LGPD). Envio de mensagens bloqueado.
+              <strong>Opt-out ativo.</strong> Este contato pediu pra não ser abordado (LGPD). Envio de mensagens bloqueado.
               {lead.opt_out_at && (
                 <span className="ml-1.5 text-[12px] font-normal opacity-80">
                   Registrado {fmtRelative(lead.opt_out_at)}.
@@ -541,7 +541,7 @@ export default function FichaPage() {
           {/* Coluna esquerda: dados do negocio */}
           <div>
             <div className="mb-4 flex items-center justify-between">
-              <div className="text-[12px] font-bold uppercase tracking-wider text-faint">Dados do negocio</div>
+              <div className="text-[12px] font-bold uppercase tracking-wider text-faint">Dados do negócio</div>
               {!editing && (
                 <button
                   onClick={() => startEdit(lead)}
@@ -554,8 +554,8 @@ export default function FichaPage() {
 
             {editing ? (
               <div className="flex flex-col gap-3">
-                <EditField label="Nome do negocio" value={form.business_name ?? ""} onChange={(v) => setForm((f) => ({ ...f, business_name: v }))} prov={provOf(provenance, "business_name")} />
-                <EditField label="Dono / responsavel" value={form.owner_name ?? ""} onChange={(v) => setForm((f) => ({ ...f, owner_name: v }))} prov={provOf(provenance, "owner_name")} />
+                <EditField label="Nome do negócio" value={form.business_name ?? ""} onChange={(v) => setForm((f) => ({ ...f, business_name: v }))} prov={provOf(provenance, "business_name")} />
+                <EditField label="Dono / responsável" value={form.owner_name ?? ""} onChange={(v) => setForm((f) => ({ ...f, owner_name: v }))} prov={provOf(provenance, "owner_name")} />
                 <EditField label="Telefone" value={form.phone ?? ""} onChange={(v) => setForm((f) => ({ ...f, phone: v }))} placeholder="(11) 99999-9999" prov={provOf(provenance, "phone")} />
                 <EditField label="WhatsApp" value={form.whatsapp ?? ""} onChange={(v) => setForm((f) => ({ ...f, whatsapp: v }))} placeholder="(11) 99999-9999" prov={provOf(provenance, "whatsapp")} />
                 <EditField label="E-mail" value={form.email ?? ""} onChange={(v) => setForm((f) => ({ ...f, email: v }))} prov={provOf(provenance, "email")} />
@@ -563,13 +563,13 @@ export default function FichaPage() {
                 <EditField label="Facebook" value={form.facebook ?? ""} onChange={(v) => setForm((f) => ({ ...f, facebook: v }))} placeholder="pagina ou link" prov={provOf(provenance, "facebook")} />
                 <EditField label="Website" value={form.website ?? ""} onChange={(v) => setForm((f) => ({ ...f, website: v }))} prov={provOf(provenance, "website")} />
                 <EditField label="Categoria" value={form.category ?? ""} onChange={(v) => setForm((f) => ({ ...f, category: v }))} prov={provOf(provenance, "category")} />
-                <EditField label="Endereco" value={form.address ?? ""} onChange={(v) => setForm((f) => ({ ...f, address: v }))} prov={provOf(provenance, "address")} />
+                <EditField label="Endereço" value={form.address ?? ""} onChange={(v) => setForm((f) => ({ ...f, address: v }))} prov={provOf(provenance, "address")} />
                 <EditField label="Bairro" value={form.neighborhood ?? ""} onChange={(v) => setForm((f) => ({ ...f, neighborhood: v }))} prov={provOf(provenance, "neighborhood")} />
                 <EditField label="Cidade" value={form.city ?? ""} onChange={(v) => setForm((f) => ({ ...f, city: v }))} prov={provOf(provenance, "city")} />
                 <EditField label="UF" value={form.state ?? ""} onChange={(v) => setForm((f) => ({ ...f, state: v }))} placeholder="SP" prov={provOf(provenance, "state")} />
 
                 <div className="mt-1 border-t border-border pt-3 text-[11px] font-bold uppercase tracking-wider text-faint">
-                  Reuniao
+                  Reunião
                 </div>
                 <div>
                   <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-faint">
@@ -587,8 +587,8 @@ export default function FichaPage() {
                     className="w-full rounded-xl border border-border-2 bg-surface-2 px-3 py-2.5 text-sm text-ink outline-none focus:border-brand"
                   />
                 </div>
-                <EditField label="Link da reuniao (online)" value={form.meeting_link ?? ""} onChange={(v) => setForm((f) => ({ ...f, meeting_link: v }))} placeholder="Meet, Zoom, Teams..." />
-                <EditField label="Local (presencial)" value={form.meeting_location ?? ""} onChange={(v) => setForm((f) => ({ ...f, meeting_location: v }))} placeholder="Endereco do encontro" />
+                <EditField label="Link da reunião (online)" value={form.meeting_link ?? ""} onChange={(v) => setForm((f) => ({ ...f, meeting_link: v }))} placeholder="Meet, Zoom, Teams..." />
+                <EditField label="Local (presencial)" value={form.meeting_location ?? ""} onChange={(v) => setForm((f) => ({ ...f, meeting_location: v }))} placeholder="Endereço do encontro" />
 
                 <div className="mt-1 flex gap-2.5">
                   <button
@@ -609,27 +609,27 @@ export default function FichaPage() {
               </div>
             ) : (
               <div className="overflow-hidden rounded-[14px] border border-border bg-card">
-                <DataRow label="Dono / responsavel" value={lead.owner_name ?? "-"} prov={provOf(provenance, "owner_name")} />
+                <DataRow label="Dono / responsável" value={lead.owner_name ?? "-"} prov={provOf(provenance, "owner_name")} />
                 <DataRow label="Telefone" value={fmtPhone(lead.phone)} href={waUrl(lead.whatsapp ?? lead.phone)} prov={provOf(provenance, "phone")} />
                 <DataRow label="WhatsApp" value={lead.whatsapp ? fmtPhone(lead.whatsapp) : "-"} href={waUrl(lead.whatsapp)} prov={provOf(provenance, "whatsapp")} />
                 <DataRow label="E-mail" value={lead.email ?? "-"} href={mailUrl(lead.email)} prov={provOf(provenance, "email")} />
                 <DataRow label="Instagram" value={lead.instagram ?? "-"} href={igUrl(lead.instagram)} prov={provOf(provenance, "instagram")} />
                 <DataRow label="Facebook" value={lead.facebook ?? "-"} href={fbUrl(lead.facebook)} prov={provOf(provenance, "facebook")} />
                 <DataRow label="CNPJ" value={fmtCnpj(lead.cnpj)} prov={provOf(provenance, "cnpj")} />
-                <DataRow label="Site" value={lead.website ? lead.website : "Nao tem"} href={siteUrl(lead.website)} prov={provOf(provenance, "website")} />
+                <DataRow label="Site" value={lead.website ? lead.website : "Não tem"} href={siteUrl(lead.website)} prov={provOf(provenance, "website")} />
                 <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
-                  <span className="text-[13.5px] text-muted-foreground">Ja anuncia?</span>
+                  <span className="text-[13.5px] text-muted-foreground">Já anuncia?</span>
                   <div className="flex items-center gap-2 text-right">
                     <span className="text-[13.5px] font-semibold text-ink">
-                      {lead.ads_active == null ? "Nao sei" : lead.ads_active ? "Sim" : "Ainda nao"}
+                      {lead.ads_active == null ? "Não sei" : lead.ads_active ? "Sim" : "Ainda não"}
                     </span>
                     {adLibraryUrl(lead) && (
                       <a
                         href={adLibraryUrl(lead)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        title="Conferir na Biblioteca de Anuncios da Meta (busca pelo nome do negocio)"
-                        aria-label="Conferir na Biblioteca de Anuncios da Meta"
+                        title="Conferir na Biblioteca de Anúncios da Meta (busca pelo nome do negócio)"
+                        aria-label="Conferir na Biblioteca de Anúncios da Meta"
                         className="flex size-6 items-center justify-center rounded-md text-faint transition-colors hover:bg-accent hover:text-brand"
                       >
                         <MagnifyingGlass size={14} weight="bold" />
@@ -637,10 +637,10 @@ export default function FichaPage() {
                     )}
                   </div>
                 </div>
-                <DataRow label="Endereco" value={lead.address ?? "-"} prov={provOf(provenance, "address")} />
+                <DataRow label="Endereço" value={lead.address ?? "-"} prov={provOf(provenance, "address")} />
                 <DataRow label="Bairro" value={lead.neighborhood ?? "-"} prov={provOf(provenance, "neighborhood")} />
                 <DataRow label="Cidade / UF" value={[lead.city, lead.state].filter(Boolean).join(" / ") || "-"} />
-                <DataRow label="No Google" value="Pesquisar o negocio" href={googleSearchUrl(lead)} />
+                <DataRow label="No Google" value="Pesquisar o negócio" href={googleSearchUrl(lead)} />
                 <DataRow
                   label="No Maps"
                   value={lead.maps_url ? "Abrir no Google Maps" : "Procurar no Maps"}
@@ -648,25 +648,25 @@ export default function FichaPage() {
                 />
                 {lead.meeting_at && !editing && (
                   <div className="flex items-center justify-between">
-                    <DataRow label="Reuniao" value={fmtDateTime(lead.meeting_at)} />
+                    <DataRow label="Reunião" value={fmtDateTime(lead.meeting_at)} />
                     <button
                       type="button"
                       onClick={() => void cancelMeeting(lead)}
                       disabled={cancelling}
-                      title="Cancelar reuniao"
-                      aria-label="Cancelar reuniao"
+                      title="Cancelar reunião"
+                      aria-label="Cancelar reunião"
                       className="ml-2 flex items-center gap-1 rounded-[8px] px-2.5 py-1 text-[12px] font-semibold text-rose-500 transition-colors hover:bg-rose-50 disabled:opacity-50"
                     >
                       <CalendarX size={14} weight="bold" />
-                      Cancelar reuniao
+                      Cancelar reunião
                     </button>
                   </div>
                 )}
                 {lead.meeting_link && (
-                  <DataRow label="Link da reuniao" value={lead.meeting_link} href={lead.meeting_link} />
+                  <DataRow label="Link da reunião" value={lead.meeting_link} href={lead.meeting_link} />
                 )}
                 {lead.meeting_location && (
-                  <DataRow label="Local da reuniao" value={lead.meeting_location} />
+                  <DataRow label="Local da reunião" value={lead.meeting_location} />
                 )}
               </div>
             )}
@@ -718,7 +718,7 @@ export default function FichaPage() {
             {lead.deal_value != null && (
               <div className="rounded-[14px] border border-success/30 bg-success-bg p-4">
                 <div className="mb-1.5 flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-success">
-                  <CheckCircle size={14} weight="fill" /> Negocio fechado
+                  <CheckCircle size={14} weight="fill" /> Negócio fechado
                 </div>
                 <div className="text-xl font-bold text-ink">{fmtBRL(lead.deal_value)}</div>
                 <div className="mt-1 text-[13px] text-muted-foreground">
@@ -800,7 +800,7 @@ export default function FichaPage() {
         <div className="border-t border-border p-6 sm:p-7">
           <div className="mb-3 flex items-center justify-between">
             <div className="flex items-center gap-2 text-[12px] font-bold uppercase tracking-wider text-faint">
-              <NotePencil size={15} /> Anotacoes
+              <NotePencil size={15} /> Anotações
             </div>
             {!notesEdit && (
               <button
@@ -817,7 +817,7 @@ export default function FichaPage() {
                 value={notesVal}
                 onChange={(e) => setNotesVal(e.target.value)}
                 rows={4}
-                placeholder="Notas livres: proximos passos, contexto, observacoes..."
+                placeholder="Notas livres: próximos passos, contexto, observações..."
                 className="w-full resize-none rounded-xl border border-border-2 bg-surface-2 p-3.5 text-sm leading-relaxed text-ink outline-none focus:border-brand"
               />
               <div className="flex gap-2.5">
@@ -844,7 +844,7 @@ export default function FichaPage() {
                 lead.notes ? "border border-border bg-surface-2 text-ink-2" : "border border-dashed border-border text-faint",
               )}
             >
-              {lead.notes || "Nenhuma anotacao ainda. Clique em Editar pra adicionar."}
+              {lead.notes || "Nenhuma anotação ainda. Clique em Editar pra adicionar."}
             </div>
           )}
         </div>
@@ -855,7 +855,7 @@ export default function FichaPage() {
         {/* Historico do funil */}
         {history.length > 0 && (
           <div className="border-t border-border p-6 sm:p-7">
-            <div className="mb-4 text-[12px] font-bold uppercase tracking-wider text-faint">Historico do funil</div>
+            <div className="mb-4 text-[12px] font-bold uppercase tracking-wider text-faint">Histórico do funil</div>
             <div className="flex flex-col gap-0">
               {history.map((h, i) => {
                 const toMeta = STATUS_META[h.to_status];
@@ -885,7 +885,7 @@ export default function FichaPage() {
                           {toMeta.label}
                         </span>
                         <span className="text-[11.5px] text-faint">
-                          por {h.actor === "system" ? "sistema" : h.actor === "extension" ? "extensao" : "voce"}
+                          por {h.actor === "system" ? "sistema" : h.actor === "extension" ? "extensão" : "você"}
                         </span>
                       </div>
                       {h.note && (
@@ -904,7 +904,7 @@ export default function FichaPage() {
 
         {/* Acoes + LGPD */}
         <div className="border-t border-border p-6 sm:p-7">
-          <div className="mb-4 text-[12px] font-bold uppercase tracking-wider text-faint">Acoes</div>
+          <div className="mb-4 text-[12px] font-bold uppercase tracking-wider text-faint">Ações</div>
           <div className="flex flex-wrap gap-3">
             {/* Reativar (so quando descartado) */}
             {lead.status === "descartado" && (
@@ -950,7 +950,7 @@ export default function FichaPage() {
           {/* Info LGPD */}
           <div className="mt-4 flex items-center gap-2 text-[12px] text-faint">
             <Info size={14} />
-            Opt-out bloqueia qualquer contato com este lead (exigencia da LGPD). Arquivar apenas remove da fila, sem apagar dados.
+            Opt-out bloqueia qualquer contato com este lead (exigência da LGPD). Arquivar apenas remove da fila, sem apagar dados.
           </div>
         </div>
       </div>
@@ -973,13 +973,13 @@ export default function FichaPage() {
               <div>
                 <div className="text-base font-bold">Excluir este lead?</div>
                 <div className="text-[13px] text-muted-foreground">
-                  {lead.business_name ?? "Lead"} sera removido de vez, sem volta.
+                  {lead.business_name ?? "Lead"} será removido de vez, sem volta.
                 </div>
               </div>
             </div>
             <div className="px-6 py-4">
               <div className="rounded-[12px] border border-border bg-surface-2 p-3.5 text-[13px] leading-relaxed text-ink-2">
-                Historico e dados de proveniencia tambem serao apagados. Essa acao nao pode ser desfeita.
+                Histórico e dados de proveniência também serão apagados. Essa ação não pode ser desfeita.
               </div>
             </div>
             <div className="flex gap-2.5 px-6 pb-6">

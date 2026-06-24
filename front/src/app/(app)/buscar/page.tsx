@@ -40,13 +40,13 @@ const CoverageMap = dynamic(() => import("@/components/coverage-map"), {
 const BRASIL_CENTER = { lat: -14.235, lng: -51.925, zoom: 4 };
 
 const RADIUS_OPTIONS = [
-  { value: "1km", label: "Ate 1 km (bairro)" },
-  { value: "2km", label: "Ate 2 km" },
-  { value: "3km", label: "Ate 3 km" },
-  { value: "5km", label: "Ate 5 km" },
-  { value: "10km", label: "Ate 10 km" },
-  { value: "25km", label: "Ate 25 km" },
-  { value: "50km", label: "Ate 50 km" },
+  { value: "1km", label: "Até 1 km (bairro)" },
+  { value: "2km", label: "Até 2 km" },
+  { value: "3km", label: "Até 3 km" },
+  { value: "5km", label: "Até 5 km" },
+  { value: "10km", label: "Até 10 km" },
+  { value: "25km", label: "Até 25 km" },
+  { value: "50km", label: "Até 50 km" },
   { value: "cidade", label: "Cidade toda" },
 ];
 
@@ -401,7 +401,7 @@ export default function BuscarPage() {
         toast.success(`${labelBusca} Acompanhe os leads chegando aqui embaixo.`);
       } else {
         toast.message(
-          "Alvo salvo. O robo busca no proximo ciclo — deixei o acompanhamento ligado.",
+          "Alvo salvo. O robô busca no próximo ciclo — deixei o acompanhamento ligado.",
         );
       }
     } catch (e) {
@@ -452,8 +452,8 @@ export default function BuscarPage() {
         <div className="fu rounded-[20px] border border-border bg-card p-7 shadow-[var(--shadow)]">
           <div className="mb-1 text-[17px] font-bold">Definir alvo de busca</div>
           <p className="mb-6 text-[13.5px] text-muted-foreground">
-            Escolha onde e o que garimpar e clique em buscar pra disparar na hora. O robo roda no
-            servidor e os leads novos vao subindo na sua fila — voce acompanha aqui em tempo real.
+            Escolha onde e o que garimpar e clique em buscar pra disparar na hora. O robô roda no
+            servidor e os leads novos vão subindo na sua fila — você acompanha aqui em tempo real.
           </p>
 
           {/* Ramos (multi-selecao com chips) */}
@@ -465,8 +465,8 @@ export default function BuscarPage() {
               <button
                 type="button"
                 onClick={() => void handleSurpreendaMe()}
-                title="Sorteia estado, cidade e ramo pra voce garimpar uma regiao nova sem pensar"
-                aria-label="Surpreenda-me: sortear regiao e ramo aleatorios"
+                title="Sorteia estado, cidade e ramo pra você garimpar uma região nova sem pensar"
+                aria-label="Surpreenda-me: sortear região e ramo aleatórios"
                 className="flex items-center gap-1.5 rounded-full border border-border-2 bg-surface-2 px-3 py-1 text-[12px] font-semibold text-ink-2 transition-colors hover:border-brand hover:bg-brand-50 hover:text-brand"
               >
                 <Shuffle size={14} weight="bold" />
@@ -484,7 +484,7 @@ export default function BuscarPage() {
             />
             {niches.length > 1 && (
               <p className="mt-1.5 text-[12px] text-faint">
-                O robo vai buscar em paralelo para cada ramo selecionado.
+                O robô vai buscar em paralelo para cada ramo selecionado.
               </p>
             )}
           </div>
@@ -499,10 +499,10 @@ export default function BuscarPage() {
               uf={uf}
               onSelect={handleCitySelect}
               onClear={handleCityClear}
-              placeholder="Digite a cidade (ex: Maringa, Sao Paulo...)"
+              placeholder="Digite a cidade (ex: Maringá, São Paulo...)"
             />
             <p className="mt-1.5 text-[12px] text-faint">
-              Comece a digitar e escolha a cidade. Ja vem com o estado (ex: Maringa - PR).
+              Comece a digitar e escolha a cidade. Já vem com o estado (ex: Maringá - PR).
             </p>
           </div>
 
@@ -530,19 +530,19 @@ export default function BuscarPage() {
               disabled={!city}
             />
             <p className="mt-1.5 text-[12px] text-faint">
-              Comece a digitar e escolha o bairro da cidade. O mapa foca ali e o robo afunila a busca.
+              Comece a digitar e escolha o bairro da cidade. O mapa foca ali e o robô afunila a busca.
             </p>
           </div>
 
           {/* Raio */}
           <div className="mb-4">
             <label className="mb-1.5 block text-[12px] font-bold uppercase tracking-wider text-faint">
-              Raio de atuacao
+              Raio de atuação
             </label>
             <Dropdown
               value={radius}
               onChange={setRadius}
-              ariaLabel="Raio de atuacao"
+              ariaLabel="Raio de atuação"
               options={RADIUS_OPTIONS}
             />
           </div>
@@ -551,7 +551,7 @@ export default function BuscarPage() {
           {serviceOpts.length > 0 && (
             <div className="mb-6">
               <label className="mb-1.5 block text-[12px] font-bold uppercase tracking-wider text-faint">
-                Servico alvo
+                Serviço alvo
               </label>
               {serviceOpts.length === 1 ? (
                 <div className="flex items-center gap-2 rounded-xl border border-border-2 bg-surface-2 px-4 py-3 text-[14px] font-semibold text-ink-2">
@@ -590,7 +590,7 @@ export default function BuscarPage() {
             >
               <div className="flex items-center gap-2.5">
                 <Spinner size={18} className="animate-spin text-brand" />
-                <strong className="text-[14px] text-ink">Garimpando negocios...</strong>
+                <strong className="text-[14px] text-ink">Garimpando negócios...</strong>
                 <button
                   type="button"
                   onClick={() => setSearching(false)}
@@ -601,7 +601,7 @@ export default function BuscarPage() {
               </div>
               <div className="mt-3 flex gap-7 text-[13.5px] text-ink-2">
                 <span>
-                  <strong className="text-[18px] text-ink">{found.novos}</strong> negocios novos
+                  <strong className="text-[18px] text-ink">{found.novos}</strong> negócios novos
                 </span>
                 <span>
                   <strong className="text-[18px] text-ink">{found.prontos}</strong> prontos pra
@@ -627,7 +627,7 @@ export default function BuscarPage() {
           {!searching && (
             <div className="mt-4 flex items-center gap-2 text-[12.5px] text-faint">
               <Info size={14} />
-              A busca roda no servidor e leva 1-2 minutos. Aqui voce define o alvo e acompanha a
+              A busca roda no servidor e leva 1-2 minutos. Aqui você define o alvo e acompanha a
               chegada dos leads.
             </div>
           )}
@@ -636,7 +636,7 @@ export default function BuscarPage() {
         {/* Coluna direita: mapa de cobertura */}
         <div className="fu rounded-[20px] border border-border bg-card p-7 shadow-[var(--shadow)]">
           <div className="mb-1 flex items-center justify-between">
-            <div className="text-[17px] font-bold">Cobertura por regiao</div>
+            <div className="text-[17px] font-bold">Cobertura por região</div>
             {city && (
               <span className="text-[12px] font-semibold text-faint">
                 {neighborhood.trim()
@@ -648,7 +648,7 @@ export default function BuscarPage() {
             )}
           </div>
           <p className="mb-5 text-[13.5px] text-muted-foreground">
-            O garimpo cobre o mapa em ordem, sem pular pedaco. Veja o que ja foi varrido na cidade
+            O garimpo cobre o mapa em ordem, sem pular pedaço. Veja o que já foi varrido na cidade
             escolhida e o que falta.
           </p>
 
@@ -697,7 +697,7 @@ export default function BuscarPage() {
                 className="h-[11px] w-[11px] rounded-[3px]"
                 style={{ background: "#9B6BE8" }}
               />
-              Medio (30-69%)
+              Médio (30-69%)
             </span>
             <span className="flex items-center gap-1.5">
               <span
@@ -711,7 +711,7 @@ export default function BuscarPage() {
                 className="h-[11px] w-[11px] rounded-[3px]"
                 style={{ background: "#b9b2c4" }}
               />
-              Ainda nao
+              Ainda não
             </span>
           </div>
 
@@ -723,8 +723,8 @@ export default function BuscarPage() {
                 {city ? "Nenhuma zona varrida nessa cidade" : "Nenhuma zona varrida ainda"}
               </div>
               <p className="max-w-[300px] text-[13px] text-muted-foreground">
-                Clique em <strong>Buscar agora</strong> pra disparar o garimpo nessa regiao e
-                comecar a cobrir o mapa.
+                Clique em <strong>Buscar agora</strong> pra disparar o garimpo nessa região e
+                começar a cobrir o mapa.
               </p>
             </div>
           ) : (

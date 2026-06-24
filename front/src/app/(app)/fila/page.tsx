@@ -106,8 +106,8 @@ type SortKey = "recomendados" | "valor" | "avaliacao" | "avaliacoes" | "completo
 const SORT_OPTIONS = [
   { value: "recomendados", label: "Recomendados", hint: "(melhor encaixe)" },
   { value: "valor", label: "Maior valor sugerido" },
-  { value: "avaliacao", label: "Melhor avaliacao" },
-  { value: "avaliacoes", label: "Mais avaliacoes" },
+  { value: "avaliacao", label: "Melhor avaliação" },
+  { value: "avaliacoes", label: "Mais avaliações" },
   { value: "completo", label: "Ficha mais completa" },
 ];
 
@@ -198,13 +198,13 @@ export default function FilaPage() {
       await repo.transition(target.id, "descartado", "human");
       setTally((t) => ({ ...t, discarded: t.discarded + 1 }));
       await refresh();
-      toast.success("Descartado. Nao aparece mais pra voce.", {
+      toast.success("Descartado. Não aparece mais pra você.", {
         action: {
           label: "Desfazer",
           onClick: async () => {
             await repo.transition(target.id, "enriquecido", "human");
             await refresh();
-            toast.message("Voltou pra revisao.");
+            toast.message("Voltou pra revisão.");
           },
         },
       });
@@ -250,7 +250,7 @@ export default function FilaPage() {
       await repo.setArchived(target.id, true);
       setTally((t) => ({ ...t, archived: t.archived + 1 }));
       await refresh();
-      toast.success("Arquivado. Sai da fila, mas nao some.", {
+      toast.success("Arquivado. Sai da fila, mas não some.", {
         action: {
           label: "Desfazer",
           onClick: async () => {
@@ -332,12 +332,12 @@ export default function FilaPage() {
             {primeiroUso ? <MagnifyingGlass size={36} weight="bold" /> : <CheckCircle size={38} weight="fill" />}
           </div>
           <div className="font-heading text-2xl font-bold">
-            {primeiroUso ? "Bora encher sua fila" : "Fila zerada, parabens."}
+            {primeiroUso ? "Bora encher sua fila" : "Fila zerada, parabéns."}
           </div>
           <p className="mt-2 text-muted-foreground">
             {primeiroUso
-              ? "Voce ainda nao tem leads. Rode sua primeira busca: escolha o ramo e a regiao, e o robo traz os negocios pra voce abordar."
-              : `Voce revisou tudo. Aprovou ${tally.approved} e descartou ${tally.discarded} agora. Vou continuar buscando e te aviso quando chegar gente nova.`}
+              ? "Você ainda não tem leads. Rode sua primeira busca: escolha o ramo e a região, e o robô traz os negócios pra você abordar."
+              : `Você revisou tudo. Aprovou ${tally.approved} e descartou ${tally.discarded} agora. Vou continuar buscando e te aviso quando chegar gente nova.`}
           </p>
           <Link
             href="/buscar"
@@ -451,7 +451,7 @@ export default function FilaPage() {
             {/* motivo */}
             <div className="rounded-[14px] border border-brand-100 bg-brand-50 p-4">
               <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-brand-700">
-                <Sparkle size={15} weight="fill" /> Por que esse e um bom alvo
+                <Sparkle size={15} weight="fill" /> Por que esse é um bom alvo
               </div>
               <div className="text-[14.5px] leading-relaxed text-ink-2">{cur.score_reason?.summary}</div>
             </div>
@@ -485,7 +485,7 @@ export default function FilaPage() {
               if (chips.length === 0) return null;
               return (
                 <div>
-                  <div className="mb-2 text-xs font-bold uppercase tracking-wider text-faint">Diagnostico do site</div>
+                  <div className="mb-2 text-xs font-bold uppercase tracking-wider text-faint">Diagnóstico do site</div>
                   <div className="flex flex-wrap gap-2">
                     {chips.map((chip, i) => (
                       <span key={i} className={cn("rounded-full px-2.5 py-1 text-[12px]", signalChipClass(chip.variant))}>
@@ -544,7 +544,7 @@ export default function FilaPage() {
                 />
               </div>
               <div className="flex items-center gap-1.5 text-xs text-faint">
-                <Info size={14} /> Quem envia e voce, no seu ritmo. Nada sai sozinho.
+                <Info size={14} /> Quem envia é você, no seu ritmo. Nada sai sozinho.
               </div>
             </div>
           </div>
@@ -594,7 +594,7 @@ export default function FilaPage() {
         <div
           onClick={() => {
             setSendLead(null);
-            toast.message("Voltei pra fila. Quando quiser, e so abrir e enviar.");
+            toast.message("Voltei pra fila. Quando quiser, é só abrir e enviar.");
           }}
           className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(20,12,40,.45)] p-6 backdrop-blur-[2px]"
         >
@@ -619,7 +619,7 @@ export default function FilaPage() {
                 {[sendLead.draft_msg1, sendLead.draft_msg2].filter(Boolean).join("\n\n")}
               </div>
               <div className="mt-3 flex items-center gap-2 text-[12.5px] text-faint">
-                <ShieldCheck size={16} className="text-success" /> Voce manda do seu numero, com a propria mao. O
+                <ShieldCheck size={16} className="text-success" /> Você manda do seu número, com a própria mão. O
                 4YU CRM nunca dispara sozinho.
               </div>
             </div>
@@ -642,7 +642,7 @@ export default function FilaPage() {
                 onClick={markSent}
                 className="w-full rounded-[14px] border border-border-2 bg-card p-3 text-sm font-semibold text-ink-2"
               >
-                Ja mandei, marcar como enviado
+                Já mandei, marcar como enviado
               </button>
             </div>
           </div>

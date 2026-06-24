@@ -60,7 +60,7 @@ interface KpiData {
 
 function fmtDelta(n: number | null): string {
   if (n === null) return "";
-  if (n === 0) return "igual a semana passada";
+  if (n === 0) return "igual à semana passada";
   return `${n > 0 ? "+" : ""}${n} vs semana passada`;
 }
 
@@ -255,7 +255,7 @@ export default function ResultadosPage() {
           </div>
           <div className="font-heading text-2xl font-bold">Sem dados ainda</div>
           <p className="mt-2 text-muted-foreground">
-            Quando voce tiver leads na base, os resultados aparecem aqui com numeros reais. Comece buscando ou adicionando os primeiros contatos.
+            Quando você tiver leads na base, os resultados aparecem aqui com números reais. Comece buscando ou adicionando os primeiros contatos.
           </p>
         </div>
       </div>
@@ -356,7 +356,7 @@ export default function ResultadosPage() {
           />
           <div className="relative">
             <div className="text-[13px] font-semibold tracking-[.04em] opacity-85 uppercase">
-              Meta do mes
+              Meta do mês
             </div>
             <div className="mt-3 mb-1 flex items-baseline gap-2">
               <span className="font-heading text-[50px] font-bold leading-none">
@@ -378,7 +378,7 @@ export default function ResultadosPage() {
             </div>
             {!loading && meta.fechados === 0 && (
               <div className="mt-3 rounded-[12px] bg-white/15 px-4 py-3 text-[13px] leading-relaxed opacity-90">
-                Nenhum lead fechado no mes ainda. Quando fechar o primeiro, aparece aqui.
+                Nenhum lead fechado no mês ainda. Quando fechar o primeiro, aparece aqui.
               </div>
             )}
           </div>

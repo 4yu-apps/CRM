@@ -74,7 +74,7 @@ function LeadCard({ lead, onSent, repo, refresh }: CardProps) {
       await navigator.clipboard.writeText(msg);
       toast.success("Mensagem copiada.");
     } catch {
-      toast.error("Nao consegui copiar. Selecione o texto manualmente.");
+      toast.error("Não consegui copiar. Selecione o texto manualmente.");
     }
   }, [msg]);
 
@@ -205,7 +205,7 @@ function LeadCard({ lead, onSent, repo, refresh }: CardProps) {
               disabled={busy}
               className="w-full rounded-[14px] border border-border-2 bg-card p-3.5 text-sm font-semibold text-ink-2 disabled:opacity-50"
             >
-              {busy ? "Aguarde..." : "Ja enviei, marcar como feito"}
+              {busy ? "Aguarde..." : "Já enviei, marcar como feito"}
             </button>
           </div>
         </div>
@@ -257,7 +257,7 @@ export default function CelularPage() {
           </div>
           <div className="font-heading text-xl font-bold">
             {sentCount > 0
-              ? `Voce enviou ${sentCount}. Fila zerada.`
+              ? `Você enviou ${sentCount}. Fila zerada.`
               : "Fila zerada, nada pra enviar agora."}
           </div>
           <p className="mt-2 text-[13.5px] text-muted-foreground">
@@ -284,8 +284,8 @@ export default function CelularPage() {
         <div className="mt-3 flex gap-2.5 rounded-[14px] border border-border bg-surface-2 p-3.5">
           <Info size={16} className="mt-0.5 flex-none text-brand" />
           <p className="text-[12.5px] leading-relaxed text-ink-2">
-            No celular voce abre cada conversa direto no WhatsApp e manda do seu numero, no seu
-            tempo. A injecao automatica nao roda aqui. Depois que enviar, marca o status no proprio
+            No celular você abre cada conversa direto no WhatsApp e manda do seu número, no seu
+            tempo. A injeção automática não roda aqui. Depois que enviar, marca o status no próprio
             card abaixo.
           </p>
         </div>
@@ -307,7 +307,7 @@ export default function CelularPage() {
       {/* rodape de seguranca */}
       <div className="mt-6 flex items-center justify-center gap-2 text-[11.5px] text-faint">
         <ShieldCheck size={15} className="text-success" />
-        Voce manda do seu numero, com a propria mao. O 4YU CRM nunca dispara sozinho.
+        Você manda do seu número, com a própria mão. O 4YU CRM nunca dispara sozinho.
       </div>
     </div>
   );
