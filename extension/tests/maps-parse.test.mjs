@@ -173,6 +173,17 @@ const NO_ADDRESS_CARD_HTML = `
   <span>Clinica medica</span>
 </div>`;
 
+// Card com telefone (botao "Ligar") e site (link externo) — Maps mostra isso
+// em muitos resultados. Sem telefone o lead seria descartado (nao da WhatsApp).
+const CARD_WITH_CONTACT_HTML = `
+<div role="article">
+  <a href="/maps/place/Pizzaria+Boa/!1sChIJPHONE123!4m..." aria-label="Pizzaria Boa">Pizzaria Boa</a>
+  <span aria-label="4,6 estrelas de 5, com base em 200 avaliacoes">4,6</span>
+  <span>Pizzaria</span>
+  <button aria-label="Ligar para Pizzaria Boa: (44) 99876-5432">Ligar</button>
+  <a href="https://pizzariaboa.com.br" aria-label="Visitar site: pizzariaboa.com.br">Site</a>
+</div>`;
+
 // Lista com 2 cards
 const LIST_HTML = `
 <div>
@@ -257,6 +268,21 @@ test("parseCard degrada quando endereco ausente", () => {
 
 test("parseCard retorna null para elemento null", () => {
   assert.equal(parseCard(null), null);
+});
+
+test("parseCard extrai telefone e site quando o Maps mostra", () => {
+  const card = fakeEl(CARD_WITH_CONTACT_HTML);
+  const r = parseCard(card);
+  assert.ok(r.phone && r.phone.replace(/\D/g, "").length >= 10,
+    `telefone esperado, recebeu: ${r.phone}`);
+  assert.ok(r.website && r.website.includes("pizzariaboa"),
+    `site esperado, recebeu: ${r.website}`);
+});
+
+test("parseCard sem contato deixa telefone e site vazios", () => {
+  const r = parseCard(fakeEl(FULL_CARD_HTML));
+  assert.equal(r.phone, "");
+  assert.equal(r.website, "");
 });
 
 test("parseResultsList extrai multiplos cards", () => {

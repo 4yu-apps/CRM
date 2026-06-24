@@ -276,6 +276,23 @@
     }
     const state = parseState(address);
     const city = parseCity(address);
+    let phone = "";
+    const telLink = card.querySelector('a[href*="tel:"]');
+    if (telLink) phone = (telLink.getAttribute("href") || "").replace(/^tel:/, "").trim();
+    if (!phone) {
+      const callEl = card.querySelector('[aria-label*="Ligar"], [aria-label*="telefone"], [data-item-id*="phone"]');
+      const src = callEl ? callEl.getAttribute("aria-label") || callEl.textContent || "" : card.textContent || "";
+      const m = src.match(/\(?\d{2}\)?\s?9?\d{4}[-\s.]?\d{4}/);
+      if (m) phone = m[0].trim();
+    }
+    let website = "";
+    for (const a of card.querySelectorAll("a[href]")) {
+      const h = a.getAttribute("href") || "";
+      if (h.startsWith("http") && !h.includes("google.com") && !h.includes("/maps/")) {
+        website = h;
+        break;
+      }
+    }
     return {
       business_name,
       maps_place_id,
@@ -287,7 +304,9 @@
       neighborhood: "",
       // nao disponivel diretamente no card da lista
       city,
-      state
+      state,
+      phone,
+      website
     };
   }
   function parseResultsList(root) {
