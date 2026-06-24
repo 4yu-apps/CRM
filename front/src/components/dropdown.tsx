@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CaretDown, Check, MagnifyingGlass } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
@@ -58,6 +58,10 @@ export function Dropdown({
   const searchRef = useRef<HTMLInputElement>(null);
   const selected = options.find((o) => o.value === value);
   const withSearch = searchable ?? options.length > 10;
+  const baseId = useId();
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const activeRef = useRef(-1);
+  const prevOpen = useRef(false);
 
   const visible = useMemo(() => {
     if (!withSearch || !query.trim()) return options;
@@ -113,6 +117,67 @@ export function Dropdown({
     }
   }, [open, withSearch]);
 
+  // Mantem o ref do indice ativo em dia (lido no handler de Enter sem recriar deps).
+  useEffect(() => {
+    activeRef.current = activeIndex;
+  }, [activeIndex]);
+
+  // Ao abrir, destaca a opcao ja selecionada (ou a primeira). Ao filtrar, volta ao topo.
+  useEffect(() => {
+    if (open) {
+      const idx = visible.findIndex((o) => o.value === value);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setActiveIndex(idx >= 0 ? idx : 0);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (open) setActiveIndex(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query]);
+
+  // Navegacao por teclado: setas, Home/End e Enter (Esc ja fecha no efeito acima).
+  useEffect(() => {
+    if (!open) return;
+    const onNav = (e: KeyboardEvent) => {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setActiveIndex((i) => Math.min(visible.length - 1, i + 1));
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setActiveIndex((i) => Math.max(0, i - 1));
+      } else if (e.key === "Home") {
+        e.preventDefault();
+        setActiveIndex(0);
+      } else if (e.key === "End") {
+        e.preventDefault();
+        setActiveIndex(visible.length - 1);
+      } else if (e.key === "Enter") {
+        const o = visible[activeRef.current];
+        if (o) {
+          e.preventDefault();
+          onChange(o.value);
+          setOpen(false);
+        }
+      }
+    };
+    document.addEventListener("keydown", onNav);
+    return () => document.removeEventListener("keydown", onNav);
+  }, [open, visible, onChange]);
+
+  // Rola a opcao destacada pra dentro da area visivel.
+  useEffect(() => {
+    if (!open) return;
+    document.getElementById(`${baseId}-opt-${activeIndex}`)?.scrollIntoView({ block: "nearest" });
+  }, [activeIndex, open, baseId]);
+
+  // Devolve o foco ao gatilho quando o menu fecha (so na transicao aberto->fechado).
+  useEffect(() => {
+    if (prevOpen.current && !open) triggerRef.current?.focus();
+    prevOpen.current = open;
+  }, [open]);
+
   return (
     <div className={cn("relative", className)}>
       <button
@@ -150,6 +215,7 @@ export function Dropdown({
             <div
               ref={menuRef}
               role="listbox"
+              aria-activedescendant={activeIndex >= 0 ? `${baseId}-opt-${activeIndex}` : undefined}
               style={{
                 position: "fixed",
                 top: rect.top,
@@ -175,21 +241,28 @@ export function Dropdown({
                 {visible.length === 0 ? (
                   <div className="px-3.5 py-3 text-[13px] text-faint">Nada encontrado</div>
                 ) : (
-                  visible.map((o) => {
+                  visible.map((o, i) => {
                     const active = o.value === value;
+                    const highlighted = i === activeIndex;
                     return (
                       <button
                         key={o.value}
+                        id={`${baseId}-opt-${i}`}
                         type="button"
                         role="option"
                         aria-selected={active}
+                        onMouseEnter={() => setActiveIndex(i)}
                         onClick={() => {
                           onChange(o.value);
                           setOpen(false);
                         }}
                         className={cn(
                           "flex w-full items-center justify-between gap-3 rounded-[10px] py-2.5 pl-3.5 pr-3 text-left text-[13.5px] transition-colors",
-                          active ? "bg-brand-50 font-semibold text-brand" : "text-ink-2 hover:bg-accent",
+                          active
+                            ? "bg-brand-50 font-semibold text-brand"
+                            : highlighted
+                              ? "bg-accent text-ink-2"
+                              : "text-ink-2 hover:bg-accent",
                         )}
                       >
                         <span className="truncate">
