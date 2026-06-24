@@ -300,6 +300,65 @@ function buildSegments(leads: Lead[], dim: Dim, topN = 8): { rows: Segment[]; hi
   return { rows, hidden: all.length - rows.length };
 }
 
+// ---------- seletor de periodo (#13) ----------
+
+type Period = "all" | "month" | "prev_month" | "d30" | "d90";
+
+const PERIOD_LABELS: Record<Period, string> = {
+  all: "Tudo",
+  month: "Este mês",
+  prev_month: "Mês passado",
+  d30: "30 dias",
+  d90: "90 dias",
+};
+
+interface Range {
+  from: Date | null;
+  to: Date | null;
+}
+
+function daysAgo(now: Date, n: number): Date {
+  const d = new Date(now);
+  d.setDate(d.getDate() - n);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+/** Janela [from, to) do periodo escolhido. from=null => tudo. */
+function periodRange(p: Period, now: Date): Range {
+  const upTo = new Date(now.getTime() + 1);
+  switch (p) {
+    case "all":
+      return { from: null, to: null };
+    case "month":
+      return { from: startOfMonth(now), to: upTo };
+    case "prev_month":
+      return { from: new Date(now.getFullYear(), now.getMonth() - 1, 1), to: startOfMonth(now) };
+    case "d30":
+      return { from: daysAgo(now, 30), to: upTo };
+    case "d90":
+      return { from: daysAgo(now, 90), to: upTo };
+  }
+}
+
+/** Janela imediatamente anterior, de mesma duracao, p/ comparacao. null se nao aplicavel. */
+function previousRange(p: Period, now: Date): Range | null {
+  switch (p) {
+    case "all":
+      return null;
+    case "month":
+      return { from: new Date(now.getFullYear(), now.getMonth() - 1, 1), to: startOfMonth(now) };
+    case "prev_month":
+      return { from: new Date(now.getFullYear(), now.getMonth() - 2, 1), to: new Date(now.getFullYear(), now.getMonth() - 1, 1) };
+    case "d30":
+      return { from: daysAgo(now, 60), to: daysAgo(now, 30) };
+    case "d90":
+      return { from: daysAgo(now, 180), to: daysAgo(now, 90) };
+  }
+}
+
+const closedCount = (ls: Lead[]) => ls.filter((l) => l.status === "fechado").length;
+
 // ---------- icone de delta ----------
 
 function DeltaIcon({ n }: { n: number | null }) {
@@ -314,12 +373,28 @@ export default function ResultadosPage() {
   const { leads, loading } = useLeads();
 
   const kpis = useMemo(() => buildKpis(leads), [leads]);
-  const funnelBars = useMemo(() => buildFunnelBars(leads), [leads]);
   const meta = useMemo(() => buildMeta(leads), [leads]);
 
-  // recorte por dimensao (#12)
+  // seletor de periodo (#13) — escopa funil e recortes (coorte por created_at)
+  const [period, setPeriod] = useState<Period>("all");
+  const now = useMemo(() => new Date(), []);
+  const range = useMemo(() => periodRange(period, now), [period, now]);
+  const scoped = useMemo(
+    () => (range.from ? createdIn(leads, range.from, range.to!) : leads),
+    [leads, range]
+  );
+  // comparacao vs periodo anterior (so fechados, p/ tendencia)
+  const closedDelta = useMemo(() => {
+    const prev = previousRange(period, now);
+    if (!prev || !prev.from || !prev.to) return null;
+    return closedCount(scoped) - closedCount(createdIn(leads, prev.from, prev.to));
+  }, [leads, scoped, period, now]);
+
+  const funnelBars = useMemo(() => buildFunnelBars(scoped), [scoped]);
+
+  // recorte por dimensao (#12) — respeita o periodo
   const [dim, setDim] = useState<Dim>("category");
-  const segments = useMemo(() => buildSegments(leads, dim), [leads, dim]);
+  const segments = useMemo(() => buildSegments(scoped, dim), [scoped, dim]);
 
   // Meta de receita editavel (persistida). Hidrata da localStorage no cliente.
   const [metaReceita, setMetaReceita] = useState(10000);
@@ -410,6 +485,30 @@ export default function ResultadosPage() {
         ))}
       </div>
 
+      {/* seletor de periodo (#13) — escopa funil e recortes */}
+      <div className="fu flex flex-wrap items-center justify-between gap-3 rounded-[18px] border border-border bg-card px-5 py-3 shadow-[var(--shadow)]">
+        <span className="text-[12.5px] font-semibold text-muted-foreground">
+          Período <span className="font-normal text-faint">(funil e recortes abaixo)</span>
+        </span>
+        <div className="flex flex-wrap gap-1 rounded-full bg-[var(--inset)] p-1">
+          {(["all", "month", "prev_month", "d30", "d90"] as Period[]).map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => setPeriod(p)}
+              aria-pressed={period === p}
+              className={`rounded-full px-3 py-1 text-[12.5px] font-semibold transition-colors ${
+                period === p
+                  ? "bg-card text-foreground shadow-[var(--shadow)]"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {PERIOD_LABELS[p]}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* funil + meta */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.5fr_1fr] lg:items-start">
 
@@ -417,7 +516,20 @@ export default function ResultadosPage() {
         <div className="fu rounded-[18px] border border-border bg-card p-6 shadow-[var(--shadow)]">
           <div className="mb-5 flex items-baseline justify-between gap-2">
             <span className="text-[16px] font-bold">Da prospecção ao fechamento</span>
-            <span className="text-[11.5px] text-faint">% = conversão da etapa anterior</span>
+            <div className="flex flex-col items-end gap-0.5 text-right">
+              {closedDelta !== null && (
+                <span
+                  className={`flex items-center gap-1 text-[12px] font-bold ${
+                    closedDelta > 0 ? "text-success" : closedDelta < 0 ? "text-danger" : "text-faint"
+                  }`}
+                >
+                  <DeltaIcon n={closedDelta} />
+                  {closedDelta > 0 ? "+" : ""}
+                  {closedDelta} fechados vs período anterior
+                </span>
+              )}
+              <span className="text-[11.5px] text-faint">% = conversão da etapa anterior</span>
+            </div>
           </div>
           {loading ? (
             <div className="space-y-3">
