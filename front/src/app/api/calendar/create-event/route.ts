@@ -79,7 +79,7 @@ export async function POST(request: NextRequest): Promise<Response> {
   const business = lead.business_name?.trim() || "lead";
 
   // Descricao com telefone e servico, quando existirem.
-  const descLines: string[] = ["Reuniao agendada pelo Garimpo CRM."];
+  const descLines: string[] = ["Reuniao agendada pelo 4YU CRM."];
   if (lead.phone?.trim()) descLines.push(`Telefone: ${lead.phone.trim()}`);
   if (lead.service_label?.trim()) descLines.push(`Servico: ${lead.service_label.trim()}`);
   const place = lead.location?.trim();

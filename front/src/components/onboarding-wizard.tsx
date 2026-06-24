@@ -131,7 +131,10 @@ export function OnboardingWizard() {
               >
                 <Sparkle size={18} weight="fill" />
               </div>
-              <span className="text-[15px] font-bold tracking-tight">Garimpo</span>
+              <span className="flex items-baseline gap-[3px] font-heading">
+                <span className="text-[16px] font-bold tracking-tight text-foreground">4YU</span>
+                <span className="text-[11px] font-semibold tracking-[.14em] text-brand">CRM</span>
+              </span>
             </div>
             <span className="text-[12.5px] font-semibold text-muted-foreground">
               Passo {step + 1} de {STEPS.length}

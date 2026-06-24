@@ -611,7 +611,7 @@ export default function ConfigPage() {
           <div className="rounded-[14px] border border-border bg-surface-2 p-4">
             <div className="mb-3 text-[13.5px] leading-relaxed text-ink-2">
               A conexao com o Calendar permite marcar reunioes direto pelo sistema sem sair do app.
-              Nao e obrigatorio para usar o Garimpo, mas facilita bastante quando as conversas evoluem.
+              Nao e obrigatorio para usar o 4YU CRM, mas facilita bastante quando as conversas evoluem.
             </div>
             <div className="mb-4 flex items-center gap-2 text-[12.5px] text-faint">
               <Info size={14} />
