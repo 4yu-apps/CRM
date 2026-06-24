@@ -30,6 +30,7 @@ import {
   CaretLeft,
   CaretRight,
   ShieldStar,
+  DotsThree,
 } from "@phosphor-icons/react";
 import { useAuth } from "@/lib/auth";
 import { useT } from "@/lib/i18n";
@@ -39,22 +40,54 @@ import { meetingsWithin, meetingModality, fmtMeetingWhen } from "@/lib/meetings"
 import { buildNotifications, groupNotifications, type NotifKind } from "@/lib/notifications";
 import type { Lead } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 
 type NavItem = { href: string; label: string; Icon: typeof House };
+type NavGroup = { label: string | null; items: NavItem[] };
 
-const NAV: NavItem[] = [
-  { href: "/", label: "Início", Icon: House },
-  { href: "/fila", label: "Fila de leads", Icon: Tray },
-  { href: "/funil", label: "Funil", Icon: Funnel },
-  { href: "/contatos", label: "Contatos", Icon: AddressBook },
-  { href: "/clientes", label: "Clientes", Icon: Handshake },
-  { href: "/agenda", label: "Agenda", Icon: CalendarBlank },
-  { href: "/resultados", label: "Resultados", Icon: ChartLineUp },
-  { href: "/buscar", label: "Buscar leads", Icon: MagnifyingGlass },
-  { href: "/celular", label: "No celular", Icon: DeviceMobile },
-  { href: "/templates", label: "Templates", Icon: ChatText },
-  { href: "/config", label: "Configuração", Icon: GearSix },
+// Grupos da sidebar (ordem e hierarquia).
+const NAV_GROUPS: NavGroup[] = [
+  { label: null, items: [{ href: "/", label: "Início", Icon: House }] },
+  {
+    label: "Prospecção",
+    items: [
+      { href: "/buscar", label: "Garimpar", Icon: MagnifyingGlass },
+      { href: "/fila", label: "Fila de leads", Icon: Tray },
+    ],
+  },
+  {
+    label: "Pipeline",
+    items: [
+      { href: "/funil", label: "Funil", Icon: Funnel },
+      { href: "/contatos", label: "Contatos", Icon: AddressBook },
+      { href: "/agenda", label: "Agenda", Icon: CalendarBlank },
+      { href: "/clientes", label: "Clientes", Icon: Handshake },
+    ],
+  },
+  {
+    label: "Análise",
+    items: [{ href: "/resultados", label: "Resultados", Icon: ChartLineUp }],
+  },
+  {
+    label: "Ferramentas",
+    items: [
+      { href: "/templates", label: "Templates", Icon: ChatText },
+      { href: "/celular", label: "No celular", Icon: DeviceMobile },
+    ],
+  },
+  {
+    label: "Sistema",
+    items: [{ href: "/config", label: "Configuração", Icon: GearSix }],
+  },
 ];
+
+// Itens que aparecem no menu inferior do celular (resto vai no "Mais").
+const MOBILE_PRIMARY: string[] = ["/", "/fila", "/funil", "/contatos", "/buscar"];
 
 const TITLES: Record<string, [string, string]> = {
   "/": ["Visão geral", "Seu ponto de partida do dia"],
@@ -65,7 +98,7 @@ const TITLES: Record<string, [string, string]> = {
   "/agenda": ["Agenda", "Suas próximas reuniões"],
   "/resultados": ["Resultados", "Tá valendo a pena?"],
   "/templates": ["Templates", "Modelos de mensagem reutilizáveis"],
-  "/buscar": ["Buscar leads", "Sob comando, quando você quiser"],
+  "/buscar": ["Garimpar leads", "Sob comando, quando você quiser"],
   "/celular": ["No celular", "Acompanhe e envie pelo WhatsApp"],
   "/config": ["Configuração", "Ajuste uma vez, eu cuido do resto"],
   "/ficha": ["Ficha do lead", "Tudo que eu juntei sobre o negócio"],
@@ -272,7 +305,7 @@ function NotificationBell({ leads }: { leads: Lead[] }) {
     <div className="relative">
       <button
         type="button"
-        aria-label="Notificações"
+        aria-label="Notificacoes"
         onClick={() => setOpen((o) => !o)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         className="relative flex size-9 items-center justify-center rounded-full border border-border bg-accent text-ink-2 transition-colors hover:text-brand"
@@ -290,11 +323,11 @@ function NotificationBell({ leads }: { leads: Lead[] }) {
       {open && (
         <div className="absolute right-0 top-[calc(100%+8px)] z-50 max-h-[70vh] w-[360px] max-w-[80vw] overflow-y-auto rounded-[14px] border border-border bg-card shadow-xl">
           <div className="sticky top-0 border-b border-border bg-card px-4 py-2.5 text-[12px] font-bold uppercase tracking-wider text-faint">
-            {total === 0 ? "Tudo em dia" : `${total} pra você agora`}
+            {total === 0 ? "Tudo em dia" : `${total} pra voce agora`}
           </div>
           {total === 0 ? (
             <div className="px-4 py-5 text-[13px] text-muted-foreground">
-              Nada exigindo sua atenção agora. Quando alguém responder, uma reunião chegar ou um follow-up vencer, aparece aqui.
+              Nada exigindo sua atencao agora. Quando alguem responder, uma reuniao chegar ou um follow-up vencer, aparece aqui.
             </div>
           ) : (
             groups.map((g) => {
@@ -356,9 +389,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { leads } = useLeads();
   const t = useT();
 
-  const navItems: NavItem[] = isAdmin
-    ? [...NAV, { href: "/admin", label: "Admin", Icon: ShieldStar }]
-    : NAV;
+  // Grupos com admin injetado no grupo "Sistema" quando necessario.
+  const navGroups: NavGroup[] = useMemo(() => {
+    if (!isAdmin) return NAV_GROUPS;
+    return NAV_GROUPS.map((g) =>
+      g.label === "Sistema"
+        ? { ...g, items: [...g.items, { href: "/admin", label: "Admin", Icon: ShieldStar }] }
+        : g,
+    );
+  }, [isAdmin]);
+
+  // Lista achatada derivada dos grupos (inclui admin quando necessario).
+  const navItems: NavItem[] = useMemo(() => navGroups.flatMap((g) => g.items), [navGroups]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -367,6 +409,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   // Quando o usuario viu a fila por ultimo (ms). Leads prontos com updated_at
   // depois disso = "novos chegaram" (sinal cross-pagina apos a busca).
   const [lastSeenFila, setLastSeenFila] = useState<number | null>(null);
@@ -417,47 +460,64 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const sub = t(`sub.${normPath}`, fallbackSub);
   const isDark = mounted && resolvedTheme === "dark";
 
+  // Renderiza um item de navegacao (usado na sidebar e no Sheet de "Mais").
+  const renderNavLink = (href: string, label: string, Icon: NavItem["Icon"]) => {
+    const active = isActive(pathname, href);
+    const badge = href === "/fila" && queue > 0;
+    return (
+      <Link
+        key={href}
+        href={href}
+        title={collapsed ? label : undefined}
+        className={cn(
+          "flex items-center gap-3 rounded-xl py-2.5 text-sm font-medium transition-colors",
+          collapsed ? "justify-center px-0" : "px-3",
+          active
+            ? "bg-accent font-bold text-brand"
+            : "text-ink-2 hover:bg-accent/60",
+        )}
+      >
+        <span className="relative flex flex-none">
+          <Icon size={19} weight={active ? "fill" : "regular"} />
+          {badge && collapsed && (
+            <span
+              className="absolute -right-1.5 -top-1.5 size-2.5 rounded-full ring-2 ring-card"
+              style={{ background: "var(--grad)" }}
+            />
+          )}
+        </span>
+        {!collapsed && <span className="flex-1">{t(`nav.${href}`, label)}</span>}
+        {!collapsed && badge && (
+          <span
+            className="flex h-[21px] min-w-[21px] items-center justify-center rounded-full px-1.5 text-[11.5px] font-bold text-white"
+            style={{ background: "var(--grad)" }}
+          >
+            {queue}
+          </span>
+        )}
+      </Link>
+    );
+  };
+
+  // Sidebar com grupos e rotulos de secao.
   const nav = (extra?: string) => (
     <nav className={cn("flex flex-col gap-0.5", extra)}>
-      {navItems.map(({ href, label, Icon }) => {
-        const active = isActive(pathname, href);
-        const badge = href === "/fila" && queue > 0;
-        return (
-          <Link
-            key={href}
-            href={href}
-            title={collapsed ? label : undefined}
-            className={cn(
-              "flex items-center gap-3 rounded-xl py-2.5 text-sm font-medium transition-colors",
-              collapsed ? "justify-center px-0" : "px-3",
-              active
-                ? "bg-accent font-bold text-brand"
-                : "text-ink-2 hover:bg-accent/60",
-            )}
-          >
-            <span className="relative flex flex-none">
-              <Icon size={19} weight={active ? "fill" : "regular"} />
-              {badge && collapsed && (
-                <span
-                  className="absolute -right-1.5 -top-1.5 size-2.5 rounded-full ring-2 ring-card"
-                  style={{ background: "var(--grad)" }}
-                />
-              )}
-            </span>
-            {!collapsed && <span className="flex-1">{t(`nav.${href}`, label)}</span>}
-            {!collapsed && badge && (
-              <span
-                className="flex h-[21px] min-w-[21px] items-center justify-center rounded-full px-1.5 text-[11.5px] font-bold text-white"
-                style={{ background: "var(--grad)" }}
-              >
-                {queue}
-              </span>
-            )}
-          </Link>
-        );
-      })}
+      {navGroups.map((group, gi) => (
+        <div key={gi}>
+          {group.label && !collapsed && (
+            <div className="px-3 pb-1 pt-4 text-[11px] font-bold uppercase tracking-wider text-faint">
+              {group.label}
+            </div>
+          )}
+          {group.items.map(({ href, label, Icon }) => renderNavLink(href, label, Icon))}
+        </div>
+      ))}
     </nav>
   );
+
+  // Bottom-nav mobile: so primarias + botao "Mais".
+  const primary = navItems.filter((i) => MOBILE_PRIMARY.includes(i.href));
+  const overflow = navItems.filter((i) => !MOBILE_PRIMARY.includes(i.href));
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
@@ -600,7 +660,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     ? "1 novo lead chegou"
                     : `${novos} novos leads chegaram`
                   : queue > 0
-                    ? `${queue} leads prontos pra você`
+                    ? `${queue} leads prontos pra voce`
                     : "Buscando novos leads"}
               </span>
             </Link>
@@ -609,9 +669,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <main className="min-h-0 flex-1 overflow-y-auto p-6 pb-24 sm:p-8 lg:pb-8">{children}</main>
 
-        {/* nav mobile (bottom) */}
+        {/* nav mobile (bottom) - apenas primarias + botao Mais */}
         <div className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t border-border bg-card px-2 py-1.5 lg:hidden">
-          {navItems.map(({ href, label, Icon }) => {
+          {primary.map(({ href, label, Icon }) => {
             const active = isActive(pathname, href);
             return (
               <Link
@@ -635,6 +695,46 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </Link>
             );
           })}
+
+          {overflow.length > 0 && (
+            <>
+              <button
+                type="button"
+                aria-label="Mais"
+                onClick={() => setMoreOpen(true)}
+                className="relative flex flex-col items-center gap-0.5 rounded-lg px-2 py-1.5 text-faint"
+              >
+                <DotsThree size={22} weight="bold" />
+              </button>
+
+              <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
+                <SheetContent side="bottom" showCloseButton={false}>
+                  <SheetHeader>
+                    <SheetTitle>Mais opcoes</SheetTitle>
+                  </SheetHeader>
+                  <nav className="flex flex-col gap-0.5 px-2 pb-4">
+                    {overflow.map(({ href, label, Icon }) => {
+                      const active = isActive(pathname, href);
+                      return (
+                        <Link
+                          key={href}
+                          href={href}
+                          onClick={() => setMoreOpen(false)}
+                          className={cn(
+                            "flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-colors",
+                            active ? "bg-accent font-bold text-brand" : "text-ink-2 hover:bg-accent/60",
+                          )}
+                        >
+                          <Icon size={20} weight={active ? "fill" : "regular"} />
+                          <span className="flex-1">{t(`nav.${href}`, label)}</span>
+                        </Link>
+                      );
+                    })}
+                  </nav>
+                </SheetContent>
+              </Sheet>
+            </>
+          )}
         </div>
       </div>
     </div>
