@@ -3,6 +3,19 @@
 import { MOCK_LEADS } from "./mock-data.mjs";
 import { activeDataSource } from "./config.mjs";
 
+// Campos pra marcar um lead como "sem WhatsApp": arquiva e poe a tag (sem duplicar).
+export function noWhatsappFields(lead, nowIso) {
+  const tags = Array.isArray(lead?.tags) ? lead.tags : [];
+  const next = tags.includes("sem-whatsapp") ? tags : [...tags, "sem-whatsapp"];
+  return { archived: true, tags: next, whatsapp_checked_at: nowIso };
+}
+
+// Campos pra desfazer: tira a tag, desarquiva e zera o checked (pra revalidar).
+export function undoFields(lead) {
+  const tags = (Array.isArray(lead?.tags) ? lead.tags : []).filter((t) => t !== "sem-whatsapp");
+  return { archived: false, tags, whatsapp_checked_at: null };
+}
+
 function mockRepo() {
   const leads = MOCK_LEADS.map((l) => ({ ...l }));
   return {
@@ -70,6 +83,15 @@ function supabaseRepo(cfg) {
       if (!r.ok) throw new Error(`updateLead: ${r.status} ${await r.text()}`);
       const data = await r.json();
       return Array.isArray(data) ? data[0] : data;
+    },
+    async markNoWhatsapp(lead) {
+      return this.updateLead(lead.id, noWhatsappFields(lead, new Date().toISOString()));
+    },
+    async markChecked(id) {
+      return this.updateLead(id, { whatsapp_checked_at: new Date().toISOString() });
+    },
+    async undoNoWhatsapp(lead) {
+      return this.updateLead(lead.id, undoFields(lead));
     },
     // Insere um lead bruto vindo do Google Maps. owner_id cai no default
     // do banco (auth.uid() via RLS). Retorna o id do registro criado,
