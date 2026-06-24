@@ -185,6 +185,28 @@ export default function BuscarPage() {
     return Array.from(new Set([...(profile?.niches ?? []), ...RAMOS_DISPONIVEIS]));
   }, [profile]);
 
+  // #10 — garantia de "nao repetir": cobertura ja registrada pra cidade + nichos
+  // escolhidos. So avisa quando ja houve varredura com pct > 0 naquela zona.
+  const coberturaRegiao = useMemo(() => {
+    if (!city) return null;
+    const key = slugRegion(city, uf);
+    const cityLower = city.toLowerCase();
+    const nicheSet = new Set(niches);
+    const matches = coverage.filter((c) => {
+      const regOk = c.region_key === key || (c.region_name?.toLowerCase().includes(cityLower) ?? false);
+      if (!regOk) return false;
+      if (nicheSet.size === 0) return true;
+      return c.niche == null || nicheSet.has(c.niche);
+    });
+    if (matches.length === 0) return null;
+    const maxPct = Math.max(...matches.map((c) => c.pct ?? 0));
+    if (maxPct <= 0) return null;
+    const totalCount = matches.reduce((s, c) => s + (c.result_count ?? 0), 0);
+    const lastAt = matches.reduce((a, c) => (a > c.covered_at ? a : c.covered_at), matches[0].covered_at);
+    const dias = Math.floor((Date.now() - +new Date(lastAt)) / (24 * 60 * 60 * 1000));
+    return { maxPct, totalCount, dias };
+  }, [city, uf, niches, coverage]);
+
   const load = useCallback(async () => {
     try {
       const [p, cov] = await Promise.all([repo.getProfile(), repo.listCoverage()]);
@@ -566,6 +588,22 @@ export default function BuscarPage() {
               ) : (
                 <ServiceToggle value={service} options={serviceOpts} onChange={setService} />
               )}
+            </div>
+          )}
+
+          {/* #10 — aviso de zona ja coberta */}
+          {coberturaRegiao && (
+            <div className="rounded-[13px] border border-amber-300 bg-amber-50 px-4 py-3 text-[13px] leading-relaxed text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+              <div className="flex items-start gap-2">
+                <Info size={16} className="mt-0.5 flex-none" />
+                <span>
+                  <strong>Essa zona já foi garimpada</strong> — até {coberturaRegiao.maxPct}% varrida,{" "}
+                  {coberturaRegiao.totalCount} negócio{coberturaRegiao.totalCount === 1 ? "" : "s"} já trazido
+                  {coberturaRegiao.totalCount === 1 ? "" : "s"}
+                  {coberturaRegiao.dias === 0 ? " hoje" : ` há ${coberturaRegiao.dias} dia${coberturaRegiao.dias === 1 ? "" : "s"}`}.
+                  Pode rodar de novo pra pegar novidades, ou trocar de bairro/cidade pra achar gente nova.
+                </span>
+              </div>
             </div>
           )}
 
