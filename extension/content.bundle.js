@@ -404,17 +404,23 @@
     if (sweeping) return;
     sweeping = true;
     try {
+      let unknownSeguidos = 0;
       for (const lead of sweepTargets(state.leads)) {
         if (document.hidden) break;
         if (!await quota.canCheck()) break;
         const verdict = await waCheck(lead.whatsapp || lead.phone);
         await quota.record();
         if (verdict === "none") {
+          unknownSeguidos = 0;
           const updated = await state.repo.markNoWhatsapp(lead);
           state.leads = state.leads.map((l) => l.id === lead.id ? { ...l, ...updated } : l);
         } else if (verdict === "has") {
+          unknownSeguidos = 0;
           const updated = await state.repo.markChecked(lead.id);
           state.leads = state.leads.map((l) => l.id === lead.id ? { ...l, ...updated } : l);
+        } else {
+          unknownSeguidos += 1;
+          if (unknownSeguidos >= 3) break;
         }
         updateSweepIndicator();
         await sleep(jitter());
@@ -433,7 +439,7 @@
     if (!d || d.source !== "garimpo-page" || d.type !== "no_whatsapp") return;
     const key = phoneKey(d.phone);
     const lead = state.leads.find((l) => phoneKey(l.whatsapp || l.phone) === key);
-    if (!lead || lead.archived) return;
+    if (!lead || lead.archived || lead.whatsapp_checked_at) return;
     const updated = await state.repo.markNoWhatsapp(lead);
     state.leads = state.leads.map((l) => l.id === lead.id ? { ...l, ...updated } : l);
     toast("N\xFAmero sem WhatsApp. Arquivei e marquei sem-whatsapp.");

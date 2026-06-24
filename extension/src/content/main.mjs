@@ -84,19 +84,26 @@ async function runSweep() {
   if (sweeping) return;
   sweeping = true;
   try {
+    let unknownSeguidos = 0;
     for (const lead of sweepTargets(state.leads)) {
       if (document.hidden) break;            // so com a aba visivel
       if (!(await quota.canCheck())) break;  // respeita o teto diario
       const verdict = await waCheck(lead.whatsapp || lead.phone);
-      await quota.record();
+      await quota.record();                  // toda checagem conta (anti-ban e por chamada)
       if (verdict === "none") {
+        unknownSeguidos = 0;
         const updated = await state.repo.markNoWhatsapp(lead);
         state.leads = state.leads.map((l) => (l.id === lead.id ? { ...l, ...updated } : l));
       } else if (verdict === "has") {
+        unknownSeguidos = 0;
         const updated = await state.repo.markChecked(lead.id);
         state.leads = state.leads.map((l) => (l.id === lead.id ? { ...l, ...updated } : l));
+      } else {
+        // unknown: provavelmente a sessao do WhatsApp nao esta pronta. Se persistir,
+        // para a varredura pra nao gastar a cota do dia chamando uma sessao morta.
+        unknownSeguidos += 1;
+        if (unknownSeguidos >= 3) break;
       }
-      // unknown: nao mexe, tenta na proxima rodada
       updateSweepIndicator();
       await sleep(jitter());
     }
@@ -116,7 +123,7 @@ window.addEventListener("message", async (e) => {
   if (!d || d.source !== "garimpo-page" || d.type !== "no_whatsapp") return;
   const key = phoneKey(d.phone);
   const lead = state.leads.find((l) => phoneKey(l.whatsapp || l.phone) === key);
-  if (!lead || lead.archived) return;
+  if (!lead || lead.archived || lead.whatsapp_checked_at) return;
   const updated = await state.repo.markNoWhatsapp(lead);
   state.leads = state.leads.map((l) => (l.id === lead.id ? { ...l, ...updated } : l));
   toast("Número sem WhatsApp. Arquivei e marquei sem-whatsapp.");
