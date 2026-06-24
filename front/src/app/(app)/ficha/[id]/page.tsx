@@ -11,7 +11,6 @@ import {
   CalendarX,
   Check,
   CheckCircle,
-  Clock,
   Coffee,
   Copy,
   CurrencyCircleDollar,
@@ -39,6 +38,7 @@ import { getRepo } from "@/lib/repo";
 import { FollowupCard } from "@/components/followup-card";
 import { LeadFiles } from "@/components/lead-files";
 import { waSend, openWhatsApp } from "@/lib/whatsapp";
+import { Skeleton } from "@/components/skeleton";
 import { googleSearchUrl, googleMapsUrl } from "@/lib/links";
 import { siteSignalChips, signalChipClass } from "@/lib/site-signals";
 import { useCancelMeeting } from "@/hooks/use-cancel-meeting";
@@ -72,7 +72,7 @@ function LeadIcon({ category, size }: { category: string | null; size: number })
   if (c.includes("restaur")) return <ForkKnife size={size} />;
   if (c.includes("academ")) return <Barbell size={size} />;
   if (c.includes("odont")) return <Tooth size={size} />;
-  if (c.includes("cafe") || c.includes("cafe")) return <Coffee size={size} />;
+  if (c.includes("cafe") || c.includes("café")) return <Coffee size={size} />;
   if (c.includes("estetic") || c.includes("estet")) return <Sparkle size={size} />;
   return <Storefront size={size} />;
 }
@@ -425,7 +425,25 @@ export default function FichaPage() {
   if (loading) {
     return (
       <div className="mx-auto max-w-[880px]">
-        <StateScreen icon={<Clock size={30} />} title="Carregando..." />
+        <Skeleton className="mb-5 h-5 w-28" />
+        <div className="overflow-hidden rounded-[20px] border border-border bg-card shadow-[var(--shadow)]">
+          <div className="flex items-center gap-4 border-b border-border p-6 sm:p-7">
+            <Skeleton className="size-14 flex-none rounded-[16px]" />
+            <div className="min-w-0 flex-1 space-y-2.5">
+              <Skeleton className="h-6 w-1/2" />
+              <Skeleton className="h-4 w-1/3" />
+            </div>
+          </div>
+          <div className="space-y-3 p-6">
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-5/6" />
+            <Skeleton className="h-4 w-2/3" />
+          </div>
+        </div>
+        <div className="mt-5 grid gap-5 sm:grid-cols-2">
+          <Skeleton className="h-40 rounded-[20px]" />
+          <Skeleton className="h-40 rounded-[20px]" />
+        </div>
       </div>
     );
   }
@@ -610,7 +628,7 @@ export default function FichaPage() {
             ) : (
               <div className="overflow-hidden rounded-[14px] border border-border bg-card">
                 <DataRow label="Dono / responsável" value={lead.owner_name ?? "-"} prov={provOf(provenance, "owner_name")} />
-                <DataRow label="Telefone" value={fmtPhone(lead.phone)} href={waUrl(lead.whatsapp ?? lead.phone)} prov={provOf(provenance, "phone")} />
+                <DataRow label="Telefone" value={fmtPhone(lead.phone)} prov={provOf(provenance, "phone")} />
                 <DataRow label="WhatsApp" value={lead.whatsapp ? fmtPhone(lead.whatsapp) : "-"} href={waUrl(lead.whatsapp)} prov={provOf(provenance, "whatsapp")} />
                 <DataRow label="E-mail" value={lead.email ?? "-"} href={mailUrl(lead.email)} prov={provOf(provenance, "email")} />
                 <DataRow label="Instagram" value={lead.instagram ?? "-"} href={igUrl(lead.instagram)} prov={provOf(provenance, "instagram")} />
