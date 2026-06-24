@@ -220,13 +220,15 @@ export default function FilaPage() {
       if (m.m1 !== (cur.draft_msg1 ?? "") || m.m2 !== (cur.draft_msg2 ?? "")) {
         await repo.update(cur.id, { draft_msg1: m.m1, draft_msg2: m.m2 });
       }
-      const lead = await repo.transition(cur.id, "aprovado", "human");
-      setSendLead({ ...lead, draft_msg1: m.m1, draft_msg2: m.m2 });
-      await refresh();
+      // NAO transiciona aqui: o lead so sai da fila quando for ENVIADO de fato.
+      // Evita o "aprovou, fechou o modal sem querer e o lead sumiu sem enviar".
+      // rascunho_pronto -> enviado e uma transicao valida (state-machine), e o
+      // celular/funil tratam rascunho_pronto como "pra enviar", entao nada quebra.
+      setSendLead({ ...cur, draft_msg1: m.m1, draft_msg2: m.m2 });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao aprovar");
     }
-  }, [cur, repo, refresh, edits]);
+  }, [cur, repo, edits]);
 
   const markSent = useCallback(async () => {
     if (!sendLead) return;
@@ -590,7 +592,10 @@ export default function FilaPage() {
       {/* modal de envio */}
       {sendLead && (
         <div
-          onClick={() => setSendLead(null)}
+          onClick={() => {
+            setSendLead(null);
+            toast.message("Voltei pra fila. Quando quiser, e so abrir e enviar.");
+          }}
           className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(20,12,40,.45)] p-6 backdrop-blur-[2px]"
         >
           <div
