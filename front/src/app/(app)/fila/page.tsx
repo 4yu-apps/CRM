@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import {
@@ -181,6 +181,7 @@ export default function FilaPage() {
 
   const [edits, setEdits] = useState<Record<string, { m1: string; m2: string }>>({});
   const [sendLead, setSendLead] = useState<Lead | null>(null);
+  const sendingRef = useRef(false); // trava re-entrada (2 Enter rapidos / clique duplo)
   const [tally, setTally] = useState({ approved: 0, discarded: 0, archived: 0 });
 
   const cur = queue[0];
@@ -231,7 +232,8 @@ export default function FilaPage() {
   }, [cur, repo, edits]);
 
   const markSent = useCallback(async () => {
-    if (!sendLead) return;
+    if (!sendLead || sendingRef.current) return;
+    sendingRef.current = true;
     try {
       await repo.transition(sendLead.id, "enviado", "human");
       setTally((t) => ({ ...t, approved: t.approved + 1 }));
@@ -240,6 +242,8 @@ export default function FilaPage() {
       toast.success("Pronto. Marquei como enviado.");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao marcar enviado");
+    } finally {
+      sendingRef.current = false;
     }
   }, [sendLead, repo, refresh]);
 

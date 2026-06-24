@@ -190,9 +190,9 @@ export function MultiRamoDropdown({ selected, options, onToggle, ariaLabel = "Ra
         ? createPortal(
             <div
               ref={menuRef}
+              id={`${baseId}-listbox`}
               role="listbox"
               aria-multiselectable="true"
-              aria-activedescendant={activeIndex >= 0 ? `${baseId}-opt-${activeIndex}` : undefined}
               style={{
                 position: "fixed",
                 top: rect.top,
@@ -217,6 +217,10 @@ export function MultiRamoDropdown({ selected, options, onToggle, ariaLabel = "Ra
                 </svg>
                 <input
                   ref={searchRef}
+                  role="combobox"
+                  aria-controls={`${baseId}-listbox`}
+                  aria-expanded={open}
+                  aria-activedescendant={activeIndex >= 0 ? `${baseId}-opt-${activeIndex}` : undefined}
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Buscar ramo..."

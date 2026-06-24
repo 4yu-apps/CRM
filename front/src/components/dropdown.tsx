@@ -172,9 +172,13 @@ export function Dropdown({
     document.getElementById(`${baseId}-opt-${activeIndex}`)?.scrollIntoView({ block: "nearest" });
   }, [activeIndex, open, baseId]);
 
-  // Devolve o foco ao gatilho quando o menu fecha (so na transicao aberto->fechado).
+  // Devolve o foco ao gatilho ao fechar, mas SO se o foco ainda estava dentro do
+  // menu (fechou por Esc/selecao). Se o usuario clicou em outro campo, nao rouba.
   useEffect(() => {
-    if (prevOpen.current && !open) triggerRef.current?.focus();
+    if (prevOpen.current && !open) {
+      const a = document.activeElement;
+      if (!a || a === document.body || menuRef.current?.contains(a)) triggerRef.current?.focus();
+    }
     prevOpen.current = open;
   }, [open]);
 
@@ -185,6 +189,8 @@ export function Dropdown({
         type="button"
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-controls={open ? `${baseId}-listbox` : undefined}
+        aria-activedescendant={open && !withSearch && activeIndex >= 0 ? `${baseId}-opt-${activeIndex}` : undefined}
         aria-label={ariaLabel}
         disabled={disabled}
         onClick={toggle}
@@ -214,8 +220,8 @@ export function Dropdown({
         ? createPortal(
             <div
               ref={menuRef}
+              id={`${baseId}-listbox`}
               role="listbox"
-              aria-activedescendant={activeIndex >= 0 ? `${baseId}-opt-${activeIndex}` : undefined}
               style={{
                 position: "fixed",
                 top: rect.top,
@@ -230,6 +236,10 @@ export function Dropdown({
                   <MagnifyingGlass size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-faint" />
                   <input
                     ref={searchRef}
+                    role="combobox"
+                    aria-controls={`${baseId}-listbox`}
+                    aria-expanded={open}
+                    aria-activedescendant={activeIndex >= 0 ? `${baseId}-opt-${activeIndex}` : undefined}
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder="Buscar..."
