@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -7,6 +7,7 @@ import {
   CheckCircle,
   MagnifyingGlass,
   Sparkle,
+  Warning,
   Footprints,
   Trash,
   NotePencil,
@@ -69,16 +70,17 @@ const ACTIVITY_ICON: Record<ActivityType, React.ComponentType<{ size: number }>>
 
 export default function InicioPage() {
   const { user } = useAuth();
-  const { leads, loading: leadsLoading } = useLeads();
+  const { leads, loading: leadsLoading, error: leadsError, refresh: refreshLeads } = useLeads();
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
   const [activityLoading, setActivityLoading] = useState(true);
+  const [activityError, setActivityError] = useState(false);
 
   // Feed "o que rolou enquanto voce nao tava". A janela tem um piso rolante de
   // 24h (o "reset diario": abrindo todo dia, voce so ve o dia) e estica pra tras
   // ate a sua ultima visita quando voce fica dias fora (acumula as rodadas do
   // cron que voce perdeu). Sempre limitado a 30 itens. A "ultima visita" mora no
   // localStorage (por dispositivo) e e atualizada a cada abertura.
-  useEffect(() => {
+  const loadActivity = useCallback(() => {
     const DIA = 24 * 60 * 60 * 1000;
     let ultimaVisita = 0;
     try {
@@ -91,6 +93,8 @@ export default function InicioPage() {
     // Piso de 24h; se a ultima visita for mais antiga, a janela estica ate ela.
     const janelaInicio = ultimaVisita > 0 ? Math.min(agora - DIA, ultimaVisita) : agora - DIA;
 
+    setActivityError(false);
+    setActivityLoading(true);
     void getRepo()
       .listActivity(30)
       .then((ev) => {
@@ -103,8 +107,16 @@ export default function InicioPage() {
           /* ignora */
         }
       })
-      .catch(() => setActivityLoading(false));
+      .catch(() => {
+        // Antes engolia o erro virando "vazio". Agora distingue: erro + retry.
+        setActivityError(true);
+        setActivityLoading(false);
+      });
   }, []);
+
+  useEffect(() => {
+    loadActivity();
+  }, [loadActivity]);
 
   const nome = primeiroNome(user?.email ?? null);
   const cumprimento = saudacao();
@@ -163,6 +175,14 @@ export default function InicioPage() {
 
   return (
     <div className="mx-auto flex max-w-[1100px] flex-col gap-6">
+      {leadsError && (
+        <div className="rounded-[16px] border border-danger/30 bg-danger-bg px-5 py-4 text-[14px] text-danger">
+          Não consegui carregar seus leads: {leadsError}
+          <button type="button" onClick={() => void refreshLeads()} className="ml-3 font-semibold underline">
+            Tentar de novo
+          </button>
+        </div>
+      )}
       {/* ---- HERO ---- */}
       <div
         className="fu relative overflow-hidden rounded-[22px] p-10 text-white shadow-[var(--shadow-md)]"
@@ -281,6 +301,18 @@ export default function InicioPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          ) : activityError ? (
+            <div className="flex flex-col items-center gap-3 py-10 text-center">
+              <Warning size={28} className="text-danger" />
+              <div className="text-sm text-muted-foreground">Não consegui carregar a atividade.</div>
+              <button
+                type="button"
+                onClick={loadActivity}
+                className="text-sm font-semibold text-brand hover:underline"
+              >
+                Tentar de novo
+              </button>
             </div>
           ) : activity.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-10 text-center">

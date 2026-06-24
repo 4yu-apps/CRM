@@ -123,7 +123,7 @@ function ContactIcon({
 
 export default function ContatosPage() {
   const router = useRouter();
-  const { leads, loading, refresh, repo } = useLeads();
+  const { leads, loading, error, refresh, repo } = useLeads();
 
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<LeadStatus | "">("");
@@ -304,6 +304,20 @@ export default function ContatosPage() {
     return (
       <div className="mx-auto max-w-[1180px]">
         <ListSkeleton rows={10} />
+      </div>
+    );
+  }
+
+  // Erro de carregamento: distinto do estado "vazio" (que enganava o usuario).
+  if (error) {
+    return (
+      <div className="mx-auto max-w-[1180px]">
+        <div className="rounded-[16px] border border-danger/30 bg-danger-bg px-5 py-4 text-[14px] text-danger">
+          Não consegui carregar seus contatos: {error}
+          <button type="button" onClick={() => void refresh()} className="ml-3 font-semibold underline">
+            Tentar de novo
+          </button>
+        </div>
       </div>
     );
   }
