@@ -57,11 +57,67 @@
     return id;
   }
 
-  async function openChat(id) {
+  // Numero (so digitos) da conversa aberta agora, pra confirmar se o open pegou.
+  function activeNum() {
+    try {
+      const ac = window.WPP.chat.getActiveChat && window.WPP.chat.getActiveChat();
+      const u = ac && ac.id && (ac.id.user || String(ac.id._serialized || "").split("@")[0]);
+      return u ? String(u).replace(/\D/g, "") : null;
+    } catch {
+      return null;
+    }
+  }
+
+  // Conversa aberta bate com o numero pedido? (compara os ultimos 8 digitos: o
+  // numero local BR, suficiente pra nao confundir conversas e robusto ao lid.)
+  function opened(num) {
+    const a = activeNum();
+    if (!a) return false;
+    const tail = String(num).slice(-8);
+    return a.endsWith(tail);
+  }
+
+  function waitOpened(num, ms) {
+    if (opened(num)) return Promise.resolve(true);
+    return new Promise((resolve) => {
+      const t0 = Date.now();
+      const iv = setInterval(() => {
+        if (opened(num) || Date.now() - t0 > ms) {
+          clearInterval(iv);
+          resolve(opened(num));
+        }
+      }, 120);
+    });
+  }
+
+  // Abre a conversa SEM reload, resiliente ao "findOrCreateLatestChat lid_not_found"
+  // (numero novo cujo @c.us o WhatsApp nao mapeia pro lid). Materializa o chat antes
+  // (chat.find resolve o lid), tenta as variantes de abrir, e CONFIRMA pelo chat ativo:
+  // se a conversa abriu de fato, e sucesso mesmo que a promise tenha rejeitado — assim
+  // o erro interno do WhatsApp nao dispara um reload a toa.
+  async function openChat(id, num) {
     const chat = window.WPP.chat;
-    const fn = chat.openChatBottom || chat.openChatAt || chat.openChat;
-    if (!fn) throw new Error("sem funcao de abrir chat");
-    await fn.call(chat, id);
+    try {
+      if (chat.find) await chat.find(id);
+    } catch {
+      /* find best-effort: resolve o lid quando da, mas nao bloqueia */
+    }
+    const fns = [chat.openChatBottom, chat.openChatAt, chat.openChat].filter(Boolean);
+    if (!fns.length) throw new Error("sem funcao de abrir chat");
+    let lastErr;
+    for (const fn of fns) {
+      try {
+        await fn.call(chat, id);
+        return true;
+      } catch (e) {
+        lastErr = e;
+        // a promise pode rejeitar (lid_not_found) DEPOIS de ja ter trocado a conversa
+        if (await waitOpened(num, 700)) return true;
+      }
+    }
+    // ultima confirmacao: abriu apesar do erro?
+    if (await waitOpened(num, 1200)) return true;
+    throw lastErr || new Error("nao abriu");
   }
 
   // Pre-preenche a caixa de mensagem (footer) sem enviar. execCommand dispara os
@@ -95,7 +151,7 @@
     const num = brNumber(phone);
     if (!num) return false;
     const id = await resolveChatId(num);
-    await openChat(id);
+    await openChat(id, num);
     // Conversa aberta = sucesso. Responde JA (nao segura o ack ate o prefill, senao
     // o relay/background podem dar timeout e recarregar mesmo com a conversa aberta).
     // O prefill roda em segundo plano e e best-effort (nao recarrega se falhar).

@@ -41,11 +41,53 @@
       }
       return id;
     }
-    async function openChat(id) {
+    function activeNum() {
+      try {
+        const ac = window.WPP.chat.getActiveChat && window.WPP.chat.getActiveChat();
+        const u = ac && ac.id && (ac.id.user || String(ac.id._serialized || "").split("@")[0]);
+        return u ? String(u).replace(/\D/g, "") : null;
+      } catch {
+        return null;
+      }
+    }
+    function opened(num) {
+      const a = activeNum();
+      if (!a) return false;
+      const tail = String(num).slice(-8);
+      return a.endsWith(tail);
+    }
+    function waitOpened(num, ms) {
+      if (opened(num)) return Promise.resolve(true);
+      return new Promise((resolve) => {
+        const t0 = Date.now();
+        const iv = setInterval(() => {
+          if (opened(num) || Date.now() - t0 > ms) {
+            clearInterval(iv);
+            resolve(opened(num));
+          }
+        }, 120);
+      });
+    }
+    async function openChat(id, num) {
       const chat = window.WPP.chat;
-      const fn = chat.openChatBottom || chat.openChatAt || chat.openChat;
-      if (!fn) throw new Error("sem funcao de abrir chat");
-      await fn.call(chat, id);
+      try {
+        if (chat.find) await chat.find(id);
+      } catch {
+      }
+      const fns = [chat.openChatBottom, chat.openChatAt, chat.openChat].filter(Boolean);
+      if (!fns.length) throw new Error("sem funcao de abrir chat");
+      let lastErr;
+      for (const fn of fns) {
+        try {
+          await fn.call(chat, id);
+          return true;
+        } catch (e) {
+          lastErr = e;
+          if (await waitOpened(num, 700)) return true;
+        }
+      }
+      if (await waitOpened(num, 1200)) return true;
+      throw lastErr || new Error("nao abriu");
     }
     async function prefill(text) {
       for (let i = 0; i < 12; i++) {
@@ -72,7 +114,7 @@
       const num = brNumber(phone);
       if (!num) return false;
       const id = await resolveChatId(num);
-      await openChat(id);
+      await openChat(id, num);
       if (text && String(text).trim()) prefill(String(text));
       return true;
     }
