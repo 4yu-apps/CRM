@@ -666,8 +666,8 @@ export default function ConfigPage() {
 
             <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
               <a
-                href="/garimpo-extension.zip"
-                download
+                href="/4yu-crm-extension.zip"
+                download="4yu-crm-extension.zip"
                 className="inline-flex items-center justify-center gap-2 rounded-[14px] px-5 py-3 text-sm font-bold text-white shadow-[0_6px_16px_var(--ring)] transition-transform hover:-translate-y-0.5"
                 style={{ background: "var(--grad)" }}
               >

@@ -254,6 +254,28 @@
 }
 #garimpo-maps-panel .gm-capture:hover:not(:disabled) { filter: brightness(.96); }
 #garimpo-maps-panel .gm-capture:disabled { opacity: .45; cursor: not-allowed; }
+#garimpo-maps-panel .gm-login,
+#garimpo-maps-panel .gm-capture-box { display: flex; flex-direction: column; gap: 8px; }
+#garimpo-maps-panel .gm-input {
+  border: 1px solid #e4e4e7;
+  border-radius: 10px;
+  padding: 9px 11px;
+  font-size: 13px;
+  outline: none;
+  color: #18181b;
+  background: #fafafa;
+}
+#garimpo-maps-panel .gm-input:focus { border-color: #9f57ff; }
+#garimpo-maps-panel .gm-logout {
+  border: 0;
+  background: none;
+  color: #a1a1aa;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px;
+  align-self: flex-start;
+}
+#garimpo-maps-panel .gm-logout:hover { color: #71717a; text-decoration: underline; }
 
 #gp-toast {
   position: fixed;

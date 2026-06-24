@@ -17,8 +17,53 @@
     const stored = await chrome.storage.local.get(Object.keys(DEFAULTS));
     return { ...DEFAULTS, ...stored };
   }
+  async function setConfig(patch) {
+    if (typeof chrome === "undefined" || !chrome.storage) return;
+    await chrome.storage.local.set(patch);
+  }
   function activeDataSource(cfg) {
     return cfg.dataSource === "supabase" && cfg.supabaseUrl && cfg.anonKey && cfg.accessToken ? "supabase" : "mock";
+  }
+
+  // src/lib/auth.mjs
+  async function tokenRequest(cfg, grantType, payload) {
+    const url = cfg.supabaseUrl.replace(/\/$/, "");
+    const r = await fetch(`${url}/auth/v1/token?grant_type=${grantType}`, {
+      method: "POST",
+      headers: { apikey: cfg.anonKey, "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error_description || data.msg || data.error || `HTTP ${r.status}`);
+    return data;
+  }
+  async function saveSession(d) {
+    await setConfig({
+      accessToken: d.access_token,
+      refreshToken: d.refresh_token,
+      expiresAt: Date.now() + (d.expires_in ?? 3600) * 1e3,
+      dataSource: "supabase"
+    });
+  }
+  async function loginWithPassword(cfg, email, password) {
+    const d = await tokenRequest(cfg, "password", { email, password });
+    await saveSession(d);
+    return d.access_token;
+  }
+  async function ensureFreshToken(cfg) {
+    if (!cfg.accessToken) return null;
+    const near = cfg.expiresAt && Date.now() > cfg.expiresAt - 12e4;
+    if (!near || !cfg.refreshToken) return cfg.accessToken;
+    try {
+      const d = await tokenRequest(cfg, "refresh_token", { refresh_token: cfg.refreshToken });
+      await saveSession(d);
+      return d.access_token;
+    } catch {
+      return cfg.accessToken;
+    }
+  }
+  async function logout() {
+    await setConfig({ accessToken: "", refreshToken: "", expiresAt: 0 });
   }
 
   // src/lib/mock-data.mjs
@@ -266,6 +311,7 @@
   var PANEL_ID = "garimpo-maps-panel";
   async function init() {
     mountPanel();
+    await renderAuth();
     window.addEventListener("popstate", () => syncCount());
     const obs = new MutationObserver(debounce(syncCount, 800));
     obs.observe(document.body, { childList: true, subtree: true });
@@ -282,16 +328,69 @@
       <button class="gm-min" title="Minimizar painel" aria-label="Minimizar painel">\u2212</button>
     </div>
     <div class="gm-body">
-      <p class="gm-hint">Abra uma busca no Google Maps. Eu leio os negocios visiveis e jogo os novos na fila.</p>
-      <button class="gm-capture" id="gm-capture-btn" disabled>Capturar</button>
-      <p class="gm-count" id="gm-count"></p>
-      <p class="gm-result" id="gm-result"></p>
+      <!-- login (some quando logado) -->
+      <div class="gm-login" id="gm-login" style="display:none">
+        <p class="gm-hint">Entre com sua conta 4YU CRM pra capturar os negocios direto na sua fila.</p>
+        <input class="gm-input" id="gm-email" type="email" placeholder="voce@exemplo.com" autocomplete="username" />
+        <input class="gm-input" id="gm-pass" type="password" placeholder="sua senha" autocomplete="current-password" />
+        <button class="gm-capture" id="gm-login-btn">Entrar</button>
+        <p class="gm-result" id="gm-login-msg"></p>
+      </div>
+      <!-- captura (some quando deslogado) -->
+      <div class="gm-capture-box" id="gm-capture-box" style="display:none">
+        <p class="gm-hint">Abra uma busca no Google Maps. Eu leio os negocios visiveis e jogo os novos na sua fila.</p>
+        <button class="gm-capture" id="gm-capture-btn" disabled>Capturar</button>
+        <p class="gm-count" id="gm-count"></p>
+        <p class="gm-result" id="gm-result"></p>
+        <button class="gm-logout" id="gm-logout-btn" title="Sair">Sair da conta</button>
+      </div>
     </div>`;
     document.body.append(panel);
-    panel.querySelector(".gm-min").addEventListener("click", () => {
-      panel.classList.toggle("gm-collapsed");
-    });
+    panel.querySelector(".gm-min").addEventListener("click", () => panel.classList.toggle("gm-collapsed"));
     document.getElementById("gm-capture-btn").addEventListener("click", runCapture);
+    document.getElementById("gm-login-btn").addEventListener("click", doLogin);
+    document.getElementById("gm-logout-btn").addEventListener("click", async () => {
+      await logout();
+      await renderAuth();
+    });
+  }
+  async function renderAuth() {
+    const cfg = await getConfig();
+    const logged = !!cfg.accessToken;
+    const login = document.getElementById("gm-login");
+    const box = document.getElementById("gm-capture-box");
+    if (login) login.style.display = logged ? "none" : "";
+    if (box) box.style.display = logged ? "" : "none";
+    if (logged) syncCount();
+  }
+  async function doLogin() {
+    const btn = document.getElementById("gm-login-btn");
+    const msg = document.getElementById("gm-login-msg");
+    const email = (document.getElementById("gm-email").value || "").trim();
+    const pass = document.getElementById("gm-pass").value || "";
+    if (!email || !pass) {
+      if (msg) {
+        msg.textContent = "Preencha e-mail e senha.";
+        msg.className = "gm-result gm-err";
+      }
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = "Entrando...";
+    try {
+      const cfg = await getConfig();
+      await loginWithPassword(cfg, email, pass);
+      if (msg) msg.textContent = "";
+      await renderAuth();
+    } catch (e) {
+      if (msg) {
+        msg.textContent = `Nao consegui entrar: ${e.message}`;
+        msg.className = "gm-result gm-err";
+      }
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Entrar";
+    }
   }
   function syncCount() {
     const results = parseResultsList(document);
@@ -325,41 +424,40 @@
     let cfg;
     try {
       cfg = await getConfig();
+      await ensureFreshToken(cfg);
+      cfg = await getConfig();
     } catch (e) {
       showResult(`Erro ao ler configuracao: ${e.message}`, true);
       btn.disabled = false;
       syncCount();
       return;
     }
-    if (activeDataSource(cfg) === "supabase" && !cfg.accessToken) {
-      showResult("Entre nas Opcoes da extensao para ligar sua conta antes de capturar.", true);
+    if (!cfg.accessToken) {
+      showResult("Faca login na sua conta 4YU CRM aqui em cima pra capturar.", true);
       btn.disabled = false;
-      syncCount();
+      await renderAuth();
       return;
     }
     const repo = createRepo(cfg);
-    const isMock = repo.source === "mock";
     let inserted = 0;
     let duplicates = 0;
     let errors = 0;
     for (const lead of leads) {
       try {
         const id = await repo.insertLead(lead);
-        if (id === null) {
-          duplicates++;
-        } else {
-          inserted++;
-        }
+        if (id === null) duplicates++;
+        else inserted++;
       } catch (e) {
         errors++;
-        console.warn("[garimpo] erro ao inserir lead:", lead.business_name, e.message);
+        console.warn("[4yu-crm] erro ao inserir lead:", lead.business_name, e.message);
       }
     }
     const parts = [];
     if (inserted > 0) parts.push(`${inserted} capturado${inserted > 1 ? "s" : ""}`);
     if (duplicates > 0) parts.push(`${duplicates} repetido${duplicates > 1 ? "s" : ""}`);
     if (errors > 0) parts.push(`${errors} com erro`);
-    const msg = (parts.length ? parts.join(", ") : "Nada novo para capturar") + (isMock ? " (modo mock)" : "");
+    const base = parts.length ? parts.join(", ") : "Nada novo para capturar";
+    const msg = inserted > 0 ? `${base}. Ja estao na sua fila, a IA vai analisar e enriquecer.` : base;
     showResult(msg, errors > 0 && inserted === 0);
     btn.disabled = false;
     btn.textContent = `Capturar ${leads.length} negocio${leads.length > 1 ? "s" : ""}`;
@@ -377,5 +475,5 @@
       t = setTimeout(() => fn(...args), ms);
     };
   }
-  init().catch((e) => console.error("[garimpo-maps]", e));
+  init().catch((e) => console.error("[4yu-crm-maps]", e));
 })();

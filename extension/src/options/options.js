@@ -32,7 +32,14 @@ document.getElementById("login").addEventListener("click", async () => {
     const data = await r.json();
     if (!r.ok) throw new Error(data.error_description || data.msg || `HTTP ${r.status}`);
     document.getElementById("accessToken").value = data.access_token;
-    await chrome.storage.local.set({ accessToken: data.access_token, dataSource: "supabase" });
+    // Salva tambem refresh_token + expiracao pra renovar a sessao sozinho (sem
+    // cair a cada 1h). Espelha o login do card (auth.mjs saveSession).
+    await chrome.storage.local.set({
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token ?? "",
+      expiresAt: Date.now() + (data.expires_in ?? 3600) * 1000,
+      dataSource: "supabase",
+    });
     document.getElementById("dataSource").value = "supabase";
     flash("loginStatus", "logado ✓ (token salvo)");
   } catch (e) {
