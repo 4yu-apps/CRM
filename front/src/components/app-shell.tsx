@@ -24,6 +24,7 @@ import {
   Snowflake,
   Sparkle,
   Handshake,
+  ChatText,
   VideoCamera,
   MapPin,
   CaretLeft,
@@ -51,6 +52,7 @@ const NAV: NavItem[] = [
   { href: "/resultados", label: "Resultados", Icon: ChartLineUp },
   { href: "/buscar", label: "Buscar leads", Icon: MagnifyingGlass },
   { href: "/celular", label: "No celular", Icon: DeviceMobile },
+  { href: "/templates", label: "Templates", Icon: ChatText },
   { href: "/config", label: "Configuração", Icon: GearSix },
 ];
 
@@ -62,6 +64,7 @@ const TITLES: Record<string, [string, string]> = {
   "/clientes": ["Clientes", "Quem você fechou e quem dá pra reaquecer"],
   "/agenda": ["Agenda", "Suas próximas reuniões"],
   "/resultados": ["Resultados", "Tá valendo a pena?"],
+  "/templates": ["Templates", "Modelos de mensagem reutilizáveis"],
   "/buscar": ["Buscar leads", "Sob comando, quando você quiser"],
   "/celular": ["No celular", "Acompanhe e envie pelo WhatsApp"],
   "/config": ["Configuração", "Ajuste uma vez, eu cuido do resto"],

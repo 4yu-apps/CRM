@@ -1,7 +1,7 @@
 // Implementacao supabase — banco real. Inerte ate existir env + sessao logada.
 // A UI nao muda: mesma interface do mock.
 import { getSupabase } from "../supabase/client";
-import type { ActivityEvent, ActorType, Lead, LeadDetail, LeadEditable, LeadFile, LeadStatus, ScanCoverage, SearchPreset, SearchPresetInput, SearchProfile, SearchProfileInput } from "../types";
+import type { ActivityEvent, ActorType, Lead, LeadDetail, LeadEditable, LeadFile, LeadStatus, MessageTemplate, MessageTemplateInput, ScanCoverage, SearchPreset, SearchPresetInput, SearchProfile, SearchProfileInput } from "../types";
 
 // Bucket PRIVADO dos anexos. Path: <uid>/<leadId>/<arquivo>. RLS no banco garante
 // que cada dono so toca a propria pasta; download sai por URL assinada e curta.
@@ -242,6 +242,41 @@ async function deletePreset(id: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
+async function listTemplates(): Promise<MessageTemplate[]> {
+  const { data, error } = await getSupabase()
+    .from("message_templates")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as MessageTemplate[];
+}
+
+async function saveTemplate(input: MessageTemplateInput): Promise<MessageTemplate> {
+  const { data, error } = await getSupabase()
+    .from("message_templates")
+    .insert(input)
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return data as MessageTemplate;
+}
+
+async function updateTemplate(id: string, input: MessageTemplateInput): Promise<MessageTemplate> {
+  const { data, error } = await getSupabase()
+    .from("message_templates")
+    .update(input)
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return data as MessageTemplate;
+}
+
+async function deleteTemplate(id: string): Promise<void> {
+  const { error } = await getSupabase().from("message_templates").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
 export const supabaseRepo: LeadsRepo = {
   list,
   detail,
@@ -258,6 +293,10 @@ export const supabaseRepo: LeadsRepo = {
   listPresets,
   savePreset,
   deletePreset,
+  listTemplates,
+  saveTemplate,
+  updateTemplate,
+  deleteTemplate,
   listActivity,
   listFiles,
   uploadFile,

@@ -38,6 +38,7 @@ import {
 import { getRepo } from "@/lib/repo";
 import { FollowupCard } from "@/components/followup-card";
 import { LeadFiles } from "@/components/lead-files";
+import { TagsEditor } from "@/components/tags-editor";
 import { waSend, openWhatsApp } from "@/lib/whatsapp";
 import { Skeleton } from "@/components/skeleton";
 import { googleSearchUrl, googleMapsUrl } from "@/lib/links";
@@ -877,6 +878,9 @@ export default function FichaPage() {
             </div>
           )}
         </div>
+
+        {/* Tags (#20) */}
+        <TagsEditor lead={lead} onSaved={load} />
 
         {/* Anexos do lead (contrato, etc.) */}
         <LeadFiles leadId={lead.id} />

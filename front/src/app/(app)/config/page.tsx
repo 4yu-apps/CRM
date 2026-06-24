@@ -135,6 +135,7 @@ export default function ConfigPage() {
   const [radius, setRadius] = useState("cidade");
   const [serviceTarget, setServiceTarget] = useState<ServiceTarget>("indefinido");
   const [autopilot, setAutopilot] = useState(false);
+  const [minScore, setMinScore] = useState(0); // #19 score minimo pra entrar na fila
   // Espelho do valor JA salvo, pra avisar quando o toggle ainda nao foi salvo.
   const [savedAutopilot, setSavedAutopilot] = useState(false);
   const [profession, setProfession] = useState<string | null>(null);
@@ -160,6 +161,7 @@ export default function ConfigPage() {
           setServiceTarget(profile.default_service_target ?? "indefinido");
           setAutopilot(profile.autopilot ?? false);
           setSavedAutopilot(profile.autopilot ?? false);
+          setMinScore(profile.min_score ?? 0);
           setProfession(profile.profession ?? null);
         }
       } catch {
@@ -251,6 +253,7 @@ export default function ConfigPage() {
         default_service_target: serviceTarget,
         autopilot,
         profession,
+        min_score: minScore,
       };
       await repo.saveProfile(input);
       setSavedAutopilot(autopilot);
@@ -266,7 +269,7 @@ export default function ConfigPage() {
     } finally {
       setSaving(false);
     }
-  }, [niches, city, state, radius, serviceTarget, autopilot, profession, repo, refreshProfile, isOnboarding, router]);
+  }, [niches, city, state, radius, serviceTarget, autopilot, minScore, profession, repo, refreshProfile, isOnboarding, router]);
 
   // Ja conectou com o Google? (login via Google => agenda disponivel)
   const meta = session?.user?.app_metadata as { provider?: string; providers?: string[] } | undefined;
@@ -572,6 +575,28 @@ export default function ConfigPage() {
               </div>
             </div>
             <Toggle on={autopilot} onChange={setAutopilot} label="Busca no piloto automático" />
+          </div>
+          {/* #19 — score minimo pra entrar na fila */}
+          <div className="border-t border-border px-6 py-4">
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <span className="text-[13.5px] font-semibold">Score mínimo pra entrar na fila</span>
+              <span className="rounded-full bg-brand-50 px-2.5 py-0.5 text-[12.5px] font-bold text-brand">
+                {minScore === 0 ? "sem filtro" : minScore}
+              </span>
+            </div>
+            <p className="mb-2.5 text-[12.5px] text-muted-foreground">
+              Acima de 0, o robô só te entrega leads com nota igual ou maior. Mais qualidade, menos volume.
+            </p>
+            <input
+              type="range"
+              min={0}
+              max={90}
+              step={5}
+              value={minScore}
+              onChange={(e) => setMinScore(Number(e.target.value))}
+              aria-label="Score mínimo"
+              className="w-full accent-[var(--brand)]"
+            />
           </div>
           {autopilot !== savedAutopilot && (
             <div className="border-t border-border bg-warn-bg px-6 py-2.5 text-[12.5px] font-semibold text-warn">
