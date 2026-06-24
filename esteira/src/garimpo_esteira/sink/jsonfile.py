@@ -94,6 +94,15 @@ class JsonFileSink:
             if (r.get("places_detailed_at") or "") >= start
         )
 
+    def count_places_detailed_this_month(self) -> int:
+        """Quantos leads foram detalhados pelo Places no mes corrente (UTC) —
+        teto duro mensal; zera sozinho no dia 01."""
+        start = datetime.now(timezone.utc).strftime("%Y-%m-01T00:00:00")
+        return sum(
+            1 for r in self._db["leads"].values()
+            if (r.get("places_detailed_at") or "") >= start
+        )
+
     def fetch_pending_owners(self) -> list[str]:
         """Donos com leads ainda no meio do funil (bruto/enriquecido/qualificado).
         Usado pelo drain pra processar capturas (extensao) e stragglers de quem

@@ -47,21 +47,35 @@ class PlacesDetailsSource:
 
     name = "places_details"
 
-    def __init__(self, fetch, *, daily_limit: int, count_today):
+    def __init__(self, fetch, *, daily_limit: int, count_today,
+                 monthly_limit: int = 0, count_month=None):
         self._fetch = fetch
         self._limit = daily_limit
         self._count_today = count_today  # callable -> int (quanto ja gastou hoje)
-        self._used_initial: int | None = None
+        self._monthly_limit = monthly_limit  # teto duro do mes (0 = sem teto)
+        self._count_month = count_month  # callable -> int (quanto ja gastou no mes)
+        self._used_today_initial: int | None = None
+        self._used_month_initial: int | None = None
         self._used_run = 0
         self._warned = False
 
+    @staticmethod
+    def _safe(fn) -> int:
+        try:
+            return int(fn())
+        except Exception:
+            return 0
+
     def _budget_left(self) -> int:
-        if self._used_initial is None:
-            try:
-                self._used_initial = int(self._count_today())
-            except Exception:
-                self._used_initial = 0
-        return self._limit - self._used_initial - self._used_run
+        if self._used_today_initial is None:
+            self._used_today_initial = self._safe(self._count_today)
+        left = self._limit - self._used_today_initial - self._used_run
+        # teto mensal: religa sozinho no dia 01 (a contagem do mes zera).
+        if self._monthly_limit and self._count_month is not None:
+            if self._used_month_initial is None:
+                self._used_month_initial = self._safe(self._count_month)
+            left = min(left, self._monthly_limit - self._used_month_initial - self._used_run)
+        return left
 
     def enrich(self, lead: Lead) -> list[Finding]:
         # So gasta cota quando faz sentido: sem telefone, mas com place_id.
@@ -69,7 +83,8 @@ class PlacesDetailsSource:
             return []
         if self._budget_left() <= 0:
             if not self._warned:
-                print("places_details: cota diaria do Maps batida; pausando ate amanha.")
+                print("places_details: cota do Maps batida (dia/mes); pausando "
+                      "(religa amanha ou no dia 01 do mes).")
                 self._warned = True
             return []
         try:

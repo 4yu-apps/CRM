@@ -55,6 +55,31 @@ def test_para_quando_bate_a_cota_diaria():
     assert r1 and r2 and r3 == []
 
 
+def test_para_quando_bate_o_teto_mensal():
+    calls = []
+    # ja gastou 1000 no mes (teto), mesmo com o dia livre => nao chama
+    src = PlacesDetailsSource(
+        lambda pid: (calls.append(pid), {"phone": "x"})[1],
+        daily_limit=25, count_today=lambda: 0,
+        monthly_limit=1000, count_month=lambda: 1000,
+    )
+    assert src.enrich(_lead()) == []
+    assert calls == []
+
+
+def test_teto_mensal_limita_abaixo_do_diario():
+    calls = []
+    # so resta 1 no mes (999/1000), mesmo com o dia livre => so 1 chamada
+    src = PlacesDetailsSource(
+        lambda pid: (calls.append(pid), {"phone": "x"})[1],
+        daily_limit=25, count_today=lambda: 0,
+        monthly_limit=1000, count_month=lambda: 999,
+    )
+    src.enrich(_lead(id="1"))
+    src.enrich(_lead(id="2"))
+    assert len(calls) == 1
+
+
 def test_respeita_uso_ja_feito_hoje():
     calls = []
     # ja gastou 30 hoje, limite 30 => zero sobra, nao chama

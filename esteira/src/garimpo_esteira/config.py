@@ -61,10 +61,11 @@ class Config:
     pagespeed_key: str | None = None
     pagespeed_enabled: bool = False
     # Places Details (telefone/site das capturas via place_id). Custa (SKU
-    # Enterprise: 1.000 gratis/mes ~= 30/dia), entao limita por DIA e bloqueia ao
-    # bater. DESLIGADO por padrao (0): o dono liga via GARIMPO_PLACES_DAILY_LIMIT
-    # depois de confirmar folga de cota no Google Cloud Console.
-    places_daily_limit: int = 0
+    # Enterprise: 1.000 gratis/mes). Cota DIARIA (25) + teto MENSAL duro (1.000):
+    # ao bater o mes, para e religa sozinho no dia 01 (a contagem do mes zera).
+    # 25/dia x 30 = 750/mes, dentro do gratis com folga. Usa GOOGLE_MAPS_API_KEY.
+    places_daily_limit: int = 25
+    places_monthly_limit: int = 1000
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -102,7 +103,8 @@ class Config:
             pagespeed_enabled=(
                 ps_flag in ("1", "true", "True") if ps_flag is not None else bool(ps_key)
             ),
-            places_daily_limit=int(os.getenv("GARIMPO_PLACES_DAILY_LIMIT", "0")),
+            places_daily_limit=int(os.getenv("GARIMPO_PLACES_DAILY_LIMIT", "25")),
+            places_monthly_limit=int(os.getenv("GARIMPO_PLACES_MONTHLY_LIMIT", "1000")),
         )
 
 
@@ -239,10 +241,13 @@ def build_places_source(cfg: Config, sink):
         return None
     from .sources.places_details import PlacesDetailsSource, place_details_fetch
 
+    count_month = getattr(sink, "count_places_detailed_this_month", None)
     return PlacesDetailsSource(
         place_details_fetch(cfg.maps_key),
         daily_limit=cfg.places_daily_limit,
         count_today=sink.count_places_detailed_today,
+        monthly_limit=cfg.places_monthly_limit,
+        count_month=count_month,
     )
 
 

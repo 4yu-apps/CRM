@@ -143,17 +143,14 @@ class SupabaseSink:
         except Exception:
             return []
 
-    def count_places_detailed_today(self) -> int:
-        """Conta leads detalhados pelo Places hoje (UTC) — contador da cota diaria
-        do Maps (global). Usa o header count=exact do PostgREST."""
-        from datetime import datetime, timezone
-
-        start = datetime.now(timezone.utc).strftime("%Y-%m-%dT00:00:00Z")
+    def _count_places_since(self, start_iso: str) -> int:
+        """Conta leads detalhados pelo Places desde start_iso (global). Usa o
+        header count=exact do PostgREST."""
         try:
             r = self._send(
                 "GET",
                 f"{self.base}/leads",
-                params={"places_detailed_at": f"gte.{start}", "select": "id"},
+                params={"places_detailed_at": f"gte.{start_iso}", "select": "id"},
                 headers={"Prefer": "count=exact", "Range": "0-0"},
             )
             cr = r.headers.get("content-range", "")
@@ -161,6 +158,18 @@ class SupabaseSink:
             return int(total) if total.isdigit() else len(r.json())
         except Exception:
             return 0
+
+    def count_places_detailed_today(self) -> int:
+        """Contador da cota DIARIA do Maps (global)."""
+        from datetime import datetime, timezone
+
+        return self._count_places_since(datetime.now(timezone.utc).strftime("%Y-%m-%dT00:00:00Z"))
+
+    def count_places_detailed_this_month(self) -> int:
+        """Contador do teto MENSAL do Maps (global); zera sozinho no dia 01."""
+        from datetime import datetime, timezone
+
+        return self._count_places_since(datetime.now(timezone.utc).strftime("%Y-%m-01T00:00:00Z"))
 
     def fetch_pending_owners(self) -> list[str]:
         """Donos com leads ainda no meio do funil (bruto/enriquecido/qualificado).

@@ -8,9 +8,11 @@ name: esteira
 
 on:
   schedule:
-    # De 2 em 2 horas: lotes pequenos e frequentes drenam a fila "de pouquinho
-    # em pouquinho", sem lote gigante 2x/dia que arrisca estourar a API e empacar.
-    - cron: "0 */2 * * *"
+    # UMA vez por dia, 08h de Brasilia (11h UTC). So um run/dia pra nao multiplicar
+    # o consumo da API do Maps (descoberta + Places Details). A cota da Places
+    # Details ainda e protegida por contador global (dia/mes), mas rodar 1x/dia ja
+    # evita gastar a toa. Buscas na hora continuam pelo botao "Buscar agora".
+    - cron: "0 11 * * *"
   workflow_dispatch:
     inputs:
       command:
@@ -80,11 +82,11 @@ jobs:
           GARIMPO_MAPS_PAGES: ${{ vars.GARIMPO_MAPS_PAGES || '1' }}
           GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
           # Places Details (telefone/site das capturas via place_id). SKU Enterprise
-          # = 1.000 gratis/mes (~30/dia). DESLIGADO por padrao (0): ligue setando a
-          # var GARIMPO_PLACES_DAILY_LIMIT (ex.: 30) depois de conferir a cota no
-          # Google Cloud Console. ATENCAO: a descoberta (searchText) ja pede telefone
-          # e tambem consome SKU Enterprise — confira o consumo total antes.
-          GARIMPO_PLACES_DAILY_LIMIT: ${{ vars.GARIMPO_PLACES_DAILY_LIMIT || '0' }}
+          # = 1.000 gratis/mes. Cota DIARIA (25) + teto MENSAL duro (1.000): ao bater
+          # o mes para e religa sozinho no dia 01. 25/dia x 30 = 750/mes, dentro do
+          # gratis. Ajustaveis pelas vars GARIMPO_PLACES_DAILY_LIMIT / _MONTHLY_LIMIT.
+          GARIMPO_PLACES_DAILY_LIMIT: ${{ vars.GARIMPO_PLACES_DAILY_LIMIT || '25' }}
+          GARIMPO_PLACES_MONTHLY_LIMIT: ${{ vars.GARIMPO_PLACES_MONTHLY_LIMIT || '1000' }}
           # Nichos extras aleatorios por run (variedade sem o dono pedir). Como
           # agora roda a cada 2h, 1 basta — descoberta gentil pra nao atropelar
           # o processamento e deixar a fila drenar.
