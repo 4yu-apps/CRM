@@ -163,6 +163,10 @@ export interface Lead {
 
   // Tags manuais (#20): etiquetas livres pra segmentar.
   tags?: string[] | null;
+
+  // Multiusuario (#21, fundacao): responsavel pelo lead. Null = sem atribuicao.
+  // Inerte ate o modelo de time entrar (ver docs/phase8-multiuser-plan.md).
+  assigned_to?: string | null;
 }
 
 export interface FieldProvenance {
@@ -222,6 +226,7 @@ export type LeadEditable = Partial<
     | "followup_note"
     | "cadence_step"
     | "tags"
+    | "assigned_to"
   >
 >;
 
