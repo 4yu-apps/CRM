@@ -31,6 +31,9 @@ class Config:
     sources_mode: str = "real"        # real | fixture
     batch: int = 20
     delay: float = 1.0
+    # leads processados em paralelo no pipeline streaming (I/O-bound). >1 acelera
+    # ~Nx; o SupabaseSink e thread-safe. JsonFileSink (offline) exige workers=1.
+    workers: int = 4
     ad_token: str | None = None
     llm: str = "mock"                 # mock | gemini | groq
     gemini_key: str | None = None
@@ -72,6 +75,7 @@ class Config:
             sources_mode=os.getenv("GARIMPO_SOURCES", "real"),
             batch=int(os.getenv("GARIMPO_BATCH", "20")),
             delay=float(os.getenv("GARIMPO_DELAY", "1.0")),
+            workers=int(os.getenv("GARIMPO_WORKERS", "4")),
             ad_token=os.getenv("META_AD_LIBRARY_TOKEN"),
             llm=os.getenv("GARIMPO_LLM", "mock"),
             gemini_key=os.getenv("GEMINI_API_KEY") or os.getenv("gemini_API"),

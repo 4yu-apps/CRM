@@ -46,28 +46,53 @@ def run_pipeline_streaming(
     sink: LeadSink, sources: Sequence[Source], provider: DraftProvider, *,
     batch: int = 20, delay: float = 0.0, owner_id: str | None = None,
     profession: str | None = None, min_score: int = 0, reviews_source=None,
-    status: LeadStatus = "bruto",
+    status: LeadStatus = "bruto", workers: int = 1,
 ) -> dict:
     """Busca leads 'bruto' (ordem de descoberta: created_at.asc) e processa cada
     um por inteiro, com try/except POR LEAD. Acumula as contagens e emite no fim
     os mesmos eventos de atividade do pipeline batch (enriquecimento/descarte/
-    rascunho) com os totais — feed da home inalterado."""
+    rascunho) com os totais — feed da home inalterado.
+
+    workers>1 processa varios leads em paralelo (I/O-bound: a maior parte do
+    tempo e HTTP de site/cnpj/etc.). Cada lead so toca o proprio lead_id, e o
+    SupabaseSink e thread-safe (httpx.Client compartilhado + retry/backoff em
+    429/5xx), entao concorrencia limitada acelera ~Nx sem corromper nada. Os
+    leads continuam caindo na fila um a um conforme terminam (streaming). Use
+    workers=1 com o JsonFileSink (offline/teste), que nao e thread-safe."""
     leads = sink.fetch_by_status(status, batch, owner_id)
     counts = {"enriched": 0, "discarded": 0, "drafted": 0}
-    for i, lead in enumerate(leads):
-        try:
-            r = process_one_lead(
-                lead, sources, provider, sink,
-                profession=profession, min_score=min_score, reviews_source=reviews_source,
-            )
-            for k in counts:
-                counts[k] += int(r[k])
-        except Exception:
-            # lead ruim fica no status atual; proximo run (mop-up do autopilot ou
-            # crons redraft/backfill) retenta. Nunca derruba o resto do lote.
-            pass
-        if delay and i < len(leads) - 1:
-            time.sleep(delay)
+
+    def _work(lead) -> dict:
+        return process_one_lead(
+            lead, sources, provider, sink,
+            profession=profession, min_score=min_score, reviews_source=reviews_source,
+        )
+
+    def _tally(r) -> None:
+        for k in counts:
+            counts[k] += int(r[k])
+
+    if workers and workers > 1 and len(leads) > 1:
+        from concurrent.futures import ThreadPoolExecutor
+
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = [pool.submit(_work, lead) for lead in leads]
+            for fut in futures:  # tally na thread principal; counts sem corrida
+                try:
+                    _tally(fut.result())
+                except Exception:
+                    pass
+    else:
+        for i, lead in enumerate(leads):
+            try:
+                _tally(_work(lead))
+            except Exception:
+                # lead ruim fica no status atual; proximo run (mop-up do autopilot
+                # ou crons redraft/backfill) retenta. Nunca derruba o resto do lote.
+                pass
+            if delay and i < len(leads) - 1:
+                time.sleep(delay)
+
     log_owner = owner_id or (leads[0].owner_id if leads else "") or ""
     _log_pipeline_activity(sink, log_owner, counts)
     return counts

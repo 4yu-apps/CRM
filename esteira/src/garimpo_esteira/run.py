@@ -157,10 +157,13 @@ def cmd_autopilot(cfg: Config) -> int:
     sources = build_sources(cfg)
     reviews_source = build_reviews_source(cfg)
     print(f"autopilot · sink={cfg.sink} maps={cfg.maps_mode} llm={cfg.llm}")
+    # concorrencia so com o banco real (SupabaseSink e thread-safe); JsonFileSink
+    # offline cai pra 1 worker.
+    workers = cfg.workers if cfg.sink == "supabase" else 1
     summary = run_autopilot(
         sink, maps, provider, sources,
         batch=cfg.batch, delay=cfg.delay, extra_niches=cfg.extra_niches,
-        reviews_source=reviews_source,
+        reviews_source=reviews_source, workers=workers,
     )
     if not summary:
         print("  nenhum perfil com autopilot ligado (nada a fazer)")
@@ -210,10 +213,14 @@ def cmd_search(
     # pipeline so deste dono, STREAMING lead-a-lead: cada negocio passa por
     # enrich -> score (lente da profissao) -> draft inteiro e cai na fila assim
     # que fica pronto, em vez de esperar o lote todo. Fila enche de 1 em 1.
+    # concorrencia so com o banco real (SupabaseSink e thread-safe); o JsonFileSink
+    # offline nao e, entao cai pra 1 worker.
+    workers = cfg.workers if cfg.sink == "supabase" else 1
     run_pipeline_streaming(
         sink, sources, provider,
         batch=cfg.batch, delay=cfg.delay, owner_id=owner_id,
         profession=profession, min_score=min_score, reviews_source=reviews_source,
+        workers=workers,
     )
 
     # memoria de cobertura + feed de atividade do dono

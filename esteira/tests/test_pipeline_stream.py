@@ -116,6 +116,50 @@ def test_idempotente_segunda_rodada_nao_reprocessa(tmp_path):
     assert funil.get("descartado") == 1
 
 
+class _LockedSink:
+    """Embrulha um sink serializando as chamadas (JsonFileSink nao e thread-safe).
+    So pra teste de concorrencia: prova paralelismo sem corromper o _db."""
+
+    def __init__(self, inner):
+        import threading
+        self._inner = inner
+        self._lock = threading.Lock()
+
+    def __getattr__(self, name):
+        attr = getattr(self._inner, name)
+        if callable(attr):
+            def wrapped(*a, **k):
+                with self._lock:
+                    return attr(*a, **k)
+            return wrapped
+        return attr
+
+
+def test_processa_leads_em_paralelo_com_workers(tmp_path):
+    """workers>1 processa leads concorrentemente. Um Barrier(N) so libera se os
+    N leads chegam ao draft juntos — prova paralelismo de verdade (sequencial
+    estouraria o timeout do barrier)."""
+    import threading
+
+    n = 3
+    barrier = threading.Barrier(n, timeout=5)
+
+    class BarrierProvider:
+        model = "barrier"
+
+        def generate(self, lead):
+            barrier.wait()  # so passa quando os N chegam juntos
+            return ("oi", "tudo certo?")
+
+    sink = _LockedSink(JsonFileSink(tmp_path / "db.json"))
+    for i in range(n):
+        sink.insert_lead(_forte(f"4490000000{i}", f"L{i}"))
+
+    counts = run_pipeline_streaming(sink, [], BarrierProvider(), owner_id="o", workers=n)
+
+    assert counts["drafted"] == n  # todos rascunharam: so acontece se rodaram em paralelo
+
+
 def test_process_one_lead_retorna_resultado(tmp_path):
     """process_one_lead processa UM lead e reporta o que aconteceu."""
     sink = _sink(tmp_path)
