@@ -2,7 +2,7 @@
 // Autocomplete de cidade nacional (tipo Uber): o usuario digita o nome da cidade
 // e o sistema sugere "Cidade - UF" buscando em todos os municipios do Brasil via IBGE.
 // Ao selecionar, preenche cidade E estado de uma vez.
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { MagnifyingGlass, X } from "@phosphor-icons/react";
 import { searchMunicipios, type MunicipioComUF } from "@/lib/ibge";
@@ -21,6 +21,7 @@ interface CityAutocompleteProps {
   placeholder?: string;
   className?: string;
   disabled?: boolean;
+  ariaLabel?: string;
 }
 
 type Rect = { top: number; left: number; width: number };
@@ -33,6 +34,7 @@ export function CityAutocomplete({
   placeholder = "Digite a cidade...",
   className,
   disabled = false,
+  ariaLabel,
 }: CityAutocompleteProps) {
   // Texto exibido no input: se ha cidade+uf selecionados, mostra "Cidade - UF"
   const displayValue = cidade ? (uf ? `${cidade} - ${uf}` : cidade) : "";
@@ -48,6 +50,9 @@ export function CityAutocomplete({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Contador de requisicoes: so aplica resultado se ainda for a mais recente.
   const reqSeqRef = useRef(0);
+  const baseId = useId();
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const activeRef = useRef(-1);
 
   // Sincroniza o input quando cidade/uf mudam externamente (ex: "Surpreenda-me")
   useEffect(() => {
@@ -133,6 +138,52 @@ export function CityAutocomplete({
     onClear?.();
   }, [onClear]);
 
+  // Mantem o ref do indice ativo em dia (lido no handler de Enter sem recriar deps).
+  useEffect(() => {
+    activeRef.current = activeIndex;
+  }, [activeIndex]);
+
+  // Ao abrir/atualizar sugestoes, destaca a primeira opcao.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (open) setActiveIndex(suggestions.length > 0 ? 0 : -1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, suggestions]);
+
+  // Navegacao por teclado: setas, Home/End e Enter (Esc ja fecha no efeito acima).
+  useEffect(() => {
+    if (!open) return;
+    const onNav = (e: KeyboardEvent) => {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setActiveIndex((i) => Math.min(suggestions.length - 1, i + 1));
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setActiveIndex((i) => Math.max(0, i - 1));
+      } else if (e.key === "Home") {
+        e.preventDefault();
+        setActiveIndex(0);
+      } else if (e.key === "End") {
+        e.preventDefault();
+        setActiveIndex(suggestions.length - 1);
+      } else if (e.key === "Enter") {
+        const m = suggestions[activeRef.current];
+        if (m) {
+          e.preventDefault();
+          handleSelect(m);
+        }
+      }
+    };
+    document.addEventListener("keydown", onNav);
+    return () => document.removeEventListener("keydown", onNav);
+  }, [open, suggestions, handleSelect]);
+
+  // Rola a opcao destacada pra dentro da area visivel.
+  useEffect(() => {
+    if (!open) return;
+    document.getElementById(`${baseId}-opt-${activeIndex}`)?.scrollIntoView({ block: "nearest" });
+  }, [activeIndex, open, baseId]);
+
   const hasSelecionado = !!cidade;
 
   return (
@@ -156,8 +207,13 @@ export function CityAutocomplete({
           placeholder={placeholder}
           disabled={disabled}
           autoComplete="off"
+          role="combobox"
+          aria-label={ariaLabel}
+          aria-expanded={open}
+          aria-controls={`${baseId}-listbox`}
+          aria-activedescendant={open && activeIndex >= 0 ? `${baseId}-opt-${activeIndex}` : undefined}
           className={cn(
-            "w-full rounded-xl border bg-surface-2 py-3 pl-9 pr-9 text-[13.5px] text-ink outline-none transition-colors disabled:cursor-not-allowed disabled:opacity-60",
+            "w-full rounded-xl border bg-surface-2 py-3 pl-9 pr-11 text-[13.5px] text-ink outline-none transition-colors disabled:cursor-not-allowed disabled:opacity-60",
             open ? "border-brand" : "border-border-2 hover:border-brand/50",
           )}
         />
@@ -165,7 +221,7 @@ export function CityAutocomplete({
           <button
             type="button"
             onClick={loading ? undefined : handleClear}
-            className="absolute right-3 top-1/2 -translate-y-1/2 rounded p-0.5 text-faint hover:text-ink"
+            className="absolute right-1 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded text-faint hover:text-ink"
             aria-label="Limpar cidade"
           >
             {loading ? (
@@ -192,6 +248,7 @@ export function CityAutocomplete({
         ? createPortal(
             <div
               ref={menuRef}
+              id={`${baseId}-listbox`}
               role="listbox"
               style={{
                 position: "fixed",
@@ -207,18 +264,25 @@ export function CityAutocomplete({
                     Nenhuma cidade encontrada
                   </div>
                 ) : (
-                  suggestions.map((m) => (
+                  suggestions.map((m, i) => {
+                    const isSelected = m.nome === cidade && m.uf === uf;
+                    const highlighted = i === activeIndex;
+                    return (
                     <button
                       key={m.id}
+                      id={`${baseId}-opt-${i}`}
                       type="button"
                       role="option"
-                      aria-selected={m.nome === cidade && m.uf === uf}
+                      aria-selected={isSelected}
+                      onMouseEnter={() => setActiveIndex(i)}
                       onClick={() => handleSelect(m)}
                       className={cn(
                         "flex w-full items-center gap-3 rounded-[10px] py-2.5 pl-3.5 pr-3 text-left text-[13.5px] transition-colors",
-                        m.nome === cidade && m.uf === uf
+                        isSelected
                           ? "bg-brand-50 font-semibold text-brand"
-                          : "text-ink-2 hover:bg-accent",
+                          : highlighted
+                            ? "bg-accent text-ink-2"
+                            : "text-ink-2 hover:bg-accent",
                       )}
                     >
                       <span className="flex-1 truncate font-medium text-ink">{m.nome}</span>
@@ -226,7 +290,8 @@ export function CityAutocomplete({
                         {m.uf}
                       </span>
                     </button>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>,

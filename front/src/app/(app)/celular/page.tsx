@@ -151,11 +151,9 @@ function LeadCard({ lead, onSent, repo, refresh }: CardProps) {
               Aprovado
             </span>
           )}
-          {expanded ? (
-            <CaretUp size={16} className="text-muted-foreground" />
-          ) : (
-            <CaretDown size={16} className="text-muted-foreground" />
-          )}
+          <span className="-mr-2 flex size-11 items-center justify-center text-muted-foreground">
+            {expanded ? <CaretUp size={16} /> : <CaretDown size={16} />}
+          </span>
         </div>
       </button>
 
@@ -170,7 +168,8 @@ function LeadCard({ lead, onSent, repo, refresh }: CardProps) {
                 </span>
                 <button
                   onClick={copyMsg}
-                  className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11.5px] font-semibold text-brand"
+                  aria-label="Copiar mensagem"
+                  className="-mr-2 flex min-h-[44px] items-center gap-1 rounded-lg px-3 py-2 text-[11.5px] font-semibold text-brand"
                 >
                   <Copy size={13} /> Copiar
                 </button>

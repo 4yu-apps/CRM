@@ -1,7 +1,7 @@
 "use client";
 // Dropdown de ramos com suporte a multi-selecao.
 // Ramos ja selecionados aparecem marcados; clicar num ramo adiciona ou remove da lista.
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
@@ -18,17 +18,21 @@ interface MultiRamoDropdownProps {
   selected: string[];
   options: string[];
   onToggle: (ramo: string) => void;
+  ariaLabel?: string;
 }
 
 type Rect = { top: number; left: number; width: number };
 
-export function MultiRamoDropdown({ selected, options, onToggle }: MultiRamoDropdownProps) {
+export function MultiRamoDropdown({ selected, options, onToggle, ariaLabel = "Ramo" }: MultiRamoDropdownProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [rect, setRect] = useState<Rect | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const baseId = useId();
+  const [activeIndex, setActiveIndex] = useState(0);
+  const activeRef = useRef(0);
 
   const measure = useCallback(() => {
     const el = triggerRef.current;
@@ -92,6 +96,62 @@ export function MultiRamoDropdown({ selected, options, onToggle }: MultiRamoDrop
     setOpen(false);
   }, [selected, onToggle]);
 
+  // Lista navegavel: indice 0 = "Qualquer ramo", indices 1..N = opcoes visiveis.
+  const navCount = visible.length + 1;
+
+  // Mantem o ref do indice ativo em dia (lido no handler de Enter sem recriar deps).
+  useEffect(() => {
+    activeRef.current = activeIndex;
+  }, [activeIndex]);
+
+  // Ao abrir, destaca o topo; ao filtrar, volta ao topo.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (open) setActiveIndex(0);
+  }, [open]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (open) setActiveIndex(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query]);
+
+  // Navegacao por teclado: setas, Home/End e Enter (Esc ja fecha no efeito acima).
+  useEffect(() => {
+    if (!open) return;
+    const onNav = (e: KeyboardEvent) => {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setActiveIndex((i) => Math.min(navCount - 1, i + 1));
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setActiveIndex((i) => Math.max(0, i - 1));
+      } else if (e.key === "Home") {
+        e.preventDefault();
+        setActiveIndex(0);
+      } else if (e.key === "End") {
+        e.preventDefault();
+        setActiveIndex(navCount - 1);
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        const idx = activeRef.current;
+        if (idx === 0) {
+          handleClearAll();
+        } else {
+          const o = visible[idx - 1];
+          if (o) onToggle(o);
+        }
+      }
+    };
+    document.addEventListener("keydown", onNav);
+    return () => document.removeEventListener("keydown", onNav);
+  }, [open, navCount, visible, onToggle, handleClearAll]);
+
+  // Rola a opcao destacada pra dentro da area visivel.
+  useEffect(() => {
+    if (!open) return;
+    document.getElementById(`${baseId}-opt-${activeIndex}`)?.scrollIntoView({ block: "nearest" });
+  }, [activeIndex, open, baseId]);
+
   return (
     <div className="relative">
       <button
@@ -99,7 +159,7 @@ export function MultiRamoDropdown({ selected, options, onToggle }: MultiRamoDrop
         type="button"
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-label="Ramo"
+        aria-label={ariaLabel}
         onClick={toggle}
         className={cn(
           "flex w-full items-center justify-between gap-2.5 rounded-xl border bg-surface-2 py-3 pl-4 pr-3.5 text-[13.5px] text-ink outline-none transition-colors",
@@ -132,6 +192,7 @@ export function MultiRamoDropdown({ selected, options, onToggle }: MultiRamoDrop
               ref={menuRef}
               role="listbox"
               aria-multiselectable="true"
+              aria-activedescendant={activeIndex >= 0 ? `${baseId}-opt-${activeIndex}` : undefined}
               style={{
                 position: "fixed",
                 top: rect.top,
@@ -167,15 +228,19 @@ export function MultiRamoDropdown({ selected, options, onToggle }: MultiRamoDrop
               <div className="min-h-0 flex-1 overflow-y-auto p-1.5">
                 {/* "Qualquer ramo" limpa a selecao */}
                 <button
+                  id={`${baseId}-opt-0`}
                   type="button"
                   role="option"
                   aria-selected={selected.length === 0}
+                  onMouseEnter={() => setActiveIndex(0)}
                   onClick={handleClearAll}
                   className={cn(
                     "flex w-full items-center justify-between gap-3 rounded-[10px] py-2.5 pl-3.5 pr-3 text-left text-[13.5px] transition-colors",
                     selected.length === 0
                       ? "bg-brand-50 font-semibold text-brand"
-                      : "text-ink-2 hover:bg-accent",
+                      : activeIndex === 0
+                        ? "bg-accent text-ink-2"
+                        : "text-ink-2 hover:bg-accent",
                   )}
                 >
                   <span className="truncate italic">Qualquer ramo</span>
@@ -187,20 +252,25 @@ export function MultiRamoDropdown({ selected, options, onToggle }: MultiRamoDrop
                 {visible.length === 0 ? (
                   <div className="px-3.5 py-3 text-[13px] text-faint">Nenhum ramo encontrado</div>
                 ) : (
-                  visible.map((o) => {
+                  visible.map((o, i) => {
                     const active = selected.includes(o);
+                    const highlighted = activeIndex === i + 1;
                     return (
                       <button
                         key={o}
+                        id={`${baseId}-opt-${i + 1}`}
                         type="button"
                         role="option"
                         aria-selected={active}
+                        onMouseEnter={() => setActiveIndex(i + 1)}
                         onClick={() => onToggle(o)}
                         className={cn(
                           "flex w-full items-center justify-between gap-3 rounded-[10px] py-2.5 pl-3.5 pr-3 text-left text-[13.5px] transition-colors",
                           active
                             ? "bg-brand-50 font-semibold text-brand"
-                            : "text-ink-2 hover:bg-accent",
+                            : highlighted
+                              ? "bg-accent text-ink-2"
+                              : "text-ink-2 hover:bg-accent",
                         )}
                       >
                         <span className="truncate">{o}</span>

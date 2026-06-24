@@ -142,7 +142,7 @@ export default function AgendaPage() {
           <CalendarBlank size={40} className="text-faint" />
           <div className="text-[15px] font-semibold text-ink">Nenhuma reunião marcada</div>
           <p className="max-w-[340px] text-[13px] text-muted-foreground">
-            Quando você marcar uma reunião (no funil ou pela extensão), ela aparece aqui — com
+            Quando você marcar uma reunião (no funil ou pela extensão), ela aparece aqui, com
             horário, link e endereço.
           </p>
         </div>

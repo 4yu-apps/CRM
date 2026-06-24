@@ -3,7 +3,7 @@
 // autocomplete de cidade, mas aceita texto livre tambem (zonas tipo "Zona 7" que
 // nem sempre estao no mapa). Conforme digita, sugere bairros reais da cidade via
 // Nominatim; clicar preenche, mas o usuario pode digitar o que quiser.
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { MapPin, X } from "@phosphor-icons/react";
 import { suggestBairros, type BairroSuggestion } from "@/lib/geocode";
@@ -20,6 +20,7 @@ interface BairroAutocompleteProps {
   placeholder?: string;
   disabled?: boolean;
   className?: string;
+  ariaLabel?: string;
 }
 
 type Rect = { top: number; left: number; width: number };
@@ -33,6 +34,7 @@ export function BairroAutocomplete({
   placeholder = "Comece a digitar o bairro ou zona",
   disabled = false,
   className,
+  ariaLabel,
 }: BairroAutocompleteProps) {
   const [suggestions, setSuggestions] = useState<BairroSuggestion[]>([]);
   const [open, setOpen] = useState(false);
@@ -44,6 +46,9 @@ export function BairroAutocomplete({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // So aplica o resultado se ainda for a requisicao mais recente (anti-corrida).
   const reqSeqRef = useRef(0);
+  const baseId = useId();
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const activeRef = useRef(-1);
 
   const measure = useCallback(() => {
     const el = inputRef.current;
@@ -119,6 +124,52 @@ export function BairroAutocomplete({
     setOpen(false);
   }, [onChange]);
 
+  // Mantem o ref do indice ativo em dia (lido no handler de Enter sem recriar deps).
+  useEffect(() => {
+    activeRef.current = activeIndex;
+  }, [activeIndex]);
+
+  // Ao abrir/atualizar sugestoes, destaca a primeira opcao.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (open) setActiveIndex(suggestions.length > 0 ? 0 : -1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, suggestions]);
+
+  // Navegacao por teclado: setas, Home/End e Enter (Esc ja fecha no efeito acima).
+  useEffect(() => {
+    if (!open) return;
+    const onNav = (e: KeyboardEvent) => {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setActiveIndex((i) => Math.min(suggestions.length - 1, i + 1));
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setActiveIndex((i) => Math.max(0, i - 1));
+      } else if (e.key === "Home") {
+        e.preventDefault();
+        setActiveIndex(0);
+      } else if (e.key === "End") {
+        e.preventDefault();
+        setActiveIndex(suggestions.length - 1);
+      } else if (e.key === "Enter") {
+        const s = suggestions[activeRef.current];
+        if (s) {
+          e.preventDefault();
+          handlePick(s);
+        }
+      }
+    };
+    document.addEventListener("keydown", onNav);
+    return () => document.removeEventListener("keydown", onNav);
+  }, [open, suggestions, handlePick]);
+
+  // Rola a opcao destacada pra dentro da area visivel.
+  useEffect(() => {
+    if (!open) return;
+    document.getElementById(`${baseId}-opt-${activeIndex}`)?.scrollIntoView({ block: "nearest" });
+  }, [activeIndex, open, baseId]);
+
   return (
     <div className={cn("relative", className)}>
       <div className="relative">
@@ -140,8 +191,13 @@ export function BairroAutocomplete({
           placeholder={placeholder}
           disabled={disabled}
           autoComplete="off"
+          role="combobox"
+          aria-label={ariaLabel}
+          aria-expanded={open}
+          aria-controls={`${baseId}-listbox`}
+          aria-activedescendant={open && activeIndex >= 0 ? `${baseId}-opt-${activeIndex}` : undefined}
           className={cn(
-            "w-full rounded-xl border bg-surface-2 py-3.5 pl-9 pr-9 text-[14.5px] text-ink outline-none transition-colors disabled:cursor-not-allowed disabled:opacity-60",
+            "w-full rounded-xl border bg-surface-2 py-3.5 pl-9 pr-11 text-[14.5px] text-ink outline-none transition-colors disabled:cursor-not-allowed disabled:opacity-60",
             open ? "border-brand" : "border-border-2 hover:border-brand/50",
           )}
         />
@@ -149,7 +205,7 @@ export function BairroAutocomplete({
           <button
             type="button"
             onClick={loading ? undefined : handleClear}
-            className="absolute right-3 top-1/2 -translate-y-1/2 rounded p-0.5 text-faint hover:text-ink"
+            className="absolute right-1 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded text-faint hover:text-ink"
             aria-label="Limpar bairro"
           >
             {loading ? (
@@ -168,6 +224,7 @@ export function BairroAutocomplete({
         ? createPortal(
             <div
               ref={menuRef}
+              id={`${baseId}-listbox`}
               role="listbox"
               style={{ position: "fixed", top: rect.top, left: rect.left, minWidth: rect.width }}
               className="z-[200] flex max-h-[280px] min-w-[220px] flex-col overflow-hidden rounded-[14px] border border-border bg-card shadow-xl"
@@ -178,22 +235,32 @@ export function BairroAutocomplete({
                     Nenhum bairro encontrado. Pode digitar a zona do seu jeito.
                   </div>
                 ) : (
-                  suggestions.map((s) => (
+                  suggestions.map((s, i) => {
+                    const isSelected = s.name === value;
+                    const highlighted = i === activeIndex;
+                    return (
                     <button
                       key={s.name}
+                      id={`${baseId}-opt-${i}`}
                       type="button"
                       role="option"
-                      aria-selected={s.name === value}
+                      aria-selected={isSelected}
+                      onMouseEnter={() => setActiveIndex(i)}
                       onClick={() => handlePick(s)}
                       className={cn(
                         "flex w-full items-center gap-2.5 rounded-[10px] py-2.5 pl-3.5 pr-3 text-left text-[13.5px] transition-colors",
-                        s.name === value ? "bg-brand-50 font-semibold text-brand" : "text-ink-2 hover:bg-accent",
+                        isSelected
+                          ? "bg-brand-50 font-semibold text-brand"
+                          : highlighted
+                            ? "bg-accent text-ink-2"
+                            : "text-ink-2 hover:bg-accent",
                       )}
                     >
                       <MapPin size={14} className="flex-none text-faint" />
                       <span className="flex-1 truncate font-medium text-ink">{s.name}</span>
                     </button>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>,

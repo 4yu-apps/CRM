@@ -31,7 +31,11 @@ import { ProfessionCard } from "@/components/profession-card";
 import { cn } from "@/lib/utils";
 
 
+// Mesmas opcoes da tela Buscar, pra um raio salvo (ex.: "2km") nao sumir no Dropdown.
 const RAIOS: { value: string; label: string }[] = [
+  { value: "1km", label: "Até 1 km" },
+  { value: "2km", label: "Até 2 km" },
+  { value: "3km", label: "Até 3 km" },
   { value: "5km", label: "Até 5 km" },
   { value: "10km", label: "Até 10 km" },
   { value: "25km", label: "Até 25 km" },

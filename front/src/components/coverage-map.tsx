@@ -14,6 +14,24 @@ function coverageColor(pct: number): string {
   return "#b9b2c4";
 }
 
+// Segundo sinal alem da cor (acessibilidade para daltonicos): cada nivel de
+// cobertura ganha um glifo e um padrao de borda distintos. Assim os niveis se
+// distinguem sem depender da cor.
+function coverageGlyph(pct: number): string {
+  if (pct >= 70) return "◉"; // circulo preenchido com anel
+  if (pct >= 30) return "◐"; // meio circulo
+  if (pct > 0) return "○"; // circulo vazado
+  return "×"; // x (ainda nao varrido)
+}
+
+// Padrao de tracejado da borda por nivel (reforca o sinal nao-cromatico).
+function coverageDash(pct: number): string | undefined {
+  if (pct >= 70) return undefined; // borda solida
+  if (pct >= 30) return "6 3"; // tracejado medio
+  if (pct > 0) return "2 3"; // pontilhado
+  return "1 4"; // pontilhado fino
+}
+
 interface CoverageMapProps {
   zones: ScanCoverage[];
   centerLat: number;
@@ -103,6 +121,8 @@ export default function CoverageMap({
       scrollWheelZoom={false}
       style={{ width: "100%", height: "100%", borderRadius: "inherit" }}
     >
+      {/* Neutraliza a bolha padrao do Leaflet no glifo central (so o simbolo aparece) */}
+      <style>{`.coverage-glyph-tip{background:transparent;border:none;box-shadow:none;padding:0;}.coverage-glyph-tip::before{display:none;}`}</style>
       <TileLayer
         url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
         maxZoom={19}
@@ -145,6 +165,8 @@ export default function CoverageMap({
       {zones.map((z) => {
         if (z.center_lat == null || z.center_lng == null) return null;
         const color = coverageColor(z.pct);
+        const glyph = coverageGlyph(z.pct);
+        const dash = coverageDash(z.pct);
         const label = (z.region_name ?? z.region_key) + (z.niche ? ` / ${z.niche}` : "");
         return (
           <CircleMarker
@@ -156,11 +178,26 @@ export default function CoverageMap({
               weight: 2,
               fillColor: color,
               fillOpacity: 0.32,
+              dashArray: dash,
             }}
           >
+            {/* Glifo central: segundo sinal alem da cor para daltonicos */}
+            <Tooltip
+              permanent
+              direction="center"
+              className="coverage-glyph-tip"
+              opacity={1}
+            >
+              <span
+                aria-hidden="true"
+                style={{ fontSize: "15px", fontWeight: 700, color, lineHeight: 1 }}
+              >
+                {glyph}
+              </span>
+            </Tooltip>
             <Tooltip direction="top" sticky>
               <span style={{ fontSize: "12px", fontWeight: 600 }}>
-                {label} &bull; {z.pct}% coberto ({z.result_count} leads)
+                {glyph} {label} &bull; {z.pct}% coberto ({z.result_count} leads)
               </span>
             </Tooltip>
           </CircleMarker>

@@ -475,20 +475,25 @@ export default function ContatosPage() {
             {paged.map((lead) => (
               <div
                 key={lead.id}
-                className="group grid cursor-pointer grid-cols-1 gap-2 px-5 py-3.5 transition-colors hover:bg-accent/40 lg:grid-cols-[auto_2.4fr_1fr_1.1fr_1fr_0.6fr_0.9fr_auto] lg:items-center lg:gap-3"
+                className="group grid cursor-pointer grid-cols-[auto_1fr] items-start gap-x-3 gap-y-2 px-5 py-3.5 transition-colors hover:bg-accent/40 lg:grid-cols-[auto_2.4fr_1fr_1.1fr_1fr_0.6fr_0.9fr_auto] lg:items-center lg:gap-3"
               >
-                <div className="hidden lg:flex">
+                {/* Selecao: visivel no mobile (ocupa a 1a coluna) e no desktop */}
+                <label
+                  className="flex items-center pt-0.5 lg:pt-0"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <input
                     type="checkbox"
                     checked={selected.has(lead.id)}
                     onChange={() => toggleSelect(lead.id)}
                     onClick={(e) => e.stopPropagation()}
+                    aria-label={`Selecionar ${lead.business_name ?? "contato"}`}
                     className="h-4 w-4 cursor-pointer rounded"
                   />
-                </div>
+                </label>
                 <div
                   onClick={() => router.push(`/ficha/${lead.id}`)}
-                  className="contents"
+                  className="flex min-w-0 flex-col gap-2 lg:contents"
                 >
                 {/* Negocio */}
                 <div className="min-w-0">

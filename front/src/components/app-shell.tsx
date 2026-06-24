@@ -71,35 +71,57 @@ function titleFor(pathname: string): [string, string] {
   return TITLES[pathname] ?? ["", ""];
 }
 
+// Acha contatos por nome/cidade/telefone para a busca rapida. Compartilhado
+// entre a busca de desktop e o overlay do mobile.
+function searchLeads(leads: Lead[], q: string): Lead[] {
+  if (q.trim().length < 2) return [];
+  const needle = q.trim().toLowerCase();
+  const num = needle.replace(/\D/g, "");
+  return leads
+    .filter((l) => {
+      const hay = [l.business_name, l.city, l.state, l.owner_name]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      if (hay.includes(needle)) return true;
+      if (num) {
+        const p = (l.phone ?? "").replace(/\D/g, "");
+        const w = (l.whatsapp ?? "").replace(/\D/g, "");
+        if (p.includes(num) || w.includes(num)) return true;
+      }
+      return false;
+    })
+    .slice(0, 7);
+}
+
+// Cada resultado da busca: clica e abre a ficha do lead.
+function SearchResult({ lead, onPick }: { lead: Lead; onPick: () => void }) {
+  return (
+    <button
+      type="button"
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={onPick}
+      className="flex w-full flex-col items-start gap-0.5 border-b border-border px-4 py-3 text-left transition-colors last:border-0 hover:bg-accent/60"
+    >
+      <span className="line-clamp-2 text-[13.5px] font-semibold text-ink">
+        {lead.business_name ?? "(sem nome)"}
+      </span>
+      <span className="truncate text-[12px] text-faint">
+        {[lead.city, lead.state].filter(Boolean).join(" / ") || STATUS_META[lead.status].label}
+      </span>
+    </button>
+  );
+}
+
 // Busca rapida no cabecalho: acha um contato por nome/cidade/telefone e abre a
 // ficha na hora. Atalho pra quando voce so quer pular pra um lead especifico.
+// So aparece no desktop; no mobile a lupa abre o MobileSearch (overlay).
 function HeaderSearch({ leads, t }: { leads: Lead[]; t: (key: string, fallback?: string) => string }) {
   const router = useRouter();
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
 
-  const matches =
-    q.trim().length < 2
-      ? []
-      : (() => {
-          const needle = q.trim().toLowerCase();
-          const num = needle.replace(/\D/g, "");
-          return leads
-            .filter((l) => {
-              const hay = [l.business_name, l.city, l.state, l.owner_name]
-                .filter(Boolean)
-                .join(" ")
-                .toLowerCase();
-              if (hay.includes(needle)) return true;
-              if (num) {
-                const p = (l.phone ?? "").replace(/\D/g, "");
-                const w = (l.whatsapp ?? "").replace(/\D/g, "");
-                if (p.includes(num) || w.includes(num)) return true;
-              }
-              return false;
-            })
-            .slice(0, 7);
-        })();
+  const matches = searchLeads(leads, q);
 
   const go = (id: string) => {
     setQ("");
@@ -130,23 +152,85 @@ function HeaderSearch({ leads, t }: { leads: Lead[]; t: (key: string, fallback?:
           {matches.length === 0 ? (
             <div className="px-4 py-3 text-[13px] text-muted-foreground">Nada encontrado</div>
           ) : (
-            matches.map((l) => (
-              <button
-                key={l.id}
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => go(l.id)}
-                className="flex w-full flex-col items-start gap-0.5 border-b border-border px-4 py-2.5 text-left transition-colors last:border-0 hover:bg-accent/60"
-              >
-                <span className="line-clamp-2 text-[13.5px] font-semibold text-ink">
-                  {l.business_name ?? "(sem nome)"}
-                </span>
-                <span className="truncate text-[12px] text-faint">
-                  {[l.city, l.state].filter(Boolean).join(" / ") || STATUS_META[l.status].label}
-                </span>
-              </button>
-            ))
+            matches.map((l) => <SearchResult key={l.id} lead={l} onPick={() => go(l.id)} />)
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Busca no mobile: a lupa fica no header em telas pequenas e abre um painel de
+// busca em tela cheia. Mesma logica do desktop, leva a ficha do lead.
+function MobileSearch({ leads, t }: { leads: Lead[]; t: (key: string, fallback?: string) => string }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+
+  const matches = searchLeads(leads, q);
+
+  const close = () => {
+    setOpen(false);
+    setQ("");
+  };
+  const go = (id: string) => {
+    close();
+    router.push(`/ficha/${id}`);
+  };
+
+  return (
+    <div className="md:hidden">
+      <button
+        type="button"
+        aria-label={t("topbar.search", "Buscar contato...")}
+        onClick={() => setOpen(true)}
+        className="flex size-9 items-center justify-center rounded-full border border-border bg-accent text-ink-2 transition-colors hover:text-brand"
+      >
+        <MagnifyingGlass size={17} />
+      </button>
+      {open && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-background/95 backdrop-blur-sm">
+          <div className="flex items-center gap-2 border-b border-border bg-card px-4 py-3">
+            <div className="relative flex-1">
+              <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-faint" />
+              <input
+                // eslint-disable-next-line jsx-a11y/no-autofocus
+                autoFocus
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && matches[0]) go(matches[0].id);
+                  if (e.key === "Escape") close();
+                }}
+                placeholder={t("topbar.search", "Buscar contato...")}
+                className="w-full rounded-full border border-border bg-accent py-2.5 pl-9 pr-3 text-[14px] text-ink outline-none focus:border-brand"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={close}
+              className="flex-none rounded-lg px-3 py-2 text-[13px] font-semibold text-ink-2 transition-colors hover:bg-accent"
+            >
+              Cancelar
+            </button>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {q.trim().length < 2 ? (
+              <div className="px-4 py-6 text-center text-[13px] text-muted-foreground">
+                Digite ao menos 2 letras pra buscar.
+              </div>
+            ) : matches.length === 0 ? (
+              <div className="px-4 py-6 text-center text-[13px] text-muted-foreground">
+                Nada encontrado
+              </div>
+            ) : (
+              <div className="divide-y divide-border bg-card">
+                {matches.map((l) => (
+                  <SearchResult key={l.id} lead={l} onPick={() => go(l.id)} />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -453,6 +537,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
           <div className="flex items-center gap-3.5">
             <HeaderSearch leads={leads} t={t} />
+            <MobileSearch leads={leads} t={t} />
             <NotificationBell leads={leads} />
             <Link
               href="/fila"

@@ -401,7 +401,7 @@ export default function BuscarPage() {
         toast.success(`${labelBusca} Acompanhe os leads chegando aqui embaixo.`);
       } else {
         toast.message(
-          "Alvo salvo. O robô busca no próximo ciclo — deixei o acompanhamento ligado.",
+          "Alvo salvo. O robô busca no próximo ciclo, e deixei o acompanhamento ligado.",
         );
       }
     } catch (e) {
@@ -453,7 +453,7 @@ export default function BuscarPage() {
           <div className="mb-1 text-[17px] font-bold">Definir alvo de busca</div>
           <p className="mb-6 text-[13.5px] text-muted-foreground">
             Escolha onde e o que garimpar e clique em buscar pra disparar na hora. O robô roda no
-            servidor e os leads novos vão subindo na sua fila — você acompanha aqui em tempo real.
+            servidor e os leads novos vão subindo na sua fila, e você acompanha aqui em tempo real.
           </p>
 
           {/* Ramos (multi-selecao com chips) */}
@@ -477,6 +477,7 @@ export default function BuscarPage() {
               selected={niches}
               options={[...nicheOptions]}
               onToggle={handleNicheToggle}
+              ariaLabel="Ramo"
             />
             <RamoChips
               ramos={niches}
@@ -499,6 +500,7 @@ export default function BuscarPage() {
               uf={uf}
               onSelect={handleCitySelect}
               onClear={handleCityClear}
+              ariaLabel="Cidade"
               placeholder="Digite a cidade (ex: Maringá, São Paulo...)"
             />
             <p className="mt-1.5 text-[12px] text-faint">
@@ -524,6 +526,7 @@ export default function BuscarPage() {
               }}
               city={city}
               uf={uf}
+              ariaLabel="Bairro ou zona"
               placeholder={
                 city ? "Comece a digitar o bairro ou zona (em branco = cidade toda)" : "Escolha a cidade primeiro"
               }
@@ -640,7 +643,7 @@ export default function BuscarPage() {
             {city && (
               <span className="text-[12px] font-semibold text-faint">
                 {neighborhood.trim()
-                  ? `${neighborhood.trim()} — ${city}${uf ? ` / ${uf}` : ""}`
+                  ? `${neighborhood.trim()}, ${city}${uf ? ` / ${uf}` : ""}`
                   : uf
                     ? `${city} / ${uf}`
                     : city}
@@ -683,13 +686,16 @@ export default function BuscarPage() {
             />
           </div>
 
-          {/* Legenda */}
-          <div className="mb-5 flex gap-4 text-[12px] text-muted-foreground">
+          {/* Legenda: cada nivel tem cor + glifo (segundo sinal para daltonicos) */}
+          <div className="mb-5 flex flex-wrap gap-4 text-[12px] text-muted-foreground">
             <span className="flex items-center gap-1.5">
               <span
                 className="h-[11px] w-[11px] rounded-[3px]"
                 style={{ background: "#7C3AED" }}
               />
+              <span aria-hidden="true" className="font-bold" style={{ color: "#7C3AED" }}>
+                ◉
+              </span>
               Alto (70%+)
             </span>
             <span className="flex items-center gap-1.5">
@@ -697,6 +703,9 @@ export default function BuscarPage() {
                 className="h-[11px] w-[11px] rounded-[3px]"
                 style={{ background: "#9B6BE8" }}
               />
+              <span aria-hidden="true" className="font-bold" style={{ color: "#9B6BE8" }}>
+                ◐
+              </span>
               Médio (30-69%)
             </span>
             <span className="flex items-center gap-1.5">
@@ -704,6 +713,9 @@ export default function BuscarPage() {
                 className="h-[11px] w-[11px] rounded-[3px]"
                 style={{ background: "#C4A8F0" }}
               />
+              <span aria-hidden="true" className="font-bold" style={{ color: "#C4A8F0" }}>
+                ○
+              </span>
               Iniciando
             </span>
             <span className="flex items-center gap-1.5">
@@ -711,6 +723,9 @@ export default function BuscarPage() {
                 className="h-[11px] w-[11px] rounded-[3px]"
                 style={{ background: "#b9b2c4" }}
               />
+              <span aria-hidden="true" className="font-bold" style={{ color: "#b9b2c4" }}>
+                ×
+              </span>
               Ainda não
             </span>
           </div>
