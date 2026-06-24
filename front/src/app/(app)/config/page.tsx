@@ -139,6 +139,7 @@ export default function ConfigPage() {
   // Espelho do valor JA salvo, pra avisar quando o toggle ainda nao foi salvo.
   const [savedAutopilot, setSavedAutopilot] = useState(false);
   const [professions, setProfessions] = useState<string[]>([]);
+  const [senderName, setSenderName] = useState(""); // nome que vai na copy ("me chamo X")
 
   // Listas vindas do IBGE para os selects em cascata (estado -> cidade)
   const [estados, setEstados] = useState<UF[]>([]);
@@ -162,6 +163,7 @@ export default function ConfigPage() {
           setAutopilot(profile.autopilot ?? false);
           setSavedAutopilot(profile.autopilot ?? false);
           setMinScore(profile.min_score ?? 0);
+          setSenderName(profile.sender_name ?? "");
           setProfessions(
             profile.professions?.length
               ? profile.professions
@@ -282,6 +284,7 @@ export default function ConfigPage() {
         professions,
         profession: professions[0] ?? null,
         min_score: minScore,
+        sender_name: senderName.trim() || null,
       };
       await repo.saveProfile(input);
       setSavedAutopilot(autopilot);
@@ -297,7 +300,7 @@ export default function ConfigPage() {
     } finally {
       setSaving(false);
     }
-  }, [niches, city, state, radius, serviceTarget, autopilot, minScore, professions, repo, refreshProfile, isOnboarding, router]);
+  }, [niches, city, state, radius, serviceTarget, autopilot, minScore, professions, senderName, repo, refreshProfile, isOnboarding, router]);
 
   // Ja conectou com o Google? (login via Google => agenda disponivel)
   const meta = session?.user?.app_metadata as { provider?: string; providers?: string[] } | undefined;
@@ -391,6 +394,29 @@ export default function ConfigPage() {
       )}
 
       <div className="flex flex-col gap-5">
+        {/* ------------------------------------------------------------------ */}
+        {/* Seu nome — entra na 1a mensagem ("me chamo X") */}
+        {/* ------------------------------------------------------------------ */}
+        <Section
+          title="Seu nome"
+          sub="Vai na primeira mensagem que eu escrevo pros leads."
+          icon={<HandWaving size={20} />}
+        >
+          <input
+            value={senderName}
+            onChange={(e) => setSenderName(e.target.value)}
+            placeholder="Como você quer ser chamado (ex: Gabriel)"
+            className="w-full max-w-sm rounded-[12px] border border-border-2 bg-surface-2 px-3.5 py-2.5 text-[14px] text-ink outline-none focus:border-brand"
+          />
+          <p className="mt-2 text-[12.5px] leading-relaxed text-muted-foreground">
+            A abertura começa com{" "}
+            <strong className="font-semibold text-ink-2">
+              &quot;me chamo {senderName.trim() || "..."}, ...&quot;
+            </strong>
+            . Sem o nome, a mensagem não se apresenta.
+          </p>
+        </Section>
+
         {/* ------------------------------------------------------------------ */}
         {/* Idioma do sistema */}
         {/* ------------------------------------------------------------------ */}

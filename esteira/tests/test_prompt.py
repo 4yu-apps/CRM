@@ -157,3 +157,79 @@ def test_sinal_site_lento_pagespeed():
     lead = _lead(website="https://x.com", site_signals={"perf_score": 22})
     p = build_prompt(lead)
     assert "site lento no celular" in p
+
+
+# --- voz humana com auto-apresentacao (2026-06-24) ---
+
+def test_self_desc_por_profissao():
+    from garimpo_esteira.draft.prompt import self_desc
+    d = _lead(service_target="design")
+    setattr(d, "profession", "design")
+    assert "site" in self_desc(d)
+    a = _lead(service_target="ambos")
+    setattr(a, "profession", "ambos")
+    assert "marketing" in self_desc(a)
+    au = _lead(service_target="automacao")
+    setattr(au, "profession", "automacao")
+    assert "atendimento" in self_desc(au)
+
+
+def test_self_desc_acentuado_client_facing():
+    # o mock usa self_desc VERBATIM na mensagem -> precisa de acento correto
+    from garimpo_esteira.draft.prompt import self_desc
+    d = _lead(service_target="design")
+    setattr(d, "profession", "design")
+    assert "criação" in self_desc(d) and "negócio" in self_desc(d)
+
+
+def test_build_prompt_injeta_nome_quando_ha_sender():
+    lead = _lead(service_target="design")
+    setattr(lead, "profession", "design")
+    setattr(lead, "sender_name", "Gabriel")
+    p = build_prompt(lead)
+    assert "me chamo Gabriel" in p
+
+
+def test_build_prompt_sem_sender_nao_inventa_nome():
+    lead = _lead()
+    p = build_prompt(lead)
+    assert "nao tem nome cadastrado" in p
+    assert "Apresente-se assim" not in p  # essa instrucao so existe quando ha nome
+
+
+def test_strip_numbers_raspa_nota_e_avaliacoes():
+    from garimpo_esteira.draft.prompt import _strip_numbers
+    out = _strip_numbers("Black Gym nota 4.8 com 120 avaliacoes, cabe site.")
+    assert "4.8" not in out and "120" not in out
+    assert "boa reputacao" in out
+
+
+def test_build_prompt_raspa_numero_do_diagnostico():
+    lead = _lead(score_reason={"summary": "Bom pra design. X nota 4.9 com 9 avaliacoes."})
+    p = build_prompt(lead)
+    # o diagnostico nao pode levar o numero cru pro modelo
+    assert "nota 4.9" not in p and "9 avaliacoes" not in p
+
+
+def test_system_proibe_cargo_e_jargao():
+    from garimpo_esteira.draft.prompt import SYSTEM_INSTRUCTION
+    assert "gestor de trafego" in SYSTEM_INSTRUCTION
+    assert "coach" in SYSTEM_INSTRUCTION.lower()
+
+
+def test_mock_abertura_se_apresenta_com_nome():
+    from garimpo_esteira.draft.mock import MockDraftProvider
+    lead = _lead(service_target="design", website=None)
+    setattr(lead, "profession", "design")
+    setattr(lead, "sender_name", "Gabriel")
+    msg1, _ = MockDraftProvider().generate(lead)
+    assert "Me chamo Gabriel" in msg1
+    assert "criação de site" in msg1  # client-facing, acentuado
+    assert "—" not in msg1 and "nota" not in msg1.lower()
+
+
+def test_mock_sem_nome_nao_quebra():
+    from garimpo_esteira.draft.mock import MockDraftProvider
+    lead = _lead(website=None)
+    msg1, _ = MockDraftProvider().generate(lead)
+    assert "Me chamo" not in msg1 and len(msg1) > 0

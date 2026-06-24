@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from ..models import Lead
 from ..validation import is_present
-from .prompt import _brief_key, lead_brief
+from .prompt import _brief_key, lead_brief, self_desc
 
 # Categorias de alimentacao que pedem o angulo iFood (pergunta genuina de canal).
 _FOOD_KEYWORDS = (
@@ -88,9 +88,13 @@ def _pergunta(b: dict, lead: Lead, service: str) -> str:
 
 
 def _abertura(b: dict, lead: Lead, service: str) -> str:
+    """Abertura humana: cumprimento + auto-apresentacao (me chamo X, o que faco) +
+    observacao real + UMA pergunta. Sem nome cadastrado, abre sem se nomear."""
     nome = b["nome"]
+    sender = (getattr(lead, "sender_name", None) or "").strip()
+    intro = f"Me chamo {sender}, {self_desc(lead)}. " if sender else ""
     return (
-        f"{_greeting(nome)} Encontrei a {nome} no Google e {_gancho(b, lead)}. "
+        f"{_greeting(nome)} {intro}Encontrei a {nome} no Google e {_gancho(b, lead)}. "
         f"{_pergunta(b, lead, service)}"
     )
 

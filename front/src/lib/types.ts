@@ -267,11 +267,14 @@ export interface SearchProfile {
   // Lista de profissoes selecionadas (multi-select). Substitui profession no
   // longo prazo; profession fica como campo primario/back-compat (professions[0]).
   professions?: string[];
+  // Nome de quem prospecta (coletado no onboarding). A esteira injeta na copy:
+  // "me chamo {sender_name}, ...". Sem ele, a abertura nao se apresenta.
+  sender_name?: string | null;
   created_at: string;
   updated_at: string;
 }
 export type SearchProfileInput = Partial<Pick<SearchProfile,
-  "niches" | "city" | "state" | "neighborhood" | "radius" | "default_service_target" | "autopilot" | "profession" | "professions" | "min_score">>;
+  "niches" | "city" | "state" | "neighborhood" | "radius" | "default_service_target" | "autopilot" | "profession" | "professions" | "min_score" | "sender_name">>;
 
 // Template de mensagem (#18).
 export type MessageTemplateKind = "abertura" | "follow_up" | "objecao" | "reativacao";

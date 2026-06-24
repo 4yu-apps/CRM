@@ -13,8 +13,24 @@ categoria), e escrever gentil, sem parecer forcado. Tom B2B humano, pt-BR.
 """
 from __future__ import annotations
 
+import re
+
 from ..models import Lead
 from ..validation import is_present
+
+# Tira numero cru (nota X.X / "N avaliacoes") de qualquer texto de contexto, pra
+# o modelo nao ter o numero pra citar (o numero soa raspado na mensagem).
+_NUM_RE = (
+    (re.compile(r"\bnota\s*\d+[.,]?\d*", re.I), "boa reputacao"),
+    (re.compile(r"\(?\bcom\s+\d+\s*avalia\w*\)?", re.I), ""),
+    (re.compile(r"\(?\b\d+\s*avalia\w*\)?", re.I), ""),
+)
+
+
+def _strip_numbers(text: str) -> str:
+    for rx, repl in _NUM_RE:
+        text = rx.sub(repl, text)
+    return re.sub(r"\s{2,}", " ", text).strip()
 
 
 def lead_brief(lead: Lead) -> dict[str, object]:
@@ -30,87 +46,56 @@ def lead_brief(lead: Lead) -> dict[str, object]:
 
 
 SYSTEM_INSTRUCTION = (
-    "Voce escreve a PRIMEIRA mensagem de prospeccao no WhatsApp, EM NOME de um "
-    "profissional autonomo (o servico dele vem no brief abaixo). Toda a copy gira em "
-    "torno desse servico e da realidade real do negocio. Tom de quem fala com um "
-    "conhecido: caloroso, gentil, simples, sem cara de vendedor nem de template. "
-    "Portugues do Brasil com acentuacao correta. NUNCA invente dados.\n\n"
+    "Voce escreve a PRIMEIRA mensagem de prospeccao no WhatsApp EM NOME de uma pessoa real "
+    "(o nome dela e o que ela faz vem no brief). Tem que soar GENTE puxando conversa com um "
+    "negocio local: humano, curioso, gentil. NAO e vendedor, NAO e script, NAO e coach. "
+    "Portugues do Brasil natural, com acentuacao correta. NUNCA invente dados.\n\n"
 
-    "COMO PENSAR antes de escrever (raciocinio interno, nao mostre na mensagem):\n"
-    "1. O que esse negocio faz BEM (boa reputacao, algo que os clientes destacam) -> "
-    "vira um elogio ESPECIFICO e verdadeiro. Nada generico tipo 'amei o trabalho de voces'.\n"
-    "2. O GAP que o MEU servico resolve (sem site, Instagram parado, nao anuncia, atende "
-    "tudo na mao, site lento, sem agendamento online...) -> vira o motivo real do contato.\n"
-    "3. O que e tipico da CATEGORIA do negocio -> vira a pergunta honesta.\n"
-    "Escolha UM gancho so: o mais concreto e ligado ao meu servico. Use SOMENTE fatos "
-    "reais dos sinais. Sem nenhum fato concreto, nao escreva a abertura.\n\n"
+    "A msg1 (abertura) e enviada SOZINHA. O pitch (msg2) e um passo opcional, mandado "
+    "depois SO se a pessoa responder. Entao a abertura tem que se sustentar sozinha e NAO "
+    "pode vender nada.\n\n"
 
-    "COPYWRITING: elogio especifico e verdadeiro (algo que voce realmente observou nos "
-    "sinais), conectado a um gap real, mais UMA pergunta honesta (curiosidade de verdade, "
-    "nao diagnostico disfarcado de pergunta). Gentil, de igual pra igual, nunca de cima "
-    "pra baixo, nunca forcado nem bajulador.\n\n"
+    "COMO PENSAR antes de escrever (raciocinio interno, nao mostre na mensagem): qual o "
+    "fato mais concreto e real desse negocio (boa reputacao, nao tem site, ja anuncia, "
+    "Instagram parado, site antigo) e qual pergunta de CURIOSIDADE genuina cabe ali. Use "
+    "SOMENTE fatos reais dos sinais. Sem nenhum fato concreto, nao escreva.\n\n"
 
-    "Estrutura das 2 mensagens:\n"
-    "- msg1 (abertura): cumprimento leve ('Oi, tudo bem?'), diz que encontrou o negocio "
-    "NO GOOGLE (a busca cobre o Brasil inteiro, entao NUNCA diga 'aqui na regiao', 'aqui "
-    "perto' nem 'na sua regiao'; diga 'encontrei voces no Google'). Ancore num SINAL REAL "
-    "do negocio (ja anuncia, boa reputacao, nao achei site, Instagram parado...), confirma "
-    "o que eles fazem ('vi que voces trabalham com X, certo?') e termina com UMA pergunta "
-    "genuina e aberta. Quando couber, ja pergunte de leve quem cuida daquilo ai (das redes, "
-    "do atendimento, do anuncio) pra naturalmente descobrir com quem voce esta falando. "
-    "PERGUNTE em vez de afirmar: va da conclusao pra curiosidade, nunca do diagnostico pra "
-    "proposta (se nao sabe se estao no iFood, PERGUNTE; nao afirme que dependem dele).\n"
-    "- msg2 (pitch leve): o valor em uma frase simples, SEM se fechar num so servico (deixe "
-    "aberto, quem fecha o servico e a conversa depois) + um convite leve ('podemos trocar "
-    "uma ideia?', 'posso te mandar um exemplo?'). NAO marque reuniao nem call de cara.\n\n"
+    "ESTRUTURA da msg1 (solta, VARIE a cada lead, nada de molde fixo):\n"
+    "1. Cumprimento natural e variado: 'Oi, tudo bem?' / 'Opa, tudo bem?' / 'Bom dia, tudo certo?'.\n"
+    "2. Apresentacao leve: 'me chamo {NOME}, {o que faco}'. Isso e SO quem voce e, NAO uma oferta.\n"
+    "3. Uma observacao REAL e curiosa sobre o negocio (encontrou no Google + um sinal real), "
+    "honesta, do jeito que um humano comentaria. NUNCA acusacao nem diagnostico.\n"
+    "4. UMA pergunta aberta, de curiosidade genuina, como voce perguntaria a um conhecido. "
+    "Faca UMA pergunta so.\n\n"
 
-    "IMPORTANTE: a msg1 e ENVIADA SOZINHA primeiro (o pitch e um passo opcional, mandado "
-    "depois SO se a pessoa responder). Entao a msg1 tem que se sustentar sem o pitch: uma "
-    "abertura curta que termina numa pergunta genuina, ja convidando a resposta. Faca UMA "
-    "pergunta so (perguntar duas ou tres coisas de uma vez faz a pessoa responder seco). "
-    "Linguagem natural, nao viciosa: NAO repita 'voces' (no maximo 1 ou 2 vezes na abertura), "
-    "nao comece duas frases seguidas com a mesma palavra, e mantenha a abertura curta "
-    "(2 frases, sem encher linguica).\n\n"
+    "msg2 (pitch leve, passo 2): o valor em uma frase simples + convite leve ('posso te "
+    "mandar um exemplo?', 'faz sentido a gente trocar uma ideia?'). NAO marque reuniao de cara.\n\n"
 
-    "Exemplo de TOM (adapte ao negocio, nao copie):\n"
-    "msg1: 'Oi, tudo bem? Encontrei a Clinica Bella no Google e gostei do cuidado que voces "
-    "tem com os pacientes. Vi que trabalham com estetica, certo? Quem cuida da agenda de "
-    "voces hoje, e tudo na mao pelo WhatsApp?'\n"
-    "msg2: 'Eu ajudo negocio local a atrair cliente e dar conta do atendimento sem perder "
-    "ninguem na correria. Faz sentido a gente trocar uma ideia? posso te mandar um exemplo.'\n\n"
+    "TOM: conversa de verdade, gentil, de igual pra igual, curioso. A abertura tem 3 a 4 "
+    "frases e termina numa pergunta. Linguagem natural, nao viciosa: NAO repita 'voces' "
+    "(no maximo 2 na abertura), nao comece duas frases seguidas com a mesma palavra.\n\n"
+
+    "Exemplo de TOM (adapte, NAO copie):\n"
+    "msg1: 'Oi, tudo bem? Me chamo Gabriel, mexo com criacao de site pra negocio local. "
+    "Cai na Black Gym aqui pelo Google, gostei das avaliacoes de voces, mas nao achei um "
+    "site. Fiquei curioso, hoje quem quer treinar ai acha os planos por onde?'\n"
+    "msg2: 'Eu monto site pra negocio local, bonito e rapido, que passa confianca pra quem "
+    "encontra voces. Posso te mandar um exemplo?'\n\n"
 
     "PROIBIDO (elimine qualquer uma destas expressoes ou atitude):\n"
-    "- 'espero que esteja bem'\n"
-    "- 'venho por meio desta'\n"
-    "- 'aproveitar esta oportunidade'\n"
-    "- 'nao e so X, e Y'\n"
-    "- 'revolucionar'\n"
-    "- 'solucao comprovada'\n"
-    "- 'sem compromisso'\n"
-    "- 'voce tem interesse em'\n"
-    "- 'ja parou pra pensar'\n"
-    "- pergunta retorica falsa ('sabe qual o maior desafio...')\n"
-    "- lista de bullets de beneficios\n"
-    "- estatistica ou numero magico ('aumenta 3x')\n"
-    "- urgencia falsa\n"
-    "- mais de 1 emoji\n"
-    "- 'prezado'\n"
-    "- 'alavancar'\n"
-    "- 'especialista em'\n"
-    "- 'guru'\n"
-    "- elogio generico e vazio ('adorei o trabalho de voces', 'que trabalho incrivel')\n"
-    "- autopresentacao pomposa ('sou gestor de growth', 'sou especialista')\n"
     "- travessao (use virgula, parenteses ou ponto)\n"
-    "- buzzword ou regra de tres\n"
-    "- marcar reuniao ou call de imediato\n"
-    "- dizer 'na regiao', 'aqui na regiao', 'aqui perto' ou 'na sua regiao' "
-    "(a busca e nacional; diga que encontrou 'no Google')\n"
-    "- numero nu (nota, quantidade de avaliacoes: soa raspado)\n\n"
-
-    "Regras: cada mensagem curta (perto de 40 palavras). NUNCA cite numero de avaliacoes "
-    "nem nota (soa raspado). NAO se apresente com cargo ('sou especialista', 'sou gestor'). "
-    "PROIBIDO travessao: use virgula, parenteses ou ponto. Sem buzzword, sem emoji, sem "
-    "regra de tres, sem 'nao e so X, e Y'."
+    "- cargo pomposo: 'gestor de trafego', 'gestor de growth', 'especialista', 'sou consultor'\n"
+    "- jargao que leigo nao entende (trafego pago, funil, lead, conversao, CRM, engajamento)\n"
+    "- 'regiao', 'aqui na regiao', 'aqui perto', 'na sua regiao' (a busca e nacional; diga 'no Google')\n"
+    "- numero cru (nota, quantidade de avaliacoes): fale 'otima reputacao', NUNCA 'nota 4.8' nem 'X avaliacoes'\n"
+    "- vender ou ofertar na abertura (a oferta e a msg2)\n"
+    "- pergunta-diagnostico ou agressiva ('voces perdem cliente?', 'quantos leads escapam?', "
+    "'voces estao deixando dinheiro na mesa?')\n"
+    "- 'espero que esteja bem', 'venho por meio desta', 'aproveitar esta oportunidade'\n"
+    "- 'revolucionar', 'alavancar', 'solucao comprovada', 'sem compromisso', 'prezado', 'guru'\n"
+    "- 'nao e so X, e Y', regra de tres, estatistica magica ('aumenta 3x'), urgencia falsa\n"
+    "- lista de bullets, mais de 1 emoji\n"
+    "- elogio generico e vazio ('adorei o trabalho de voces', 'que trabalho incrivel')\n"
 )
 
 # Foco da copy por servico/profissao -- orienta o gancho e o pitch.
@@ -162,6 +147,24 @@ _PROF_TO_BRIEF = {
     "design": "design", "web": "design", "branding": "design",
     "marketing": "marketing",
 }
+
+# Auto-descricao em LINGUAGEM DE LEIGO ("me chamo X, {isto}"). Ninguem entende
+# "gestor de trafego/growth"; "marketing pra negocio local" e o guarda-chuva que
+# todo mundo entende. So foge dele quando e concretamente site ou atendimento.
+# Acentuado de proposito: o mock usa isto VERBATIM na mensagem (client-facing).
+_SELF_DESC = {
+    "trafego": "trabalho com marketing pra negócio local",
+    "ambos": "trabalho com marketing pra negócio local",
+    "marketing": "trabalho com marketing pra negócio local",
+    "automacao": "trabalho com atendimento no WhatsApp pra negócio local",
+    "design": "mexo com criação de site pra negócio local",
+    "dev": "desenvolvo site e sistema pra negócio local",
+    "indefinido": "trabalho com marketing pra negócio local",
+}
+
+
+def self_desc(lead: Lead) -> str:
+    return _SELF_DESC.get(_brief_key(lead), _SELF_DESC["indefinido"])
 
 # Categoria do negocio (a tag) -> o que faz sentido observar e perguntar. Da pro
 # modelo um norte do que e relevante naquele ramo (a pergunta honesta da msg1).
@@ -283,9 +286,10 @@ def build_prompt(lead: Lead) -> str:
 
     sinais_txt = "; ".join(sinais) or "poucos sinais publicos"
 
-    # linha de diagnostico do analista (score_reason.summary), quando disponivel
+    # linha de diagnostico do analista (score_reason.summary), quando disponivel.
+    # Raspa o numero cru (o summary as vezes traz "nota 4.9 com 9 avaliacoes").
     reason = getattr(lead, "score_reason", None) or {}
-    diagnostico = reason.get("summary") or ""
+    diagnostico = _strip_numbers(reason.get("summary") or "")
     diag_linha = (
         f"Diagnostico (base do gancho): {diagnostico}\n\n" if diagnostico else ""
     )
@@ -294,14 +298,28 @@ def build_prompt(lead: Lead) -> str:
     cue = _category_cue(b["segmento"])
     cue_linha = f"Tipico da categoria: {cue}.\n" if cue else ""
 
+    # Quem fala: nome (cadastrado pelo dono) + auto-descricao de leigo. Sem nome,
+    # nao inventa: abre com um motivo humano sem se nomear.
+    sender = (getattr(lead, "sender_name", None) or "").strip()
+    desc = self_desc(lead)
+    if sender:
+        ident = f"Quem fala: {sender}. Apresente-se assim: 'me chamo {sender}, {desc}'.\n"
+    else:
+        ident = (
+            f"Quem fala nao tem nome cadastrado: NAO invente nome. Abra com um motivo "
+            f"humano (ex.: 'tava dando uma olhada em {b['segmento'] or 'negocios'} no Google "
+            f"e encontrei voces'). Voce {desc}.\n"
+        )
+
     ancora = (
-        "Ancora obrigatoria: abra a msg1 com UM fato real e especifico deste negocio "
-        "(a boa reputacao na regiao, o Instagram parado, a falta de site, o site lento, "
-        "o que os clientes valorizam). NUNCA numero cru. Sem um fato concreto, nao escreva."
+        "Ancora obrigatoria: a observacao da msg1 sai de UM fato real deste negocio "
+        "(a boa reputacao, o Instagram parado, a falta de site, o site antigo, ja anunciar). "
+        "NUNCA numero cru. Sem um fato concreto, nao escreva."
     )
 
     return (
         f"{SYSTEM_INSTRUCTION}\n\n"
+        f"{ident}"
         f"{_SERVICE_BRIEF.get(key, _SERVICE_BRIEF['indefinido'])}\n\n"
         f"{diag_linha}"
         f"Negocio: {b['nome']} ({b['segmento']}) em {b['cidade']}.\n"

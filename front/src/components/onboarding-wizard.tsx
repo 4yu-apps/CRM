@@ -130,9 +130,11 @@ export function OnboardingWizard() {
         default_service_target: serviceTarget,
         city: city.trim() || null,
         state: state.trim() || null,
+        // Nome de quem prospecta -> a esteira injeta na copy ("me chamo X, ...").
+        sender_name: name.trim() || null,
       };
       await repo.saveProfile(input);
-      // Nome de exibicao: guarda no user_metadata do Auth (sem coluna nova).
+      // Tambem guarda no user_metadata do Auth pra saudacao do app (greeting le dali).
       // Best-effort: nunca bloqueia o onboarding.
       if (mode === "supabase" && name.trim()) {
         try {
@@ -150,7 +152,8 @@ export function OnboardingWizard() {
     }
   }, [professions, niches, serviceTarget, city, state, name, mode, repo, refreshProfile, router]);
 
-  const canAdvance = step !== 0 || professions.length > 0;
+  // Etapa 1 so avanca com profissao E nome (o nome entra na copy: "me chamo X").
+  const canAdvance = step !== 0 || (professions.length > 0 && name.trim().length > 0);
 
   const next = useCallback(() => {
     setStep((s) => Math.min(s + 1, STEPS.length - 1));
@@ -244,7 +247,8 @@ export function OnboardingWizard() {
 
               <div className="mb-5">
                 <label htmlFor="ob-nome" className="mb-1.5 block text-[13px] font-semibold text-ink-2">
-                  Como posso te chamar? <span className="font-normal text-faint">(opcional)</span>
+                  Como posso te chamar?{" "}
+                  <span className="font-normal text-faint">(vai na sua mensagem: &quot;me chamo {name.trim() || "..."}&quot;)</span>
                 </label>
                 <input
                   id="ob-nome"
@@ -441,7 +445,11 @@ export function OnboardingWizard() {
                 className="flex items-center gap-2 rounded-[14px] px-7 py-3 text-[14px] font-bold text-white shadow-[0_6px_16px_var(--ring)] transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
                 style={{ background: "var(--grad)" }}
               >
-                {step === 0 && professions.length === 0 ? "Escolha uma área" : "Continuar"}
+                {step === 0 && professions.length === 0
+                  ? "Escolha uma área"
+                  : step === 0 && !name.trim()
+                    ? "Falta seu nome"
+                    : "Continuar"}
                 <ArrowRight size={17} weight="bold" />
               </button>
             ) : (
