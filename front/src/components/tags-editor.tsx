@@ -1,7 +1,7 @@
 "use client";
 // #20 — Editor de tags do lead. Etiquetas livres (minusculas) salvas em
 // leads.tags. Usado na ficha; o filtro por tag mora em contatos.
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Tag, X } from "@phosphor-icons/react";
 import { getRepo } from "@/lib/repo";
@@ -12,6 +12,11 @@ export function TagsEditor({ lead, onSaved }: { lead: Lead; onSaved: () => void 
   const [tags, setTags] = useState<string[]>(lead.tags ?? []);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+
+  // reflete mudancas externas (refresh da ficha) sem perder o estado otimista local
+  useEffect(() => {
+    setTags(lead.tags ?? []);
+  }, [lead.tags]);
 
   const persist = async (next: string[]) => {
     setBusy(true);

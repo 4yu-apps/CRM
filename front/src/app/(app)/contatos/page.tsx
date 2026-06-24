@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState, useCallback, useRef } from "react";
+import { useMemo, useState, useCallback, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -44,7 +44,9 @@ function digits(s: string | null | undefined): string {
 }
 
 // #20 — parser de CSV (suporta campos com aspas e virgulas internas).
-function parseCsv(text: string): string[][] {
+function parseCsv(raw: string): string[][] {
+  // Excel salva CSV com BOM UTF-8 no inicio; remove pra nao colar no 1o header.
+  const text = raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw;
   const rows: string[][] = [];
   let row: string[] = [];
   let cur = "";
@@ -209,6 +211,10 @@ export default function ContatosPage() {
       ...[...set].sort((a, b) => a.localeCompare(b)).map((t) => ({ value: t, label: t })),
     ];
   }, [leads]);
+  // se a tag filtrada deixou de existir, limpa pra nao prender a lista em vazio
+  useEffect(() => {
+    if (tagFilter && !tagOptions.some((o) => o.value === tagFilter)) setTagFilter("");
+  }, [tagOptions, tagFilter]);
 
   // Paginacao da lista filtrada. safePage clampa quando o filtro encurta o total.
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));

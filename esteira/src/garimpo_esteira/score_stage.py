@@ -34,9 +34,15 @@ def score_one(lead, sink: LeadSink, profession: str | None = None, min_score: in
     signals = {"ads_active": ads_active, "site": getattr(lead, "site_signals", None) or {}, "instagram_status": ig_status}
     result = score_lead(lead, signals, profession)
     # #19: piso de score por dono. Alem do THRESHOLD global, o dono pode exigir
-    # uma nota minima maior. min_score=0 (default) = sem filtro extra.
+    # uma nota minima maior. min_score=0 (default) = sem filtro extra. Ao rebaixar,
+    # sincroniza reason/service_target pra ficha nao mostrar "qualificado" incoerente.
     if min_score and result.score < min_score and result.decision != "descartado":
         result.decision = "descartado"
+        result.service_target = "indefinido"
+        if isinstance(result.reason, dict):
+            result.reason["decision"] = "descartado"
+            result.reason["service_target"] = "indefinido"
+            result.reason["verdict"] = f"abaixo do seu score minimo ({min_score})"
     fields: dict[str, object] = {
         "score": result.score,
         "score_reason": result.reason,
