@@ -128,6 +128,9 @@ export interface Lead {
   deal_term_months?: number | null;
   deal_closed_at?: string | null;
 
+  // Motivo de perda (#17): por que o lead foi perdido/arquivado.
+  loss_reason?: string | null;
+
   // Reuniao (Slice E): quando, e onde acontece. meeting_link = online
   // (Meet/Zoom/Teams); meeting_location = presencial (endereco). A Agenda e o
   // sininho de notificacoes leem o meeting_at.
@@ -203,6 +206,7 @@ export type LeadEditable = Partial<
     | "deal_billing"
     | "deal_term_months"
     | "deal_closed_at"
+    | "loss_reason"
     | "meeting_at"
     | "meeting_link"
     | "meeting_location"

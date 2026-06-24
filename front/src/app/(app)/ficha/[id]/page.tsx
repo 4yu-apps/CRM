@@ -4,6 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import {
+  Archive,
   ArrowLeft,
   ArrowRight,
   Barbell,
@@ -745,6 +746,16 @@ export default function FichaPage() {
                     <span className="ml-2 text-faint">em {fmtDateTime(lead.deal_closed_at)}</span>
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* Motivo de perda (#17) */}
+            {lead.loss_reason && (
+              <div className="rounded-[14px] border border-border bg-surface-2 p-4">
+                <div className="mb-1.5 flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-faint">
+                  <Archive size={14} /> Motivo da perda
+                </div>
+                <div className="text-[14px] font-semibold text-ink">{lead.loss_reason}</div>
               </div>
             )}
 
