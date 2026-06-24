@@ -9,6 +9,7 @@
 import { getConfig, setConfig } from "../lib/config.mjs";
 import { ensureFreshToken, loginWithPassword, logout } from "../lib/auth.mjs";
 import { createRepo } from "../lib/repo.mjs";
+import { undoFields as undoFieldsForCard } from "../lib/repo.mjs";
 import { matchLead, parsePhone } from "../lib/match.mjs";
 import { contextualButtons, STATUS_LABEL } from "../lib/state-machine.mjs";
 import { fmtPhone, normalizePhone, phoneKey } from "../lib/normalize.mjs";
@@ -61,9 +62,12 @@ function waCheck(phone) {
 const quota = makeQuota({});
 let sweeping = false;
 
-// Stub: a versao real (com o elemento de indicador) entra na Task 6.
-// Definir aqui evita ReferenceError quando o loop chama durante a Task 5.
-function updateSweepIndicator() {}
+function updateSweepIndicator() {
+  const elx = document.getElementById("gp-sweep");
+  if (!elx) return;
+  const total = sweepTargets(state.leads).length;
+  elx.textContent = sweeping && total > 0 ? `validando números... faltam ${total}` : "";
+}
 
 function jitter() { return SWEEP_MIN_INTERVAL_MS + Math.floor(Math.random() * 2000); }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -248,6 +252,7 @@ function mountPanel() {
       <span class="gp-mark">4Y</span>
       <span class="gp-logo">4YU CRM</span>
       <span class="gp-src"></span>
+      <span class="gp-sweep" id="gp-sweep"></span>
       <button class="gp-logout" title="Sair" aria-label="Sair" style="display:none">⎋</button>
       <button class="gp-min" title="Minimizar painel" aria-label="Minimizar painel">−</button>
       <button class="gp-close" title="Fechar painel" aria-label="Fechar painel">×</button>
@@ -370,6 +375,30 @@ function leadCard(lead, method) {
   card.append(meta);
   card.append(el("div", { className: "gp-method", textContent: `casou por ${method === "phone" ? "numero" : "nome"}` }));
 
+  if (Array.isArray(lead.tags) && lead.tags.includes("sem-whatsapp")) {
+    const box = el("div", { className: "gp-nowa" });
+    box.append(el("div", { className: "gp-nowa-title", textContent: "Esse número não tem WhatsApp" }));
+    box.append(el("div", { className: "gp-muted", textContent: "Arquivei e marquei com a tag sem-whatsapp." }));
+    const row = el("div", { className: "gp-actions" });
+    row.append(el("button", {
+      className: "gp-btn", textContent: "Desfazer",
+      onclick: async () => {
+        try {
+          const updated = await state.repo.undoNoWhatsapp(lead);
+          state.leads = state.leads.map((l) => (l.id === lead.id ? { ...l, ...updated } : l));
+          toast("Pronto, voltei o lead.");
+          evaluate(true);
+        } catch (err) { toast(`Erro: ${err.message}`, true); }
+      },
+    }));
+    row.append(el("button", {
+      className: "gp-btn", textContent: "Corrigir número",
+      onclick: () => openCorrigirNumero(lead),
+    }));
+    box.append(row);
+    card.append(box);
+  }
+
   const btns = contextualButtons(lead.status, lead.opt_out);
   if (btns.length === 0) {
     card.append(el("p", { className: "gp-muted", textContent: "Status final." }));
@@ -391,6 +420,19 @@ function leadCard(lead, method) {
   // visiveis. Escreve so no nosso banco.
   card.append(editForm(lead));
   return card;
+}
+
+async function openCorrigirNumero(lead) {
+  const novo = window.prompt("Número certo do WhatsApp (só dígitos, com DDD):", lead.whatsapp || lead.phone || "");
+  if (novo == null) return;
+  try {
+    const fields = { ...undoFieldsForCard(lead), whatsapp: novo.replace(/\D/g, "") };
+    const updated = await state.repo.updateLead(lead.id, fields);
+    state.leads = state.leads.map((l) => (l.id === lead.id ? { ...l, ...updated } : l));
+    toast("Número corrigido. Vou revalidar.");
+    evaluate(true);
+    void runSweep();
+  } catch (err) { toast(`Erro: ${err.message}`, true); }
 }
 
 function editForm(lead) {

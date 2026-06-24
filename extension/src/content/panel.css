@@ -277,6 +277,10 @@
 }
 #garimpo-maps-panel .gm-logout:hover { color: #71717a; text-decoration: underline; }
 
+#garimpo-panel .gp-nowa { margin: 6px 0; padding: 8px; border-radius: 8px; background: #fff4f4; border: 1px solid #f3c2c2; }
+#garimpo-panel .gp-nowa-title { font-weight: 700; color: #b42318; font-size: 12px; }
+#garimpo-panel .gp-sweep { font-size: 11px; color: #667085; margin-left: 8px; }
+
 #gp-toast {
   position: fixed;
   bottom: 20px;

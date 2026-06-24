@@ -388,6 +388,10 @@
   var quota = makeQuota({});
   var sweeping = false;
   function updateSweepIndicator() {
+    const elx = document.getElementById("gp-sweep");
+    if (!elx) return;
+    const total = sweepTargets(state.leads).length;
+    elx.textContent = sweeping && total > 0 ? `validando n\xFAmeros... faltam ${total}` : "";
   }
   function jitter() {
     return SWEEP_MIN_INTERVAL_MS + Math.floor(Math.random() * 2e3);
@@ -542,6 +546,7 @@
       <span class="gp-mark">4Y</span>
       <span class="gp-logo">4YU CRM</span>
       <span class="gp-src"></span>
+      <span class="gp-sweep" id="gp-sweep"></span>
       <button class="gp-logout" title="Sair" aria-label="Sair" style="display:none">\u238B</button>
       <button class="gp-min" title="Minimizar painel" aria-label="Minimizar painel">\u2212</button>
       <button class="gp-close" title="Fechar painel" aria-label="Fechar painel">\xD7</button>
@@ -659,6 +664,33 @@
     if (lead.score != null) meta.append(el("span", { className: "gp-muted", textContent: `score ${lead.score}` }));
     card.append(meta);
     card.append(el("div", { className: "gp-method", textContent: `casou por ${method === "phone" ? "numero" : "nome"}` }));
+    if (Array.isArray(lead.tags) && lead.tags.includes("sem-whatsapp")) {
+      const box = el("div", { className: "gp-nowa" });
+      box.append(el("div", { className: "gp-nowa-title", textContent: "Esse n\xFAmero n\xE3o tem WhatsApp" }));
+      box.append(el("div", { className: "gp-muted", textContent: "Arquivei e marquei com a tag sem-whatsapp." }));
+      const row = el("div", { className: "gp-actions" });
+      row.append(el("button", {
+        className: "gp-btn",
+        textContent: "Desfazer",
+        onclick: async () => {
+          try {
+            const updated = await state.repo.undoNoWhatsapp(lead);
+            state.leads = state.leads.map((l) => l.id === lead.id ? { ...l, ...updated } : l);
+            toast("Pronto, voltei o lead.");
+            evaluate(true);
+          } catch (err) {
+            toast(`Erro: ${err.message}`, true);
+          }
+        }
+      }));
+      row.append(el("button", {
+        className: "gp-btn",
+        textContent: "Corrigir n\xFAmero",
+        onclick: () => openCorrigirNumero(lead)
+      }));
+      box.append(row);
+      card.append(box);
+    }
     const btns = contextualButtons(lead.status, lead.opt_out);
     if (btns.length === 0) {
       card.append(el("p", { className: "gp-muted", textContent: "Status final." }));
@@ -677,6 +709,20 @@
     }
     card.append(editForm(lead));
     return card;
+  }
+  async function openCorrigirNumero(lead) {
+    const novo = window.prompt("N\xFAmero certo do WhatsApp (s\xF3 d\xEDgitos, com DDD):", lead.whatsapp || lead.phone || "");
+    if (novo == null) return;
+    try {
+      const fields = { ...undoFields(lead), whatsapp: novo.replace(/\D/g, "") };
+      const updated = await state.repo.updateLead(lead.id, fields);
+      state.leads = state.leads.map((l) => l.id === lead.id ? { ...l, ...updated } : l);
+      toast("N\xFAmero corrigido. Vou revalidar.");
+      evaluate(true);
+      void runSweep();
+    } catch (err) {
+      toast(`Erro: ${err.message}`, true);
+    }
   }
   function editForm(lead) {
     const form = el("div", { className: "gp-edit" });
