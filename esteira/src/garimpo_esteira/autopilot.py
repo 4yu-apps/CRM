@@ -194,3 +194,45 @@ def run_autopilot(
         summary.append({"owner_id": owner, "discovered": discovered})
 
     return summary
+
+
+def run_drain(
+    sink: LeadSink,
+    sources: Sequence[Source],
+    provider: DraftProvider,
+    *,
+    batch: int = 20,
+    delay: float = 0.0,
+    workers: int = 1,
+    reviews_source=None,
+) -> list[dict]:
+    """Processa leads pendentes (bruto/enriquecido/qualificado) de TODO dono que
+    tenha pendencia, com a profissao dele. E o que faz a captura da extensao (e
+    qualquer lead parado) virar rascunho mesmo pra quem NAO tem autopilot ligado.
+
+    Por dono: streaming dos novos (bruto) + mop-up (score/draft) pros que ja
+    estavam no meio. Erro de um dono nao bloqueia os outros.
+    """
+    if not hasattr(sink, "fetch_pending_owners"):
+        return []
+    summary: list[dict] = []
+    for owner in sink.fetch_pending_owners():
+        prof = (sink.fetch_profile(owner) or {}) if hasattr(sink, "fetch_profile") else {}
+        profession = prof.get("profession")
+        professions = list(prof.get("professions") or ([profession] if profession else []))
+        min_score = int(prof.get("min_score") or 0)
+        try:
+            counts = run_pipeline_streaming(
+                sink, sources, provider, batch=batch, delay=delay, owner_id=owner,
+                profession=profession, professions=professions, min_score=min_score,
+                reviews_source=reviews_source, workers=workers,
+            )
+            # mop-up: termina quem ficou em enriquecido/qualificado de runs anteriores
+            score_batch(sink, batch=batch, owner_id=owner, profession=profession,
+                        professions=professions, min_score=min_score)
+            draft_batch(sink, provider, batch=batch, owner_id=owner, profession=profession,
+                        reviews_source=reviews_source)
+            summary.append({"owner_id": owner, **counts})
+        except Exception:
+            pass
+    return summary

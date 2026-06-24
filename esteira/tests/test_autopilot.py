@@ -14,6 +14,7 @@ from garimpo_esteira.autopilot import (
     generate_terms,
     region_key,
     run_autopilot,
+    run_drain,
     search_term,
 )
 from garimpo_esteira.discovery import PlacesMapsSource
@@ -129,6 +130,32 @@ def test_autopilot_descobre_e_roda_pipeline(tmp_path):
     # cobertura e atividade gravadas
     assert any(c["region_key"] == region_key("Maringa", "PR") for c in sink._db["coverage"])
     assert any(a["tipo"] == "busca" for a in sink._db.get("activity", []))
+
+
+def test_drain_processa_pendentes_de_quem_nao_tem_autopilot(tmp_path):
+    """Capturas da extensao entram como 'bruto' na conta do dono. Se ele nao tem
+    autopilot, o autopilot nunca processa. O drain pega TODO dono com pendencia e
+    roda o pipeline com a profissao dele."""
+    sink = _sink(tmp_path)
+    sink.upsert_profile("owner-x", niches=[], city="Maringa", state="PR",
+                        autopilot=False, profession="trafego")
+    sink.insert_lead(Lead(id="", owner_id="owner-x", status="bruto", business_name="Forte",
+                          phone="44999990001", rating=4.7, reviews_count=300))
+    sink.insert_lead(Lead(id="", owner_id="owner-x", status="bruto", business_name="Fraco",
+                          phone="44999990002", rating=3.1, reviews_count=4))
+
+    summary = run_drain(sink, [], MockDraftProvider(), batch=20)
+
+    owned = [r for r in sink._db["leads"].values() if r["owner_id"] == "owner-x"]
+    assert len(owned) == 2
+    assert all(r["status"] != "bruto" for r in owned)  # ninguem ficou em bruto
+    assert any(r["status"] == "rascunho_pronto" for r in owned)  # o forte virou rascunho
+    assert summary and summary[0]["owner_id"] == "owner-x"
+
+
+def test_drain_sem_pendentes_nao_faz_nada(tmp_path):
+    sink = _sink(tmp_path)
+    assert run_drain(sink, [], MockDraftProvider(), batch=20) == []
 
 
 def test_autopilot_mopup_recupera_straggler_qualificado(tmp_path):

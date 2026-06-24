@@ -143,6 +143,30 @@ class SupabaseSink:
         except Exception:
             return []
 
+    def fetch_pending_owners(self) -> list[str]:
+        """Donos com leads ainda no meio do funil (bruto/enriquecido/qualificado).
+        Usado pelo drain pra processar capturas da extensao e stragglers de quem
+        nao tem autopilot. Dedup no cliente (PostgREST nao faz DISTINCT direto)."""
+        try:
+            r = self._send(
+                "GET",
+                f"{self.base}/leads",
+                params={
+                    "status": "in.(bruto,enriquecido,qualificado)",
+                    "select": "owner_id",
+                    "limit": "5000",
+                },
+            )
+            r.raise_for_status()
+            seen: list[str] = []
+            for row in r.json():
+                oid = row.get("owner_id")
+                if oid and oid not in seen:
+                    seen.append(oid)
+            return seen
+        except Exception:
+            return []
+
     def fetch_covered_keys(self, owner_id: str) -> list[tuple[str, str]]:
         try:
             r = self._send(

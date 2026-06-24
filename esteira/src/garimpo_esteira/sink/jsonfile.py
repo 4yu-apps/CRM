@@ -79,6 +79,24 @@ class JsonFileSink:
     def fetch_autopilot_profiles(self) -> list[dict]:
         return [p for p in self._db.get("profiles", []) if p.get("autopilot")]
 
+    def fetch_profile(self, owner_id: str) -> dict | None:
+        for p in self._db.get("profiles", []):
+            if p.get("owner_id") == owner_id:
+                return p
+        return None
+
+    def fetch_pending_owners(self) -> list[str]:
+        """Donos com leads ainda no meio do funil (bruto/enriquecido/qualificado).
+        Usado pelo drain pra processar capturas (extensao) e stragglers de quem
+        nao tem autopilot."""
+        pend = {"bruto", "enriquecido", "qualificado"}
+        seen: list[str] = []
+        for r in self._db["leads"].values():
+            oid = r.get("owner_id")
+            if r.get("status") in pend and oid and oid not in seen:
+                seen.append(oid)
+        return seen
+
     def fetch_covered_keys(self, owner_id: str) -> list[tuple[str, str]]:
         return [
             (c.get("region_key") or "", c.get("niche") or "")

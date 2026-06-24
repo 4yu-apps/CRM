@@ -12,7 +12,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .autopilot import region_key, run_autopilot, search_term
+from .autopilot import region_key, run_autopilot, run_drain, search_term
 from .cascade import enrich_batch, enrich_lead
 from .config import FIXTURES_DIR, Config, build_maps_source, build_provider, build_reviews_source, build_sink, build_sources
 from .discovery import discover
@@ -255,6 +255,29 @@ def _ads_from_prov(prov: list[dict]) -> bool | None:
     return None
 
 
+def cmd_drain(cfg: Config) -> int:
+    """Processa leads pendentes (bruto/enriquecido/qualificado) de TODO dono,
+    com a profissao dele. E o que faz a captura da extensao (e qualquer lead
+    parado) virar rascunho mesmo pra quem nao tem autopilot ligado."""
+    sink = build_sink(cfg)
+    sources = build_sources(cfg)
+    provider = build_provider(cfg)
+    reviews_source = build_reviews_source(cfg)
+    workers = cfg.workers if cfg.sink == "supabase" else 1
+    print(f"drain · sink={cfg.sink} llm={cfg.llm} workers={workers}")
+    summary = run_drain(
+        sink, sources, provider, batch=cfg.batch, delay=cfg.delay,
+        workers=workers, reviews_source=reviews_source,
+    )
+    if not summary:
+        print("  nada pendente (nenhum lead bruto/enriquecido/qualificado).")
+    for s in summary:
+        print(f"  owner {str(s['owner_id'])[:8]}: +{s.get('drafted', 0)} rascunhos, "
+              f"{s.get('discarded', 0)} descartes")
+    _print_counts(sink)
+    return 0
+
+
 def cmd_backfill(cfg: Config) -> int:
     """Completa leads JA avancados (rascunho_pronto etc.) que tem site mas
     ficaram sem facebook/instagram/whatsapp/ads_active — eles passaram pela
@@ -311,7 +334,7 @@ def _print_counts(sink) -> None:
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="garimpo-esteira")
     sub = p.add_subparsers(dest="cmd", required=True)
-    for name in ("seed-demo", "discover", "enrich", "score", "draft", "redraft", "pipeline", "autopilot", "backfill", "counts", "search"):
+    for name in ("seed-demo", "discover", "enrich", "score", "draft", "redraft", "pipeline", "autopilot", "drain", "backfill", "counts", "search"):
         sp = sub.add_parser(name)
         sp.add_argument("--sink", choices=["jsonfile", "supabase"])
         sp.add_argument("--json")
@@ -347,6 +370,7 @@ def main(argv: list[str] | None = None) -> int:
         "redraft": cmd_redraft,
         "pipeline": cmd_pipeline,
         "autopilot": cmd_autopilot,
+        "drain": cmd_drain,
         "backfill": cmd_backfill,
         "counts": cmd_counts,
     }
