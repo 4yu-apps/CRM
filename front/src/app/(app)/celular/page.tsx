@@ -21,6 +21,9 @@ import {
   Star,
   CaretDown,
   CaretUp,
+  Lightning,
+  ListBullets,
+  SkipForward,
 } from "@phosphor-icons/react";
 import { useLeads } from "@/hooks/use-leads";
 import { fmtPhone } from "@/lib/format";
@@ -60,10 +63,11 @@ interface CardProps {
   onSent: (id: string) => void;
   repo: ReturnType<typeof useLeads>["repo"];
   refresh: () => Promise<void>;
+  defaultExpanded?: boolean;
 }
 
-function LeadCard({ lead, onSent, repo, refresh }: CardProps) {
-  const [expanded, setExpanded] = useState(false);
+function LeadCard({ lead, onSent, repo, refresh, defaultExpanded = false }: CardProps) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
   const [busy, setBusy] = useState(false);
 
   const msg = buildMsg(lead);
@@ -221,15 +225,34 @@ function LeadCard({ lead, onSent, repo, refresh }: CardProps) {
 export default function CelularPage() {
   const { leads, loading, error, repo, refresh } = useLeads();
   const [sentCount, setSentCount] = useState(0);
+  // #7 — modo lote (fila continua): mostra um card por vez e avanca sozinho.
+  const [mode, setMode] = useState<"lista" | "lote">("lista");
+  const [deferred, setDeferred] = useState<string[]>([]);
 
   const queue = useMemo(
     () => leads.filter((l) => l.status === "rascunho_pronto" || l.status === "aprovado"),
     [leads],
   );
 
+  // Fila do lote: os pulados vao pro fim, preservando a ordem do pulo.
+  const orderedQueue = useMemo(() => {
+    const def = new Set(deferred);
+    const head = queue.filter((l) => !def.has(l.id));
+    const tail = deferred
+      .map((id) => queue.find((l) => l.id === id))
+      .filter((l): l is Lead => Boolean(l));
+    return [...head, ...tail];
+  }, [queue, deferred]);
+
   const onSent = useCallback(() => {
     setSentCount((n) => n + 1);
   }, []);
+
+  const skipLote = useCallback((id: string) => {
+    setDeferred((d) => [...d.filter((x) => x !== id), id]);
+  }, []);
+
+  const current = orderedQueue[0];
 
   if (loading) {
     return (
@@ -280,6 +303,31 @@ export default function CelularPage() {
           <span className="rounded-full bg-brand-50 px-2.5 py-0.5 text-[11.5px] font-bold text-brand">
             {queue.length}
           </span>
+          {/* #7 — alterna lista x lote */}
+          <div className="ml-auto flex gap-1 rounded-full bg-[var(--inset)] p-1">
+            <button
+              type="button"
+              onClick={() => setMode("lista")}
+              aria-pressed={mode === "lista"}
+              className={cn(
+                "flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-semibold transition-colors",
+                mode === "lista" ? "bg-card text-foreground shadow-[var(--shadow)]" : "text-muted-foreground",
+              )}
+            >
+              <ListBullets size={13} /> Lista
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("lote")}
+              aria-pressed={mode === "lote"}
+              className={cn(
+                "flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-semibold transition-colors",
+                mode === "lote" ? "bg-card text-foreground shadow-[var(--shadow)]" : "text-muted-foreground",
+              )}
+            >
+              <Lightning size={13} weight="fill" /> Lote
+            </button>
+          </div>
         </div>
 
         {/* explicacao curta do fluxo mobile */}
@@ -293,18 +341,49 @@ export default function CelularPage() {
         </div>
       </div>
 
-      {/* lista de cards */}
-      <div className="flex flex-col gap-3">
-        {queue.map((lead) => (
-          <LeadCard
-            key={lead.id}
-            lead={lead}
-            onSent={onSent}
-            repo={repo}
-            refresh={refresh}
-          />
-        ))}
-      </div>
+      {/* modo lote: um card por vez, avanca sozinho ao enviar (#7) */}
+      {mode === "lote" ? (
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-2 rounded-[14px] border border-border bg-surface-2 px-4 py-2.5">
+            <span className="text-[12.5px] font-semibold text-ink-2">
+              {sentCount > 0 ? `${sentCount} enviado${sentCount > 1 ? "s" : ""} · ` : ""}
+              faltam {orderedQueue.length}
+            </span>
+            {current && (
+              <button
+                type="button"
+                onClick={() => skipLote(current.id)}
+                className="flex items-center gap-1 text-[12.5px] font-semibold text-muted-foreground hover:text-brand"
+              >
+                <SkipForward size={14} /> Pular
+              </button>
+            )}
+          </div>
+          {current && (
+            <LeadCard
+              key={current.id}
+              lead={current}
+              onSent={onSent}
+              repo={repo}
+              refresh={refresh}
+              defaultExpanded
+            />
+          )}
+        </div>
+      ) : (
+        /* lista de cards */
+        <div className="flex flex-col gap-3">
+          {queue.map((lead) => (
+            <LeadCard
+              key={lead.id}
+              lead={lead}
+              onSent={onSent}
+              repo={repo}
+              refresh={refresh}
+            />
+          ))}
+        </div>
+      )}
 
       {/* rodape de seguranca */}
       <div className="mt-6 flex items-center justify-center gap-2 text-[11.5px] text-faint">
