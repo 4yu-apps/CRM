@@ -239,6 +239,32 @@ function buildMeta(leads: Lead[]): MetaDoMes {
   };
 }
 
+// ---------- receita recorrente (#14) ----------
+
+interface Recurring {
+  closedCount: number;
+  ticketMedio: number; // media de deal_value dos fechados com valor
+  mrr: number; // soma dos mensal_fixo (recorrente/mes)
+  porPrazoTotal: number; // soma de deal_value * meses dos por_prazo (contratado)
+}
+
+function buildRecurring(leads: Lead[]): Recurring {
+  const closed = leads.filter((l) => l.status === "fechado" && (l.deal_value ?? 0) > 0);
+  const soma = closed.reduce((s, l) => s + (l.deal_value ?? 0), 0);
+  const mrr = closed
+    .filter((l) => l.deal_billing === "mensal_fixo")
+    .reduce((s, l) => s + (l.deal_value ?? 0), 0);
+  const porPrazoTotal = closed
+    .filter((l) => l.deal_billing === "por_prazo")
+    .reduce((s, l) => s + (l.deal_value ?? 0) * (l.deal_term_months ?? 1), 0);
+  return {
+    closedCount: closed.length,
+    ticketMedio: closed.length ? soma / closed.length : 0,
+    mrr,
+    porPrazoTotal,
+  };
+}
+
 // ---------- recorte por dimensao (#12) ----------
 
 type Dim = "category" | "city" | "service_target";
@@ -374,6 +400,7 @@ export default function ResultadosPage() {
 
   const kpis = useMemo(() => buildKpis(leads), [leads]);
   const meta = useMemo(() => buildMeta(leads), [leads]);
+  const recurring = useMemo(() => buildRecurring(leads), [leads]); // #14 — sobre toda a base
 
   // seletor de periodo (#13) — escopa funil e recortes (coorte por created_at)
   const [period, setPeriod] = useState<Period>("all");
@@ -673,6 +700,43 @@ export default function ResultadosPage() {
             )}
           </div>
         </div>
+      </div>
+
+      {/* receita recorrente (#14) — sobre toda a base de fechados */}
+      <div className="fu rounded-[18px] border border-border bg-card p-6 shadow-[var(--shadow)]">
+        <div className="mb-4 flex items-baseline justify-between gap-2">
+          <span className="text-[16px] font-bold">Receita recorrente</span>
+          <span className="text-[11.5px] text-faint">todos os negócios fechados</span>
+        </div>
+        {loading ? (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="h-20 rounded-[14px] bg-[var(--inset)] animate-pulse" />
+            ))}
+          </div>
+        ) : recurring.closedCount === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Nenhum negócio fechado com valor ainda. Ao registrar o valor de um fechamento, o ticket médio e o MRR aparecem aqui.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="rounded-[14px] bg-[var(--inset)] p-4">
+              <div className="text-[12px] text-muted-foreground">Ticket médio</div>
+              <div className="mt-1 font-heading text-[26px] font-bold leading-none">{brl(recurring.ticketMedio)}</div>
+              <div className="mt-1.5 text-[12px] text-faint">{recurring.closedCount} fechados</div>
+            </div>
+            <div className="rounded-[14px] bg-[var(--inset)] p-4">
+              <div className="text-[12px] text-muted-foreground">MRR contratado</div>
+              <div className="mt-1 font-heading text-[26px] font-bold leading-none text-success">{brl(recurring.mrr)}</div>
+              <div className="mt-1.5 text-[12px] text-faint">recorrente por mês (mensal fixo)</div>
+            </div>
+            <div className="rounded-[14px] bg-[var(--inset)] p-4">
+              <div className="text-[12px] text-muted-foreground">Contratos por prazo</div>
+              <div className="mt-1 font-heading text-[26px] font-bold leading-none">{brl(recurring.porPrazoTotal)}</div>
+              <div className="mt-1.5 text-[12px] text-faint">valor total contratado (valor × meses)</div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* recorte por dimensao (#12) */}
