@@ -355,7 +355,7 @@ const faqList = [
   },
   {
     q: "Preciso assinar contrato longo?",
-    a: "Não. Sem fidelidade e sem multa. Você assina, usa, e cancela quando quiser direto pelo painel. O primeiro garimpo costuma sair no mesmo dia.",
+    a: "Não. Sem fidelidade e sem multa. Você assina, usa, e cancela quando quiser direto pelo painel. A primeira leva de leads costuma sair no mesmo dia.",
   },
   {
     q: "Meus dados e dos leads ficam seguros?",
@@ -1428,7 +1428,7 @@ export function Landing() {
             </div>
             <h2 className="h2 reveal">Escolhe e começa hoje.</h2>
             <p className="lead reveal" style={{ marginTop: 18 }}>
-              Sem fidelidade. Cancela quando quiser. O primeiro garimpo sai no mesmo dia.
+              Sem fidelidade. Cancela quando quiser. Os primeiros leads saem no mesmo dia.
             </p>
           </div>
           <div
@@ -1730,7 +1730,7 @@ export function Landing() {
                   margin: "0 0 18px",
                 }}
               >
-                O garimpo de leads no automático pra quem vive de tráfego. Acha, organiza e te entrega pronto
+                A prospecção de leads no automático pra quem vive de tráfego. Acha, organiza e te entrega pronto
                 pra fechar.
               </p>
               <div style={{ display: "flex", gap: 10 }}>

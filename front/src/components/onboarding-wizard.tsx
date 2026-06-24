@@ -313,7 +313,7 @@ export function OnboardingWizard() {
                 {[
                   {
                     icon: MagnifyingGlass,
-                    titulo: "Eu garimpo",
+                    titulo: "Eu busco",
                     texto: "Encontro negócios com a sua cara e enriqueço com os dados que importam.",
                   },
                   {

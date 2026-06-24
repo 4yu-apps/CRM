@@ -819,7 +819,7 @@ export default function BuscarPage() {
             )}
           </div>
           <p className="mb-5 text-[13.5px] text-muted-foreground">
-            O garimpo cobre o mapa em ordem, sem pular pedaço. Veja o que já foi varrido na cidade
+            A busca cobre o mapa em ordem, sem pular pedaço. Veja o que já foi varrido na cidade
             escolhida e o que falta.
           </p>
 
@@ -906,7 +906,7 @@ export default function BuscarPage() {
                 {city ? "Nenhuma zona varrida nessa cidade" : "Nenhuma zona varrida ainda"}
               </div>
               <p className="max-w-[300px] text-[13px] text-muted-foreground">
-                Clique em <strong>Buscar agora</strong> pra disparar o garimpo nessa região e
+                Clique em <strong>Buscar agora</strong> pra disparar a busca nessa região e
                 começar a cobrir o mapa.
               </p>
             </div>

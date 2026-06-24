@@ -420,18 +420,18 @@
     panel.innerHTML = `
     <div class="gp-head">
       <span class="gp-mark">4Y</span>
-      <span class="gp-logo">Garimpo</span>
+      <span class="gp-logo">4YU CRM</span>
       <span class="gp-src"></span>
       <button class="gp-logout" title="Sair" aria-label="Sair" style="display:none">\u238B</button>
       <button class="gp-min" title="Minimizar painel" aria-label="Minimizar painel">\u2212</button>
       <button class="gp-close" title="Fechar painel" aria-label="Fechar painel">\xD7</button>
     </div>
     <div class="gp-body"></div>
-    <div class="gp-foot">So le seu WhatsApp. Status e edicoes vao pro Garimpo.</div>`;
+    <div class="gp-foot">So le seu WhatsApp. Status e edicoes vao pro 4YU CRM.</div>`;
     document.body.append(panel);
     panel.querySelector(".gp-min").addEventListener("click", () => panel.classList.toggle("gp-collapsed"));
-    const launcher = el("button", { id: LAUNCHER_ID, title: "Abrir Garimpo", textContent: "4Y" });
-    launcher.setAttribute("aria-label", "Abrir Garimpo");
+    const launcher = el("button", { id: LAUNCHER_ID, title: "Abrir 4YU CRM", textContent: "4Y" });
+    launcher.setAttribute("aria-label", "Abrir 4YU CRM");
     document.body.append(launcher);
     const setClosed = (closed) => {
       panel.style.display = closed ? "none" : "";
@@ -470,7 +470,7 @@
     const body = document.querySelector(`#${PANEL_ID} .gp-body`);
     if (!body) return;
     body.replaceChildren();
-    body.append(el("p", { className: "gp-muted", textContent: "Entre com sua conta Garimpo pra ver e atualizar seus leads aqui na conversa." }));
+    body.append(el("p", { className: "gp-muted", textContent: "Entre com sua conta 4YU CRM pra ver e atualizar seus leads aqui na conversa." }));
     const email = el("input", { className: "gp-input", type: "email", placeholder: "voce@exemplo.com", autocomplete: "username" });
     const pass = el("input", { className: "gp-input", type: "password", placeholder: "sua senha", autocomplete: "current-password" });
     const btn = el("button", { className: "gp-save", textContent: "Entrar" });
