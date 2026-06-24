@@ -58,12 +58,13 @@ function serviceFocusText(p: Profession): string {
 // ---------------------------------------------------------------------------
 // Toggle simples sem dependencia de lib
 // ---------------------------------------------------------------------------
-function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
+function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label?: string }) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={on}
+      aria-label={label}
       onClick={() => onChange(!on)}
       className={cn(
         "relative flex h-[30px] w-[52px] flex-none cursor-pointer items-center rounded-full border-none transition-colors duration-200",
@@ -130,6 +131,8 @@ export default function ConfigPage() {
   const [radius, setRadius] = useState("cidade");
   const [serviceTarget, setServiceTarget] = useState<ServiceTarget>("indefinido");
   const [autopilot, setAutopilot] = useState(false);
+  // Espelho do valor JA salvo, pra avisar quando o toggle ainda nao foi salvo.
+  const [savedAutopilot, setSavedAutopilot] = useState(false);
   const [profession, setProfession] = useState<string | null>(null);
 
   // Listas vindas do IBGE para os selects em cascata (estado -> cidade)
@@ -152,6 +155,7 @@ export default function ConfigPage() {
           setRadius(profile.radius ?? "cidade");
           setServiceTarget(profile.default_service_target ?? "indefinido");
           setAutopilot(profile.autopilot ?? false);
+          setSavedAutopilot(profile.autopilot ?? false);
           setProfession(profile.profession ?? null);
         }
       } catch {
@@ -245,6 +249,7 @@ export default function ConfigPage() {
         profession,
       };
       await repo.saveProfile(input);
+      setSavedAutopilot(autopilot);
       // Libera o gate de onboarding (fonte unica no contexto de auth).
       await refreshProfile();
       const wasOnboarding = isOnboarding;
@@ -544,14 +549,31 @@ export default function ConfigPage() {
                 <Robot size={20} />
               </div>
               <div>
-                <div className="text-[15px] font-bold">Busca no piloto automatico</div>
+                <div className="flex items-center gap-2">
+                  <div className="text-[15px] font-bold">Busca no piloto automatico</div>
+                  <span
+                    className={cn(
+                      "rounded-full px-2 py-0.5 text-[11px] font-bold",
+                      autopilot ? "bg-brand-50 text-brand" : "bg-[var(--inset)] text-muted-foreground",
+                    )}
+                  >
+                    {autopilot ? "Ligado" : "Desligado"}
+                  </span>
+                </div>
                 <div className="mt-0.5 text-[13px] text-muted-foreground">
-                  Eu cubro o mapa em ordem e encho a fila sem voce precisar pedir.
+                  {autopilot
+                    ? "Eu cubro o mapa em ordem e encho a fila sem voce precisar pedir."
+                    : "Esta desligado. Voce so recebe leads quando clicar em Buscar."}
                 </div>
               </div>
             </div>
-            <Toggle on={autopilot} onChange={setAutopilot} />
+            <Toggle on={autopilot} onChange={setAutopilot} label="Busca no piloto automatico" />
           </div>
+          {autopilot !== savedAutopilot && (
+            <div className="border-t border-border bg-warn-bg px-6 py-2.5 text-[12.5px] font-semibold text-warn">
+              Alteracao nao salva. Clique em Salvar configuracoes la embaixo pra valer.
+            </div>
+          )}
         </div>
 
         {/* ------------------------------------------------------------------ */}
