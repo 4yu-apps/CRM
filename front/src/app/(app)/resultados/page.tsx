@@ -14,7 +14,7 @@ import {
   X,
 } from "@phosphor-icons/react";
 import { useLeads } from "@/hooks/use-leads";
-import { funnel, depth } from "@/lib/funnel";
+import { funnel, depth, kpis as funnelKpis, pct } from "@/lib/funnel";
 import type { Lead, LeadStatus } from "@/lib/types";
 
 // Meta de receita do mes: editavel pelo usuario, guardada na localStorage.
@@ -239,6 +239,67 @@ function buildMeta(leads: Lead[]): MetaDoMes {
   };
 }
 
+// ---------- recorte por dimensao (#12) ----------
+
+type Dim = "category" | "city" | "service_target";
+
+const DIM_LABELS: Record<Dim, string> = {
+  category: "Nicho",
+  city: "Cidade",
+  service_target: "Serviço",
+};
+
+const SERVICE_LABELS: Record<string, string> = {
+  trafego: "Tráfego",
+  automacao: "Automação",
+  ambos: "Ambos",
+  design: "Design",
+  marketing: "Marketing",
+  indefinido: "Indefinido",
+};
+
+function dimValue(l: Lead, dim: Dim): string {
+  if (dim === "service_target") return SERVICE_LABELS[l.service_target] ?? l.service_target;
+  const v = l[dim];
+  return v && v.trim() ? v.trim() : "—";
+}
+
+interface Segment {
+  key: string;
+  total: number;
+  enviados: number;
+  responderam: number;
+  fechados: number;
+  taxaResposta: number;
+  taxaFechamento: number;
+}
+
+/** Agrupa por dimensao, calcula KPIs por grupo e retorna os top N por volume. */
+function buildSegments(leads: Lead[], dim: Dim, topN = 8): { rows: Segment[]; hidden: number } {
+  const groups = new Map<string, Lead[]>();
+  for (const l of leads) {
+    const k = dimValue(l, dim);
+    const arr = groups.get(k) ?? [];
+    arr.push(l);
+    groups.set(k, arr);
+  }
+  const all: Segment[] = [...groups.entries()].map(([key, ls]) => {
+    const k = funnelKpis(ls);
+    return {
+      key,
+      total: ls.length,
+      enviados: k.enviados,
+      responderam: k.responderam,
+      fechados: k.fechados,
+      taxaResposta: k.taxaResposta,
+      taxaFechamento: k.taxaFechamento,
+    };
+  });
+  all.sort((a, b) => b.total - a.total);
+  const rows = all.slice(0, topN);
+  return { rows, hidden: all.length - rows.length };
+}
+
 // ---------- icone de delta ----------
 
 function DeltaIcon({ n }: { n: number | null }) {
@@ -255,6 +316,10 @@ export default function ResultadosPage() {
   const kpis = useMemo(() => buildKpis(leads), [leads]);
   const funnelBars = useMemo(() => buildFunnelBars(leads), [leads]);
   const meta = useMemo(() => buildMeta(leads), [leads]);
+
+  // recorte por dimensao (#12)
+  const [dim, setDim] = useState<Dim>("category");
+  const segments = useMemo(() => buildSegments(leads, dim), [leads, dim]);
 
   // Meta de receita editavel (persistida). Hidrata da localStorage no cliente.
   const [metaReceita, setMetaReceita] = useState(10000);
@@ -496,6 +561,82 @@ export default function ResultadosPage() {
             )}
           </div>
         </div>
+      </div>
+
+      {/* recorte por dimensao (#12) */}
+      <div className="fu rounded-[18px] border border-border bg-card p-6 shadow-[var(--shadow)]">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <span className="text-[16px] font-bold">Onde estou convertendo melhor</span>
+          <div className="flex gap-1 rounded-full bg-[var(--inset)] p-1">
+            {(["category", "city", "service_target"] as Dim[]).map((d) => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => setDim(d)}
+                aria-pressed={dim === d}
+                className={`rounded-full px-3.5 py-1 text-[12.5px] font-semibold transition-colors ${
+                  dim === d
+                    ? "bg-card text-foreground shadow-[var(--shadow)]"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {DIM_LABELS[d]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="space-y-2.5">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="h-9 rounded-lg bg-[var(--inset)] animate-pulse" />
+            ))}
+          </div>
+        ) : segments.rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Sem dados para esse recorte ainda.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-[13px]">
+              <thead>
+                <tr className="text-[11px] uppercase tracking-wide text-faint">
+                  <th className="pb-2 text-left font-semibold">{DIM_LABELS[dim]}</th>
+                  <th className="pb-2 text-right font-semibold">Leads</th>
+                  <th className="pb-2 text-right font-semibold">Enviados</th>
+                  <th className="pb-2 text-right font-semibold">Resp.</th>
+                  <th className="pb-2 text-right font-semibold">Taxa resp.</th>
+                  <th className="pb-2 text-right font-semibold">Fechados</th>
+                  <th className="pb-2 text-right font-semibold">Taxa fech.</th>
+                </tr>
+              </thead>
+              <tbody>
+                {segments.rows.map((s) => (
+                  <tr key={s.key} className="border-t border-border">
+                    <td className="max-w-[180px] truncate py-2 pr-3 font-semibold text-ink-2" title={s.key}>
+                      {s.key}
+                    </td>
+                    <td className="py-2 text-right tabular-nums">{s.total}</td>
+                    <td className="py-2 text-right tabular-nums">{s.enviados}</td>
+                    <td className="py-2 text-right tabular-nums">{s.responderam}</td>
+                    <td className="py-2 text-right font-semibold tabular-nums">
+                      {s.enviados ? pct(s.taxaResposta) : <span className="text-faint">—</span>}
+                    </td>
+                    <td className="py-2 text-right tabular-nums">{s.fechados}</td>
+                    <td className="py-2 text-right font-semibold tabular-nums">
+                      {s.enviados ? pct(s.taxaFechamento) : <span className="text-faint">—</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {segments.hidden > 0 && (
+              <p className="mt-3 text-[12px] text-faint">
+                +{segments.hidden} {DIM_LABELS[dim].toLowerCase()}
+                {segments.hidden > 1 ? "s" : ""} com menos leads não exibido
+                {segments.hidden > 1 ? "s" : ""}
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
