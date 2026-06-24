@@ -18,6 +18,7 @@ from .config import FIXTURES_DIR, Config, build_maps_source, build_provider, bui
 from .discovery import discover
 from .draft_stage import draft_batch, redraft_batch
 from .models import Lead
+from .pipeline_stream import run_pipeline_streaming
 from .score_stage import score_batch
 from .validation import is_present
 
@@ -206,10 +207,14 @@ def cmd_search(
     inserted = int(res.get("inserted", 0))
     print(f"  descobertos {inserted} (dedup {res.get('skipped', 0)})")
 
-    # pipeline so deste dono (enrich -> score na lente da profissao -> draft)
-    enrich_batch(sink, sources, batch=cfg.batch, delay=cfg.delay, owner_id=owner_id)
-    score_batch(sink, batch=cfg.batch, owner_id=owner_id, profession=profession, min_score=min_score)
-    draft_batch(sink, provider, batch=cfg.batch, owner_id=owner_id, profession=profession, reviews_source=reviews_source)
+    # pipeline so deste dono, STREAMING lead-a-lead: cada negocio passa por
+    # enrich -> score (lente da profissao) -> draft inteiro e cai na fila assim
+    # que fica pronto, em vez de esperar o lote todo. Fila enche de 1 em 1.
+    run_pipeline_streaming(
+        sink, sources, provider,
+        batch=cfg.batch, delay=cfg.delay, owner_id=owner_id,
+        profession=profession, min_score=min_score, reviews_source=reviews_source,
+    )
 
     # memoria de cobertura + feed de atividade do dono
     if hasattr(sink, "upsert_coverage"):

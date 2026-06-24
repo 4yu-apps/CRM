@@ -26,10 +26,10 @@ DEFAULT_NICHE_POOL = [
     "loja de roupas", "otica", "farmacia", "auto center", "clinica veterinaria",
 ]
 
-from .cascade import enrich_batch
 from .discovery import result_to_lead
 from .draft.base import DraftProvider
 from .draft_stage import draft_batch
+from .pipeline_stream import run_pipeline_streaming
 from .score_stage import score_batch
 from .sink.base import LeadSink
 from .sources.base import Source
@@ -172,17 +172,20 @@ def run_autopilot(
                 )
 
         # Pipeline escopado a este dono (nao toca leads de outros usuarios).
-        # Cada estagio isolado: uma falha no enrich nao impede score/draft, e o
-        # erro de um dono nao bloqueia os proximos donos.
-        for stage in (
-            lambda: enrich_batch(sink, sources, batch=batch, delay=delay, owner_id=owner),
-            lambda: score_batch(sink, batch=batch, owner_id=owner, profession=profession, min_score=min_score),
-            lambda: draft_batch(sink, provider, batch=batch, owner_id=owner, profession=profession, reviews_source=reviews_source),
-        ):
-            try:
-                stage()
-            except Exception:
-                pass
+        # STREAMING lead-a-lead nos leads novos (bruto): cada um cai na fila
+        # assim que fica pronto. Erro isolado por lead; erro de um dono nao
+        # bloqueia os proximos. Mop-up depois (score_batch + draft_batch)
+        # recupera stragglers deixados em enriquecido/qualificado por algum run
+        # anterior interrompido — normalmente vazio (no-op).
+        try:
+            run_pipeline_streaming(
+                sink, sources, provider, batch=batch, delay=delay, owner_id=owner,
+                profession=profession, min_score=min_score, reviews_source=reviews_source,
+            )
+            score_batch(sink, batch=batch, owner_id=owner, profession=profession, min_score=min_score)
+            draft_batch(sink, provider, batch=batch, owner_id=owner, profession=profession, reviews_source=reviews_source)
+        except Exception:
+            pass
 
         summary.append({"owner_id": owner, "discovered": discovered})
 

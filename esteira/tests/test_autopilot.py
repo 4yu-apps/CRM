@@ -131,6 +131,25 @@ def test_autopilot_descobre_e_roda_pipeline(tmp_path):
     assert any(a["tipo"] == "busca" for a in sink._db.get("activity", []))
 
 
+def test_autopilot_mopup_recupera_straggler_qualificado(tmp_path):
+    """Refator pra streaming nao pode perder a recuperacao de stragglers: um lead
+    deixado em 'qualificado' por um run anterior interrompido tem que ser
+    rascunhado pelo mop-up (score_batch + draft_batch ao fim do pipeline)."""
+    sink = _sink(tmp_path)
+    sink.upsert_profile("owner-1", niches=["estetica"], city="Maringa", state="PR", autopilot=True)
+    # zona ja varrida -> nada novo a descobrir; foca no mop-up
+    sink.upsert_coverage("owner-1", region_key("Maringa", "PR"), "estetica", result_count=5)
+    sink.insert_lead(Lead(id="", owner_id="owner-1", status="qualificado",
+                          business_name="Preso", phone="44999990009",
+                          rating=4.7, reviews_count=300))
+    maps = FakeMaps([])
+
+    run_autopilot(sink, maps, MockDraftProvider(), [], batch=20, extra_niches=0)
+
+    preso = next(r for r in sink._db["leads"].values() if r["business_name"] == "Preso")
+    assert preso["status"] == "rascunho_pronto"
+
+
 def test_autopilot_pula_zona_ja_varrida(tmp_path):
     sink = _sink(tmp_path)
     sink.upsert_profile(
