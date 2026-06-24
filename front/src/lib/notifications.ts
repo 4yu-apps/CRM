@@ -6,8 +6,9 @@
 // o "o que exige minha atencao agora".
 import type { Lead } from "./types";
 import { meetingsWithin, fmtMeetingWhen } from "./meetings";
+import { daysUntilRenewal } from "./clients";
 
-export type NotifKind = "respondeu" | "reuniao" | "followup" | "esfriando" | "fila";
+export type NotifKind = "respondeu" | "reuniao" | "followup" | "renovacao" | "esfriando" | "fila";
 
 export interface NotifItem {
   id: string;
@@ -32,12 +33,13 @@ export const NOTIF_LABEL: Record<NotifKind, string> = {
   respondeu: "Responderam",
   reuniao: "Reuniões (24h)",
   followup: "Follow-ups de hoje",
+  renovacao: "Renovações de contrato",
   esfriando: "Esfriando",
   fila: "Prontos pra revisar",
 };
 
 // Ordem de prioridade dos grupos no painel.
-const ORDER: NotifKind[] = ["respondeu", "reuniao", "followup", "esfriando", "fila"];
+const ORDER: NotifKind[] = ["respondeu", "reuniao", "followup", "renovacao", "esfriando", "fila"];
 
 export function buildNotifications(leads: Lead[], coolingDays = 5): NotifItem[] {
   const out: NotifItem[] = [];
@@ -48,6 +50,22 @@ export function buildNotifications(leads: Lead[], coolingDays = 5): NotifItem[] 
 
   for (const l of leads) {
     if (l.archived) continue;
+
+    // renovacao de contrato proxima (<= 30 dias) ou vencida (#16)
+    if (l.status === "fechado") {
+      const dr = daysUntilRenewal(l);
+      if (dr !== null && dr <= 30) {
+        out.push({
+          id: `ren-${l.id}`,
+          kind: "renovacao",
+          leadId: l.id,
+          title: l.business_name ?? "Cliente",
+          detail: dr < 0 ? `contrato venceu há ${-dr}d` : dr === 0 ? "contrato vence hoje" : `renova em ${dr}d`,
+          href: `/ficha/${l.id}`,
+          ts: now,
+        });
+      }
+    }
 
     // responderam (precisa da sua resposta)
     if (l.status === "respondeu" || l.status === "interessado") {
