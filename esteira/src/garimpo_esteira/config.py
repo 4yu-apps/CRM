@@ -62,8 +62,9 @@ class Config:
     pagespeed_enabled: bool = False
     # Places Details (telefone/site das capturas via place_id). Custa (SKU
     # Enterprise: 1.000 gratis/mes ~= 30/dia), entao limita por DIA e bloqueia ao
-    # bater. Usa a GOOGLE_MAPS_API_KEY. 0 = desligado.
-    places_daily_limit: int = 30
+    # bater. DESLIGADO por padrao (0): o dono liga via GARIMPO_PLACES_DAILY_LIMIT
+    # depois de confirmar folga de cota no Google Cloud Console.
+    places_daily_limit: int = 0
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -101,7 +102,7 @@ class Config:
             pagespeed_enabled=(
                 ps_flag in ("1", "true", "True") if ps_flag is not None else bool(ps_key)
             ),
-            places_daily_limit=int(os.getenv("GARIMPO_PLACES_DAILY_LIMIT", "30")),
+            places_daily_limit=int(os.getenv("GARIMPO_PLACES_DAILY_LIMIT", "0")),
         )
 
 
