@@ -14,7 +14,7 @@ import {
   X,
 } from "@phosphor-icons/react";
 import { useLeads } from "@/hooks/use-leads";
-import { funnel, depth } from "@/lib/funnel";
+import { funnel, depth, kpis as funnelKpis, pct } from "@/lib/funnel";
 import type { Lead, LeadStatus } from "@/lib/types";
 
 // Meta de receita do mes: editavel pelo usuario, guardada na localStorage.
@@ -165,6 +165,7 @@ interface FunnelBar {
   value: number;
   color: string;
   pct: number;
+  conv: number | null; // % que passou do estágio anterior (0..1); null no topo
 }
 
 const BAR_COLORS = [
@@ -194,11 +195,16 @@ function buildFunnelBars(leads: Lead[]): FunnelBar[] {
     { label: "Clientes fechados", value: stages.find((s) => s.status === "fechado")?.reached ?? 0 },
   ];
 
-  return rows.map((r, i) => ({
-    ...r,
-    color: BAR_COLORS[i] ?? "#C4B5FD",
-    pct: total > 0 ? Math.round((r.value / total) * 100) : 0,
-  }));
+  return rows.map((r, i) => {
+    const prev = i === 0 ? null : rows[i - 1].value;
+    return {
+      ...r,
+      color: BAR_COLORS[i] ?? "#C4B5FD",
+      pct: total > 0 ? Math.round((r.value / total) * 100) : 0,
+      // conversão etapa-a-etapa: quanto do estágio anterior chegou aqui (onde se perde lead)
+      conv: prev === null || prev === 0 ? null : r.value / prev,
+    };
+  });
 }
 
 // ---------- meta do mes ----------
@@ -233,6 +239,152 @@ function buildMeta(leads: Lead[]): MetaDoMes {
   };
 }
 
+// ---------- receita recorrente (#14) ----------
+
+interface Recurring {
+  closedCount: number;
+  ticketMedio: number; // media de deal_value dos fechados com valor
+  mrr: number; // soma dos mensal_fixo (recorrente/mes)
+  porPrazoTotal: number; // soma de deal_value * meses dos por_prazo (contratado)
+}
+
+function buildRecurring(leads: Lead[]): Recurring {
+  const closed = leads.filter((l) => l.status === "fechado" && (l.deal_value ?? 0) > 0);
+  const soma = closed.reduce((s, l) => s + (l.deal_value ?? 0), 0);
+  const mrr = closed
+    .filter((l) => l.deal_billing === "mensal_fixo")
+    .reduce((s, l) => s + (l.deal_value ?? 0), 0);
+  const porPrazoTotal = closed
+    .filter((l) => l.deal_billing === "por_prazo")
+    .reduce((s, l) => s + (l.deal_value ?? 0) * (l.deal_term_months ?? 1), 0);
+  return {
+    closedCount: closed.length,
+    ticketMedio: closed.length ? soma / closed.length : 0,
+    mrr,
+    porPrazoTotal,
+  };
+}
+
+// ---------- recorte por dimensao (#12) ----------
+
+type Dim = "category" | "city" | "service_target";
+
+const DIM_LABELS: Record<Dim, string> = {
+  category: "Nicho",
+  city: "Cidade",
+  service_target: "Serviço",
+};
+
+const SERVICE_LABELS: Record<string, string> = {
+  trafego: "Tráfego",
+  automacao: "Automação",
+  ambos: "Ambos",
+  design: "Design",
+  marketing: "Marketing",
+  indefinido: "Indefinido",
+};
+
+function dimValue(l: Lead, dim: Dim): string {
+  if (dim === "service_target") return SERVICE_LABELS[l.service_target] ?? l.service_target;
+  const v = l[dim];
+  return v && v.trim() ? v.trim() : "—";
+}
+
+interface Segment {
+  key: string;
+  total: number;
+  enviados: number;
+  responderam: number;
+  fechados: number;
+  taxaResposta: number;
+  taxaFechamento: number;
+}
+
+/** Agrupa por dimensao, calcula KPIs por grupo e retorna os top N por volume. */
+function buildSegments(leads: Lead[], dim: Dim, topN = 8): { rows: Segment[]; hidden: number } {
+  const groups = new Map<string, Lead[]>();
+  for (const l of leads) {
+    const k = dimValue(l, dim);
+    const arr = groups.get(k) ?? [];
+    arr.push(l);
+    groups.set(k, arr);
+  }
+  const all: Segment[] = [...groups.entries()].map(([key, ls]) => {
+    const k = funnelKpis(ls);
+    return {
+      key,
+      total: ls.length,
+      enviados: k.enviados,
+      responderam: k.responderam,
+      fechados: k.fechados,
+      taxaResposta: k.taxaResposta,
+      taxaFechamento: k.taxaFechamento,
+    };
+  });
+  all.sort((a, b) => b.total - a.total);
+  const rows = all.slice(0, topN);
+  return { rows, hidden: all.length - rows.length };
+}
+
+// ---------- seletor de periodo (#13) ----------
+
+type Period = "all" | "month" | "prev_month" | "d30" | "d90";
+
+const PERIOD_LABELS: Record<Period, string> = {
+  all: "Tudo",
+  month: "Este mês",
+  prev_month: "Mês passado",
+  d30: "30 dias",
+  d90: "90 dias",
+};
+
+interface Range {
+  from: Date | null;
+  to: Date | null;
+}
+
+function daysAgo(now: Date, n: number): Date {
+  const d = new Date(now);
+  d.setDate(d.getDate() - n);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+/** Janela [from, to) do periodo escolhido. from=null => tudo. */
+function periodRange(p: Period, now: Date): Range {
+  const upTo = new Date(now.getTime() + 1);
+  switch (p) {
+    case "all":
+      return { from: null, to: null };
+    case "month":
+      return { from: startOfMonth(now), to: upTo };
+    case "prev_month":
+      return { from: new Date(now.getFullYear(), now.getMonth() - 1, 1), to: startOfMonth(now) };
+    case "d30":
+      return { from: daysAgo(now, 30), to: upTo };
+    case "d90":
+      return { from: daysAgo(now, 90), to: upTo };
+  }
+}
+
+/** Janela imediatamente anterior, de mesma duracao, p/ comparacao. null se nao aplicavel. */
+function previousRange(p: Period, now: Date): Range | null {
+  switch (p) {
+    case "all":
+      return null;
+    case "month":
+      return { from: new Date(now.getFullYear(), now.getMonth() - 1, 1), to: startOfMonth(now) };
+    case "prev_month":
+      return { from: new Date(now.getFullYear(), now.getMonth() - 2, 1), to: new Date(now.getFullYear(), now.getMonth() - 1, 1) };
+    case "d30":
+      return { from: daysAgo(now, 60), to: daysAgo(now, 30) };
+    case "d90":
+      return { from: daysAgo(now, 180), to: daysAgo(now, 90) };
+  }
+}
+
+const closedCount = (ls: Lead[]) => ls.filter((l) => l.status === "fechado").length;
+
 // ---------- icone de delta ----------
 
 function DeltaIcon({ n }: { n: number | null }) {
@@ -247,8 +399,29 @@ export default function ResultadosPage() {
   const { leads, loading } = useLeads();
 
   const kpis = useMemo(() => buildKpis(leads), [leads]);
-  const funnelBars = useMemo(() => buildFunnelBars(leads), [leads]);
   const meta = useMemo(() => buildMeta(leads), [leads]);
+  const recurring = useMemo(() => buildRecurring(leads), [leads]); // #14 — sobre toda a base
+
+  // seletor de periodo (#13) — escopa funil e recortes (coorte por created_at)
+  const [period, setPeriod] = useState<Period>("all");
+  const now = useMemo(() => new Date(), []);
+  const range = useMemo(() => periodRange(period, now), [period, now]);
+  const scoped = useMemo(
+    () => (range.from ? createdIn(leads, range.from, range.to!) : leads),
+    [leads, range]
+  );
+  // comparacao vs periodo anterior (so fechados, p/ tendencia)
+  const closedDelta = useMemo(() => {
+    const prev = previousRange(period, now);
+    if (!prev || !prev.from || !prev.to) return null;
+    return closedCount(scoped) - closedCount(createdIn(leads, prev.from, prev.to));
+  }, [leads, scoped, period, now]);
+
+  const funnelBars = useMemo(() => buildFunnelBars(scoped), [scoped]);
+
+  // recorte por dimensao (#12) — respeita o periodo
+  const [dim, setDim] = useState<Dim>("category");
+  const segments = useMemo(() => buildSegments(scoped, dim), [scoped, dim]);
 
   // Meta de receita editavel (persistida). Hidrata da localStorage no cliente.
   const [metaReceita, setMetaReceita] = useState(10000);
@@ -339,6 +512,30 @@ export default function ResultadosPage() {
         ))}
       </div>
 
+      {/* seletor de periodo (#13) — escopa funil e recortes */}
+      <div className="fu flex flex-wrap items-center justify-between gap-3 rounded-[18px] border border-border bg-card px-5 py-3 shadow-[var(--shadow)]">
+        <span className="text-[12.5px] font-semibold text-muted-foreground">
+          Período <span className="font-normal text-faint">(funil e recortes abaixo)</span>
+        </span>
+        <div className="flex flex-wrap gap-1 rounded-full bg-[var(--inset)] p-1">
+          {(["all", "month", "prev_month", "d30", "d90"] as Period[]).map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => setPeriod(p)}
+              aria-pressed={period === p}
+              className={`rounded-full px-3 py-1 text-[12.5px] font-semibold transition-colors ${
+                period === p
+                  ? "bg-card text-foreground shadow-[var(--shadow)]"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {PERIOD_LABELS[p]}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* funil + meta */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.5fr_1fr] lg:items-start">
 
@@ -346,7 +543,20 @@ export default function ResultadosPage() {
         <div className="fu rounded-[18px] border border-border bg-card p-6 shadow-[var(--shadow)]">
           <div className="mb-5 flex items-baseline justify-between gap-2">
             <span className="text-[16px] font-bold">Da prospecção ao fechamento</span>
-            <span className="text-[11.5px] text-faint">instantâneo · por status atual</span>
+            <div className="flex flex-col items-end gap-0.5 text-right">
+              {closedDelta !== null && (
+                <span
+                  className={`flex items-center gap-1 text-[12px] font-bold ${
+                    closedDelta > 0 ? "text-success" : closedDelta < 0 ? "text-danger" : "text-faint"
+                  }`}
+                >
+                  <DeltaIcon n={closedDelta} />
+                  {closedDelta > 0 ? "+" : ""}
+                  {closedDelta} fechados vs período anterior
+                </span>
+              )}
+              <span className="text-[11.5px] text-faint">% = conversão da etapa anterior</span>
+            </div>
           </div>
           {loading ? (
             <div className="space-y-3">
@@ -378,6 +588,12 @@ export default function ResultadosPage() {
                     {b.value === 0 && (
                       <span className="absolute inset-y-0 left-2 flex items-center text-[12.5px] text-faint">0</span>
                     )}
+                  </div>
+                  <div
+                    className="w-[52px] flex-none text-right text-[12.5px] font-bold tabular-nums text-ink-2"
+                    title={b.conv !== null ? "Conversão da etapa anterior" : undefined}
+                  >
+                    {b.conv !== null ? `${Math.round(b.conv * 100)}%` : <span className="text-faint">—</span>}
                   </div>
                 </div>
               ))}
@@ -484,6 +700,119 @@ export default function ResultadosPage() {
             )}
           </div>
         </div>
+      </div>
+
+      {/* receita recorrente (#14) — sobre toda a base de fechados */}
+      <div className="fu rounded-[18px] border border-border bg-card p-6 shadow-[var(--shadow)]">
+        <div className="mb-4 flex items-baseline justify-between gap-2">
+          <span className="text-[16px] font-bold">Receita recorrente</span>
+          <span className="text-[11.5px] text-faint">todos os negócios fechados</span>
+        </div>
+        {loading ? (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="h-20 rounded-[14px] bg-[var(--inset)] animate-pulse" />
+            ))}
+          </div>
+        ) : recurring.closedCount === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Nenhum negócio fechado com valor ainda. Ao registrar o valor de um fechamento, o ticket médio e o MRR aparecem aqui.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="rounded-[14px] bg-[var(--inset)] p-4">
+              <div className="text-[12px] text-muted-foreground">Ticket médio</div>
+              <div className="mt-1 font-heading text-[26px] font-bold leading-none">{brl(recurring.ticketMedio)}</div>
+              <div className="mt-1.5 text-[12px] text-faint">{recurring.closedCount} fechados</div>
+            </div>
+            <div className="rounded-[14px] bg-[var(--inset)] p-4">
+              <div className="text-[12px] text-muted-foreground">MRR contratado</div>
+              <div className="mt-1 font-heading text-[26px] font-bold leading-none text-success">{brl(recurring.mrr)}</div>
+              <div className="mt-1.5 text-[12px] text-faint">recorrente por mês (mensal fixo)</div>
+            </div>
+            <div className="rounded-[14px] bg-[var(--inset)] p-4">
+              <div className="text-[12px] text-muted-foreground">Contratos por prazo</div>
+              <div className="mt-1 font-heading text-[26px] font-bold leading-none">{brl(recurring.porPrazoTotal)}</div>
+              <div className="mt-1.5 text-[12px] text-faint">valor total contratado (valor × meses)</div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* recorte por dimensao (#12) */}
+      <div className="fu rounded-[18px] border border-border bg-card p-6 shadow-[var(--shadow)]">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <span className="text-[16px] font-bold">Onde estou convertendo melhor</span>
+          <div className="flex gap-1 rounded-full bg-[var(--inset)] p-1">
+            {(["category", "city", "service_target"] as Dim[]).map((d) => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => setDim(d)}
+                aria-pressed={dim === d}
+                className={`rounded-full px-3.5 py-1 text-[12.5px] font-semibold transition-colors ${
+                  dim === d
+                    ? "bg-card text-foreground shadow-[var(--shadow)]"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {DIM_LABELS[d]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="space-y-2.5">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="h-9 rounded-lg bg-[var(--inset)] animate-pulse" />
+            ))}
+          </div>
+        ) : segments.rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Sem dados para esse recorte ainda.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-[13px]">
+              <thead>
+                <tr className="text-[11px] uppercase tracking-wide text-faint">
+                  <th className="pb-2 text-left font-semibold">{DIM_LABELS[dim]}</th>
+                  <th className="pb-2 text-right font-semibold">Leads</th>
+                  <th className="pb-2 text-right font-semibold">Enviados</th>
+                  <th className="pb-2 text-right font-semibold">Resp.</th>
+                  <th className="pb-2 text-right font-semibold">Taxa resp.</th>
+                  <th className="pb-2 text-right font-semibold">Fechados</th>
+                  <th className="pb-2 text-right font-semibold">Taxa fech.</th>
+                </tr>
+              </thead>
+              <tbody>
+                {segments.rows.map((s) => (
+                  <tr key={s.key} className="border-t border-border">
+                    <td className="max-w-[180px] truncate py-2 pr-3 font-semibold text-ink-2" title={s.key}>
+                      {s.key}
+                    </td>
+                    <td className="py-2 text-right tabular-nums">{s.total}</td>
+                    <td className="py-2 text-right tabular-nums">{s.enviados}</td>
+                    <td className="py-2 text-right tabular-nums">{s.responderam}</td>
+                    <td className="py-2 text-right font-semibold tabular-nums">
+                      {s.enviados ? pct(s.taxaResposta) : <span className="text-faint">—</span>}
+                    </td>
+                    <td className="py-2 text-right tabular-nums">{s.fechados}</td>
+                    <td className="py-2 text-right font-semibold tabular-nums">
+                      {s.enviados ? pct(s.taxaFechamento) : <span className="text-faint">—</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {segments.hidden > 0 && (
+              <p className="mt-3 text-[12px] text-faint">
+                +{segments.hidden} {DIM_LABELS[dim].toLowerCase()}
+                {segments.hidden > 1 ? "s" : ""} com menos leads não exibido
+                {segments.hidden > 1 ? "s" : ""}
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

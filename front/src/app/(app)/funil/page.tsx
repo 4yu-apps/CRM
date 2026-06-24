@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { HandGrabbing, CalendarBlank, CurrencyDollar, X, DotsThreeVertical, CaretRight, Bell } from "@phosphor-icons/react";
+import { HandGrabbing, CalendarBlank, CurrencyDollar, X, DotsThreeVertical, CaretRight, Bell, Archive } from "@phosphor-icons/react";
 import { useLeads } from "@/hooks/use-leads";
 import { SERVICE_META } from "@/lib/service";
 import { createCalendarEvent } from "@/lib/calendar";
@@ -443,6 +443,118 @@ function FunnelDealModal({ lead, onConfirm, onClose }: DealModalProps) {
 }
 
 // ---------------------------------------------------------------------------
+// Modal: motivo de perda (#17) — ao arquivar um lead
+// ---------------------------------------------------------------------------
+
+const LOSS_REASONS = [
+  "Preço",
+  "Sem orçamento",
+  "Foi pra concorrente",
+  "Sumiu / parou de responder",
+  "Sem fit",
+  "Fora de hora",
+];
+
+interface LossModalProps {
+  lead: Lead;
+  onConfirm: (reason: string) => void;
+  onClose: () => void;
+}
+
+function FunnelLossModal({ lead, onConfirm, onClose }: LossModalProps) {
+  const [picked, setPicked] = useState<string | null>(null);
+  const [extra, setExtra] = useState("");
+
+  const handle = (skip: boolean) => {
+    if (skip) {
+      onConfirm("");
+      return;
+    }
+    const reason = [picked, extra.trim()].filter(Boolean).join(" · ");
+    onConfirm(reason);
+  };
+
+  return (
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(20,12,40,.45)] p-6 backdrop-blur-[2px]"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-[440px] max-w-full overflow-hidden rounded-[22px] bg-card shadow-[var(--shadow-lg)]"
+        style={{ animation: "fadeUp .25s both" }}
+      >
+        <div className="flex items-center justify-between border-b border-border px-6 py-5">
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 flex-none items-center justify-center rounded-[12px] bg-slate-500/15 text-slate-600">
+              <Archive size={20} weight="fill" />
+            </div>
+            <div>
+              <div className="text-base font-bold">Arquivar lead</div>
+              <div className="text-[12.5px] text-muted-foreground">{lead.business_name}</div>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="flex flex-col gap-4 px-6 py-5">
+          <div>
+            <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wider text-faint">
+              Por que perdeu esse lead?
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {LOSS_REASONS.map((r) => (
+                <button
+                  key={r}
+                  onClick={() => setPicked((p) => (p === r ? null : r))}
+                  className={cn(
+                    "rounded-full border px-3 py-1.5 text-[12.5px] font-semibold transition-colors",
+                    picked === r
+                      ? "border-brand bg-brand-50 text-brand"
+                      : "border-border-2 bg-surface-2 text-ink-2 hover:border-brand/50"
+                  )}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-faint">
+              Detalhe (opcional)
+            </label>
+            <input
+              type="text"
+              placeholder="Ex: achou caro, vai pensar..."
+              value={extra}
+              onChange={(e) => setExtra(e.target.value)}
+              className="w-full rounded-xl border border-border-2 bg-surface-2 px-3.5 py-3 text-sm outline-none focus:border-brand"
+            />
+          </div>
+        </div>
+        <div className="flex gap-3 px-6 pb-6">
+          <button
+            onClick={() => handle(true)}
+            className="flex-1 rounded-[14px] border border-border-2 bg-card p-3.5 text-sm font-semibold text-ink-2"
+          >
+            Arquivar sem motivo
+          </button>
+          <button
+            onClick={() => handle(false)}
+            disabled={!picked && !extra.trim()}
+            className="flex-1 rounded-[14px] p-3.5 text-sm font-bold text-white disabled:opacity-50"
+            style={{ background: "var(--grad)" }}
+          >
+            Arquivar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Card individual do kanban
 // ---------------------------------------------------------------------------
 
@@ -664,7 +776,8 @@ function MoveSheet({
 type ModalState =
   | { type: "none" }
   | { type: "meeting"; lead: Lead; targetColId: string }
-  | { type: "deal"; lead: Lead; targetColId: string };
+  | { type: "deal"; lead: Lead; targetColId: string }
+  | { type: "loss"; lead: Lead; targetColId: string };
 
 export default function FunilPage() {
   const { leads, repo, refresh } = useLeads();
@@ -821,6 +934,11 @@ export default function FunilPage() {
     (lead: Lead, col: KanbanColumn) => {
       const currentCol = getColumnForLead(lead);
       if (currentCol?.id === col.id) return;
+      // Arquivar um lead ativo: pergunta o motivo da perda (#17) antes.
+      if (col.isArchived && !currentCol?.isArchived) {
+        setModal({ type: "loss", lead, targetColId: col.id });
+        return;
+      }
       if (col.id === "reuniao") {
         setModal({ type: "meeting", lead, targetColId: col.id });
         return;
@@ -959,6 +1077,22 @@ export default function FunilPage() {
     [modal, repo, executeTransition]
   );
 
+  const handleLossConfirm = useCallback(
+    async (reason: string) => {
+      if (modal.type !== "loss") return;
+      const { lead } = modal;
+      const col = KANBAN_COLUMNS.find((c) => c.isArchived)!;
+      setModal({ type: "none" });
+      try {
+        if (reason) await repo.update(lead.id, { loss_reason: reason });
+        await executeTransition(lead, col);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Erro ao arquivar");
+      }
+    },
+    [modal, repo, executeTransition]
+  );
+
   // -------------------------------------------------------------------------
   // Render
   // -------------------------------------------------------------------------
@@ -1034,6 +1168,15 @@ export default function FunilPage() {
         <FunnelDealModal
           lead={modal.lead}
           onConfirm={handleDealConfirm}
+          onClose={() => setModal({ type: "none" })}
+        />
+      )}
+
+      {/* Modal de motivo de perda (#17) */}
+      {modal.type === "loss" && (
+        <FunnelLossModal
+          lead={modal.lead}
+          onConfirm={handleLossConfirm}
           onClose={() => setModal({ type: "none" })}
         />
       )}
