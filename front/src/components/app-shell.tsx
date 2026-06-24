@@ -2,7 +2,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTheme } from "next-themes";
 import {
   House,
@@ -18,6 +18,11 @@ import {
   Moon,
   SignOut,
   Bell,
+  BellRinging,
+  ChatCircleDots,
+  CalendarCheck,
+  Snowflake,
+  Sparkle,
   VideoCamera,
   MapPin,
   CaretLeft,
@@ -29,6 +34,7 @@ import { useT } from "@/lib/i18n";
 import { useLeads } from "@/hooks/use-leads";
 import { STATUS_META } from "@/lib/state-machine";
 import { meetingsWithin, meetingModality, fmtMeetingWhen } from "@/lib/meetings";
+import { buildNotifications, groupNotifications, type NotifKind } from "@/lib/notifications";
 import type { Lead } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -237,12 +243,23 @@ function MobileSearch({ leads, t }: { leads: Lead[]; t: (key: string, fallback?:
   );
 }
 
-// Sininho: as reunioes das proximas 48h. Mostra contagem, e clicar abre a ficha.
-// "amanha voce tem reuniao com X" sem voce ir caçar na agenda.
+// Icone por tipo de notificacao.
+const NOTIF_ICON: Record<NotifKind, React.ComponentType<{ size: number; weight?: "fill" }>> = {
+  respondeu: ChatCircleDots,
+  reuniao: CalendarCheck,
+  followup: BellRinging,
+  esfriando: Snowflake,
+  fila: Sparkle,
+};
+
+// Central de notificacoes: tudo que exige sua atencao agora, derivado dos leads.
+// Respondeu, reuniao em 24h, follow-up de hoje, esfriando e novos na fila.
 function NotificationBell({ leads }: { leads: Lead[] }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const items = meetingsWithin(leads, 48);
+  const items = useMemo(() => buildNotifications(leads), [leads]);
+  const groups = useMemo(() => groupNotifications(items), [items]);
+  const total = items.length;
 
   return (
     <div className="relative">
@@ -253,58 +270,71 @@ function NotificationBell({ leads }: { leads: Lead[] }) {
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         className="relative flex size-9 items-center justify-center rounded-full border border-border bg-accent text-ink-2 transition-colors hover:text-brand"
       >
-        <Bell size={17} weight={items.length ? "fill" : "regular"} />
-        {items.length > 0 && (
+        <Bell size={17} weight={total ? "fill" : "regular"} />
+        {total > 0 && (
           <span
             className="absolute -right-0.5 -top-0.5 flex h-[17px] min-w-[17px] items-center justify-center rounded-full px-1 text-[10px] font-bold text-white"
             style={{ background: "var(--grad)" }}
           >
-            {items.length}
+            {total}
           </span>
         )}
       </button>
       {open && (
-        <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-[360px] max-w-[80vw] overflow-hidden rounded-[14px] border border-border bg-card shadow-xl">
-          <div className="border-b border-border px-4 py-2.5 text-[12px] font-bold uppercase tracking-wider text-faint">
-            Próximas reuniões
+        <div className="absolute right-0 top-[calc(100%+8px)] z-50 max-h-[70vh] w-[360px] max-w-[80vw] overflow-y-auto rounded-[14px] border border-border bg-card shadow-xl">
+          <div className="sticky top-0 border-b border-border bg-card px-4 py-2.5 text-[12px] font-bold uppercase tracking-wider text-faint">
+            {total === 0 ? "Tudo em dia" : `${total} pra você agora`}
           </div>
-          {items.length === 0 ? (
-            <div className="px-4 py-4 text-[13px] text-muted-foreground">
-              Nada nas próximas 48h.
+          {total === 0 ? (
+            <div className="px-4 py-5 text-[13px] text-muted-foreground">
+              Nada exigindo sua atenção agora. Quando alguém responder, uma reunião chegar ou um follow-up vencer, aparece aqui.
             </div>
           ) : (
-            items.map(({ lead, at }) => {
-              const modality = meetingModality(lead);
+            groups.map((g) => {
+              const Icon = NOTIF_ICON[g.kind];
               return (
-                <button
-                  key={lead.id}
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => {
-                    setOpen(false);
-                    router.push(`/ficha/${lead.id}`);
-                  }}
-                  className="flex w-full flex-col items-start gap-0.5 border-b border-border px-4 py-2.5 text-left transition-colors last:border-0 hover:bg-accent/60"
-                >
-                  <span className="line-clamp-2 text-[13.5px] font-semibold text-ink">
-                    {lead.business_name ?? "(sem nome)"}
-                  </span>
-                  <span className="flex items-center gap-1.5 text-[12px] text-brand-700">
-                    {fmtMeetingWhen(at)}
-                    {modality === "online" && <VideoCamera size={12} weight="fill" />}
-                    {modality === "presencial" && <MapPin size={12} weight="fill" />}
-                  </span>
-                </button>
+                <div key={g.kind}>
+                  <div className="flex items-center gap-1.5 bg-surface-2 px-4 py-1.5 text-[11px] font-bold uppercase tracking-wider text-faint">
+                    <Icon size={12} weight="fill" /> {g.label}
+                    <span className="ml-auto">{g.items.length}</span>
+                  </div>
+                  {g.items.slice(0, 6).map((it) => {
+                    const lead = it.leadId ? leads.find((l) => l.id === it.leadId) : null;
+                    const modality = lead ? meetingModality(lead) : "indefinido";
+                    return (
+                      <button
+                        key={it.id}
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          setOpen(false);
+                          router.push(it.href);
+                        }}
+                        className="flex w-full flex-col items-start gap-0.5 border-b border-border px-4 py-2.5 text-left transition-colors last:border-0 hover:bg-accent/60"
+                      >
+                        <span className="line-clamp-1 text-[13.5px] font-semibold text-ink">{it.title}</span>
+                        <span className="flex items-center gap-1.5 text-[12px] text-brand-700">
+                          {it.detail}
+                          {g.kind === "reuniao" && modality === "online" && <VideoCamera size={12} weight="fill" />}
+                          {g.kind === "reuniao" && modality === "presencial" && <MapPin size={12} weight="fill" />}
+                        </span>
+                      </button>
+                    );
+                  })}
+                  {g.items.length > 6 && (
+                    <div className="px-4 py-1.5 text-[11.5px] text-faint">+{g.items.length - 6} mais</div>
+                  )}
+                </div>
               );
             })
           )}
           <Link
-            href="/agenda"
+            href="/"
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => setOpen(false)}
-            className="block bg-surface-2 px-4 py-2.5 text-center text-[12.5px] font-semibold text-brand hover:underline"
+            className="sticky bottom-0 block border-t border-border bg-surface-2 px-4 py-2.5 text-center text-[12.5px] font-semibold text-brand hover:underline"
           >
-            Ver agenda completa
+            Abrir o resumo do dia
           </Link>
         </div>
       )}
