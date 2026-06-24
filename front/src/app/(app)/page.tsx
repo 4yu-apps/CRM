@@ -15,6 +15,8 @@ import {
   ChatCircleDots,
   CalendarCheck,
   Snowflake,
+  CaretDown,
+  CaretUp,
 } from "@phosphor-icons/react";
 import { useLeads } from "@/hooks/use-leads";
 import { useAuth } from "@/lib/auth";
@@ -22,6 +24,8 @@ import { getRepo } from "@/lib/repo";
 import { fmtRelative } from "@/lib/format";
 import { meetingsWithin, fmtMeetingWhen } from "@/lib/meetings";
 import { cn } from "@/lib/utils";
+import { QuickActions } from "@/components/quick-actions";
+import type { LeadsRepo } from "@/lib/repo";
 import type { ActivityEvent, ActivityType, Lead } from "@/lib/types";
 
 // ---- helpers ----------------------------------------------------------------
@@ -74,7 +78,7 @@ const ACTIVITY_ICON: Record<ActivityType, React.ComponentType<{ size: number }>>
 
 export default function InicioPage() {
   const { user } = useAuth();
-  const { leads, loading: leadsLoading, error: leadsError, refresh: refreshLeads } = useLeads();
+  const { leads, loading: leadsLoading, error: leadsError, refresh: refreshLeads, repo } = useLeads();
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
   const [activityLoading, setActivityLoading] = useState(true);
   const [activityError, setActivityError] = useState(false);
@@ -269,6 +273,8 @@ export default function InicioPage() {
               tone="green"
               leads={precisaResponder}
               labelOf={(l) => (l.status === "interessado" ? "interessado" : "respondeu")}
+              repo={repo}
+              onDone={refreshLeads}
             />
             <ActionBucket
               icon={<BellRinging size={15} weight="fill" />}
@@ -281,6 +287,8 @@ export default function InicioPage() {
                 const inicioHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
                 return due < inicioHoje ? "atrasado" : "hoje";
               }}
+              repo={repo}
+              onDone={refreshLeads}
             />
             <ActionBucket
               icon={<CalendarCheck size={15} weight="fill" />}
@@ -291,6 +299,8 @@ export default function InicioPage() {
                 const r = reunioes.find((x) => x.lead.id === l.id);
                 return r ? fmtMeetingWhen(r.at) : "";
               }}
+              repo={repo}
+              onDone={refreshLeads}
             />
             <ActionBucket
               icon={<Snowflake size={15} weight="fill" />}
@@ -301,6 +311,8 @@ export default function InicioPage() {
                 const dias = Math.floor((Date.now() - +new Date(l.updated_at)) / (24 * 60 * 60 * 1000));
                 return `há ${dias}d`;
               }}
+              repo={repo}
+              onDone={refreshLeads}
             />
           </div>
         </div>
@@ -438,12 +450,16 @@ function ActionBucket({
   tone,
   leads,
   labelOf,
+  repo,
+  onDone,
 }: {
   icon: React.ReactNode;
   title: string;
   tone: "green" | "amber" | "brand" | "sky";
   leads: Lead[];
   labelOf: (l: Lead) => string;
+  repo: LeadsRepo;
+  onDone: () => void | Promise<void>;
 }) {
   if (leads.length === 0) return null;
   const headClass =
@@ -472,19 +488,64 @@ function ActionBucket({
       </div>
       <div className="flex flex-col gap-1.5">
         {leads.slice(0, 4).map((l) => (
-          <Link
+          <BucketRow
             key={l.id}
-            href={`/ficha/${l.id}`}
-            className="flex items-center justify-between gap-2 rounded-[10px] border border-border bg-card px-3 py-2 text-[13px] font-semibold transition-colors hover:border-brand"
-          >
-            <span className="truncate">{l.business_name ?? "Sem nome"}</span>
-            <span className={cn("flex-none rounded-full px-2 py-0.5 text-[10.5px] font-bold", pillClass)}>
-              {labelOf(l)}
-            </span>
-          </Link>
+            lead={l}
+            label={labelOf(l)}
+            pillClass={pillClass}
+            repo={repo}
+            onDone={onDone}
+          />
         ))}
       </div>
       {leads.length > 4 && <div className="mt-2 text-[12px] text-faint">+{leads.length - 4} mais</div>}
+    </div>
+  );
+}
+
+// Linha de um bucket: nome (link pra ficha) + selo + caret que abre as acoes
+// rapidas (#5/#6) sem sair da Inicio.
+function BucketRow({
+  lead,
+  label,
+  pillClass,
+  repo,
+  onDone,
+}: {
+  lead: Lead;
+  label: string;
+  pillClass: string;
+  repo: LeadsRepo;
+  onDone: () => void | Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded-[10px] border border-border bg-card">
+      <div className="flex items-center gap-2 px-3 py-2">
+        <Link
+          href={`/ficha/${lead.id}`}
+          className="min-w-0 flex-1 truncate text-[13px] font-semibold transition-colors hover:text-brand"
+        >
+          {lead.business_name ?? "Sem nome"}
+        </Link>
+        <span className={cn("flex-none rounded-full px-2 py-0.5 text-[10.5px] font-bold", pillClass)}>
+          {label}
+        </span>
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-label="Ações rápidas"
+          aria-expanded={open}
+          className="flex-none text-faint transition-colors hover:text-brand"
+        >
+          {open ? <CaretUp size={14} /> : <CaretDown size={14} />}
+        </button>
+      </div>
+      {open && (
+        <div className="px-2.5 pb-2.5">
+          <QuickActions lead={lead} repo={repo} onDone={onDone} />
+        </div>
+      )}
     </div>
   );
 }
