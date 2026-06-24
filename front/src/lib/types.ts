@@ -259,6 +259,27 @@ export interface SearchProfile {
 export type SearchProfileInput = Partial<Pick<SearchProfile,
   "niches" | "city" | "state" | "neighborhood" | "radius" | "default_service_target" | "autopilot" | "profession">>;
 
+// Preset de busca salvo (#8): combinacao nomeada pra re-rodar com 1 clique.
+export interface SearchPresetParams {
+  niches: string[];
+  uf: string;
+  city: string;
+  neighborhood: string;
+  radius: string;
+  service: ServiceTarget;
+}
+export interface SearchPreset {
+  id: string;
+  owner_id: string;
+  name: string;
+  params: SearchPresetParams;
+  created_at: string;
+}
+export interface SearchPresetInput {
+  name: string;
+  params: SearchPresetParams;
+}
+
 // Cobertura de varredura por regiao/nicho (scan_coverage).
 export interface ScanCoverage {
   id: string;
