@@ -10,7 +10,8 @@ export type CadenceStep = {
   rotulo: string;
 };
 
-// Regua de toques apos o envio. Intervalos em dias corridos a partir do envio.
+// Regua de toques apos o envio. `dias` = quantos dias somar a data atual ao
+// agendar cada toque (o intervalo conta a partir do agendamento, nao do envio).
 export const CADENCE: CadenceStep[] = [
   { step: 1, dias: 0, kind: "abertura", rotulo: "Abertura" },
   { step: 2, dias: 2, kind: "follow_up", rotulo: "1º follow-up" },

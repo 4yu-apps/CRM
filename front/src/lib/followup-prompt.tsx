@@ -48,7 +48,7 @@ export function promptFollowupSuggestion(opts: {
               try {
                 await repo.update(lead.id, {
                   followup_at: dataProx.toISOString(),
-                  cadence_step: 1,
+                  cadence_step: Math.max(stepAtual, 1),
                 });
                 toast.dismiss(id);
                 toast.success(`Beleza, te lembro do ${rotuloProx.toLowerCase()} em ${diasProx}d.`);
@@ -66,7 +66,7 @@ export function promptFollowupSuggestion(opts: {
             onClick={() => toast.dismiss(id)}
             className="ml-auto rounded-full px-2.5 py-1 text-xs font-semibold text-faint hover:text-ink-2"
           >
-            Agora nao
+            Agora não
           </button>
         </div>
       </div>

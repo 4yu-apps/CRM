@@ -305,7 +305,7 @@ function NotificationBell({ leads }: { leads: Lead[] }) {
     <div className="relative">
       <button
         type="button"
-        aria-label="Notificacoes"
+        aria-label="Notificações"
         onClick={() => setOpen((o) => !o)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         className="relative flex size-9 items-center justify-center rounded-full border border-border bg-accent text-ink-2 transition-colors hover:text-brand"
@@ -323,11 +323,11 @@ function NotificationBell({ leads }: { leads: Lead[] }) {
       {open && (
         <div className="absolute right-0 top-[calc(100%+8px)] z-50 max-h-[70vh] w-[360px] max-w-[80vw] overflow-y-auto rounded-[14px] border border-border bg-card shadow-xl">
           <div className="sticky top-0 border-b border-border bg-card px-4 py-2.5 text-[12px] font-bold uppercase tracking-wider text-faint">
-            {total === 0 ? "Tudo em dia" : `${total} pra voce agora`}
+            {total === 0 ? "Tudo em dia" : `${total} pra você agora`}
           </div>
           {total === 0 ? (
             <div className="px-4 py-5 text-[13px] text-muted-foreground">
-              Nada exigindo sua atencao agora. Quando alguem responder, uma reuniao chegar ou um follow-up vencer, aparece aqui.
+              Nada exigindo sua atenção agora. Quando alguém responder, uma reunião chegar ou um follow-up vencer, aparece aqui.
             </div>
           ) : (
             groups.map((g) => {
@@ -660,7 +660,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     ? "1 novo lead chegou"
                     : `${novos} novos leads chegaram`
                   : queue > 0
-                    ? `${queue} leads prontos pra voce`
+                    ? `${queue} leads prontos pra você`
                     : "Buscando novos leads"}
               </span>
             </Link>
@@ -702,7 +702,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 type="button"
                 aria-label="Mais"
                 onClick={() => setMoreOpen(true)}
-                className="relative flex flex-col items-center gap-0.5 rounded-lg px-2 py-1.5 text-faint"
+                className={cn(
+                  "relative flex flex-col items-center gap-0.5 rounded-lg px-2 py-1.5",
+                  overflow.some((i) => isActive(pathname, i.href)) ? "text-brand" : "text-faint",
+                )}
               >
                 <DotsThree size={22} weight="bold" />
               </button>
@@ -710,7 +713,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
                 <SheetContent side="bottom" showCloseButton={false}>
                   <SheetHeader>
-                    <SheetTitle>Mais opcoes</SheetTitle>
+                    <SheetTitle>Mais opções</SheetTitle>
                   </SheetHeader>
                   <nav className="flex flex-col gap-0.5 px-2 pb-4">
                     {overflow.map(({ href, label, Icon }) => {

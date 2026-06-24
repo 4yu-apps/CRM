@@ -120,7 +120,7 @@ export function FollowupCard({
       // Passo 1 (abertura) foi feito. Agendar passo 2 (1o follow-up).
       const prox = proximoToque(1);
       if (!prox) {
-        toast.error("Cadencia nao configurada.");
+        toast.error("Cadência não configurada.");
         return;
       }
       const novoAt = dataSugerida(prox).toISOString();
@@ -253,7 +253,7 @@ export function FollowupCard({
         <textarea
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          placeholder="Ex: oi, tudo bem? so passando pra saber se voce viu minha mensagem..."
+          placeholder="Ex: oi, tudo bem? só passando pra saber se você viu minha mensagem..."
           rows={3}
           className="w-full resize-none rounded-xl border border-border-2 bg-card px-3 py-2 text-sm outline-none focus:border-brand"
         />
@@ -284,7 +284,7 @@ export function FollowupCard({
       {/* Cadencia multi-toque (cadence.ts) */}
       <div className="mt-4 border-t border-border pt-3">
         <div className="mb-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-faint">
-          <ArrowsClockwise size={14} weight="bold" /> Cadencia de {REGUA_TOTAL} toques
+          <ArrowsClockwise size={14} weight="bold" /> Cadência de {REGUA_TOTAL} toques
         </div>
 
         {step === 0 ? (

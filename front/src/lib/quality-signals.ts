@@ -90,5 +90,7 @@ export function matchesSignal(l: Lead, f: SignalFilter): boolean {
       return temLoja(l);
     case "sem_instagram":
       return !temInstagram(l);
+    default:
+      return false;
   }
 }
