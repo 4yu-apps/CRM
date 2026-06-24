@@ -165,6 +165,7 @@ interface FunnelBar {
   value: number;
   color: string;
   pct: number;
+  conv: number | null; // % que passou do estágio anterior (0..1); null no topo
 }
 
 const BAR_COLORS = [
@@ -194,11 +195,16 @@ function buildFunnelBars(leads: Lead[]): FunnelBar[] {
     { label: "Clientes fechados", value: stages.find((s) => s.status === "fechado")?.reached ?? 0 },
   ];
 
-  return rows.map((r, i) => ({
-    ...r,
-    color: BAR_COLORS[i] ?? "#C4B5FD",
-    pct: total > 0 ? Math.round((r.value / total) * 100) : 0,
-  }));
+  return rows.map((r, i) => {
+    const prev = i === 0 ? null : rows[i - 1].value;
+    return {
+      ...r,
+      color: BAR_COLORS[i] ?? "#C4B5FD",
+      pct: total > 0 ? Math.round((r.value / total) * 100) : 0,
+      // conversão etapa-a-etapa: quanto do estágio anterior chegou aqui (onde se perde lead)
+      conv: prev === null || prev === 0 ? null : r.value / prev,
+    };
+  });
 }
 
 // ---------- meta do mes ----------
@@ -346,7 +352,7 @@ export default function ResultadosPage() {
         <div className="fu rounded-[18px] border border-border bg-card p-6 shadow-[var(--shadow)]">
           <div className="mb-5 flex items-baseline justify-between gap-2">
             <span className="text-[16px] font-bold">Da prospecção ao fechamento</span>
-            <span className="text-[11.5px] text-faint">instantâneo · por status atual</span>
+            <span className="text-[11.5px] text-faint">% = conversão da etapa anterior</span>
           </div>
           {loading ? (
             <div className="space-y-3">
@@ -378,6 +384,12 @@ export default function ResultadosPage() {
                     {b.value === 0 && (
                       <span className="absolute inset-y-0 left-2 flex items-center text-[12.5px] text-faint">0</span>
                     )}
+                  </div>
+                  <div
+                    className="w-[52px] flex-none text-right text-[12.5px] font-bold tabular-nums text-ink-2"
+                    title={b.conv !== null ? "Conversão da etapa anterior" : undefined}
+                  >
+                    {b.conv !== null ? `${Math.round(b.conv * 100)}%` : <span className="text-faint">—</span>}
                   </div>
                 </div>
               ))}
