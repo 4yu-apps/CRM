@@ -243,6 +243,22 @@ export default function FilaPage() {
     }
   }, [sendLead, repo, refresh]);
 
+  // Abrir o WhatsApp e marcar enviado (compartilhado pelo botao e pela tecla Enter).
+  const sendNow = useCallback(() => {
+    if (!sendLead) return;
+    openWhatsApp(
+      sendLead.whatsapp ?? sendLead.phone,
+      [sendLead.draft_msg1, sendLead.draft_msg2].filter(Boolean).join("\n\n"),
+    );
+    void markSent();
+  }, [sendLead, markSent]);
+
+  // Fechar o modal sem enviar: o lead continua na fila (nao virou enviado).
+  const closeSend = useCallback(() => {
+    setSendLead(null);
+    toast.message("Voltei pra fila. Quando quiser, é só abrir e enviar.");
+  }, []);
+
   const archive = useCallback(async () => {
     if (!cur) return;
     const target = cur;
@@ -269,14 +285,28 @@ export default function FilaPage() {
   // Pular: manda o lead atual pro fim da fila (revisita depois), sem mexer no banco.
   const skip = useCallback(() => {
     if (!cur) return;
-    setSkipped((s) => [...s.filter((x) => x !== cur.id), cur.id]);
+    const id = cur.id;
+    setSkipped((s) => [...s.filter((x) => x !== id), id]);
+    toast.message("Pulei. Volta no fim da fila.", {
+      action: { label: "Desfazer", onClick: () => setSkipped((s) => s.filter((x) => x !== id)) },
+    });
   }, [cur]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (sendLead) return;
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "TEXTAREA" || tag === "INPUT" || tag === "SELECT") return;
+      // Modal de envio aberto: Enter envia, Esc fecha. Atalhos de triagem ficam off.
+      if (sendLead) {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          sendNow();
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          closeSend();
+        }
+        return;
+      }
       if (e.key === "a" || e.key === "A") void approve();
       if (e.key === "d" || e.key === "D") void discard();
       if (e.key === "s" || e.key === "S") void archive();
@@ -287,7 +317,7 @@ export default function FilaPage() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [approve, discard, archive, skip, sendLead]);
+  }, [approve, discard, archive, skip, sendLead, sendNow, closeSend]);
 
   // carregando: skeleton (evita piscar o estado de "primeiro uso" antes dos
   // leads chegarem).
@@ -385,7 +415,7 @@ export default function FilaPage() {
             align="end"
             className="w-[168px]"
           />
-          <span className="hidden items-center gap-1.5 text-[12px] text-faint xl:flex">
+          <span className="hidden items-center gap-1.5 text-[12px] text-faint md:flex">
             <kbd className="rounded-md border border-border-2 bg-[var(--inset)] px-1.5 py-0.5 font-heading font-semibold text-ink-2">A</kbd>
             aprovar
             <kbd className="rounded-md border border-border-2 bg-[var(--inset)] px-1.5 py-0.5 font-heading font-semibold text-ink-2">S</kbd>
@@ -592,10 +622,7 @@ export default function FilaPage() {
       {/* modal de envio */}
       {sendLead && (
         <div
-          onClick={() => {
-            setSendLead(null);
-            toast.message("Voltei pra fila. Quando quiser, é só abrir e enviar.");
-          }}
+          onClick={closeSend}
           className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(20,12,40,.45)] p-6 backdrop-blur-[2px]"
         >
           <div
@@ -626,13 +653,7 @@ export default function FilaPage() {
             <div className="flex flex-col gap-2.5 px-6 pb-6">
               <button
                 type="button"
-                onClick={() => {
-                  openWhatsApp(
-                    sendLead.whatsapp ?? sendLead.phone,
-                    [sendLead.draft_msg1, sendLead.draft_msg2].filter(Boolean).join("\n\n"),
-                  );
-                  void markSent();
-                }}
+                onClick={sendNow}
                 className="flex w-full items-center justify-center gap-2 rounded-[14px] p-4 text-sm font-bold text-white"
                 style={{ background: "var(--wa)" }}
               >
