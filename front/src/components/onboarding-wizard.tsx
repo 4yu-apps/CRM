@@ -16,6 +16,7 @@ import {
   Target,
 } from "@phosphor-icons/react";
 import { getRepo } from "@/lib/repo";
+import { getSupabase } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { getProfession, PROFESSIONS, type Profession } from "@/lib/professions";
 import type { SearchProfileInput, ServiceTarget } from "@/lib/types";
@@ -51,11 +52,12 @@ function focoText(p: Profession): string {
 
 export function OnboardingWizard() {
   const repo = getRepo();
-  const { refreshProfile } = useAuth();
+  const { refreshProfile, mode } = useAuth();
   const router = useRouter();
 
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [name, setName] = useState("");
 
   // Campos coletados no fluxo.
   const [profession, setProfession] = useState<string | null>(null);
@@ -98,6 +100,15 @@ export function OnboardingWizard() {
         state: state.trim() || null,
       };
       await repo.saveProfile(input);
+      // Nome de exibicao: guarda no user_metadata do Auth (sem coluna nova).
+      // Best-effort: nunca bloqueia o onboarding.
+      if (mode === "supabase" && name.trim()) {
+        try {
+          await getSupabase().auth.updateUser({ data: { full_name: name.trim() } });
+        } catch {
+          /* ignora */
+        }
+      }
       // Libera o gate (fonte unica de verdade no contexto de auth).
       await refreshProfile();
       router.replace("/");
@@ -105,7 +116,7 @@ export function OnboardingWizard() {
       toast.error(e instanceof Error ? e.message : "Erro ao salvar. Tenta de novo.");
       setSaving(false);
     }
-  }, [profession, niches, serviceTarget, city, state, repo, refreshProfile, router]);
+  }, [profession, niches, serviceTarget, city, state, name, mode, repo, refreshProfile, router]);
 
   const canAdvance = step !== 0 || !!profession;
 
@@ -197,6 +208,19 @@ export function OnboardingWizard() {
                     os leads e escrever a primeira mensagem do seu jeito.
                   </p>
                 </div>
+              </div>
+
+              <div className="mb-5">
+                <label htmlFor="ob-nome" className="mb-1.5 block text-[13px] font-semibold text-ink-2">
+                  Como posso te chamar? <span className="font-normal text-faint">(opcional)</span>
+                </label>
+                <input
+                  id="ob-nome"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Seu nome"
+                  className="w-full max-w-sm rounded-[12px] border border-border-2 bg-surface-2 px-3.5 py-2.5 text-[14px] text-ink outline-none focus:border-brand"
+                />
               </div>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">

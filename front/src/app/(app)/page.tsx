@@ -118,7 +118,7 @@ export default function InicioPage() {
     loadActivity();
   }, [loadActivity]);
 
-  const nome = primeiroNome(user?.email ?? null);
+  const nome = user?.name?.trim() || primeiroNome(user?.email ?? null);
   const cumprimento = saudacao();
 
   // contadores derivados de leads reais

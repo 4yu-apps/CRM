@@ -7,6 +7,9 @@ import { getSupabase } from "./supabase/client";
 export interface AuthUser {
   id: string;
   email: string | null;
+  // Nome de exibicao (do user_metadata, coletado no onboarding). Usado na
+  // saudacao em vez de derivar do e-mail.
+  name: string | null;
 }
 
 interface AuthContextValue {
@@ -30,7 +33,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 // No modo mock nao ha login real: entra como usuario demo.
-const DEMO_USER: AuthUser = { id: "demo", email: "demo@garimpo.local" };
+const DEMO_USER: AuthUser = { id: "demo", email: "demo@garimpo.local", name: null };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const mode = activeDataSource();
@@ -163,8 +166,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
-function toUser(sess: { user: { id: string; email?: string } } | null): AuthUser | null {
-  return sess ? { id: sess.user.id, email: sess.user.email ?? null } : null;
+function toUser(
+  sess: { user: { id: string; email?: string; user_metadata?: { full_name?: string | null } } } | null,
+): AuthUser | null {
+  return sess
+    ? {
+        id: sess.user.id,
+        email: sess.user.email ?? null,
+        name: sess.user.user_metadata?.full_name ?? null,
+      }
+    : null;
 }
 
 export function useAuth(): AuthContextValue {
