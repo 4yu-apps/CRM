@@ -1,7 +1,7 @@
 // Implementacao mock — em memoria, espelha o comportamento do banco:
 // valida transicoes, aplica guarda LGPD e grava historico (como os triggers).
 import { canTransition, nextStatuses, STATUS_META } from "../state-machine";
-import type { ActivityEvent, ActorType, FieldProvenance, Lead, LeadDetail, LeadEditable, LeadFile, LeadStatus, ScanCoverage, SearchProfile, SearchProfileInput, StatusHistory } from "../types";
+import type { ActivityEvent, ActorType, FieldProvenance, Lead, LeadDetail, LeadEditable, LeadFile, LeadStatus, ScanCoverage, SearchPreset, SearchPresetInput, SearchProfile, SearchProfileInput, StatusHistory } from "../types";
 import { buildSeed, DEMO_ACTIVITY, DEMO_COVERAGE, DEMO_OWNER, DEMO_PROFILE } from "./mock-data";
 import type { LeadsRepo } from "./index";
 
@@ -189,6 +189,32 @@ async function listActivity(limit = 20): Promise<ActivityEvent[]> {
   );
 }
 
+// Presets de busca em memoria (demo). Somem ao recarregar, esperado no mock.
+const mockPresets: SearchPreset[] = [];
+
+async function listPresets(): Promise<SearchPreset[]> {
+  return clone(
+    [...mockPresets].sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at)),
+  );
+}
+
+async function savePreset(input: SearchPresetInput): Promise<SearchPreset> {
+  const preset: SearchPreset = {
+    id: `preset-${Date.now()}`,
+    owner_id: DEMO_OWNER,
+    name: input.name,
+    params: input.params,
+    created_at: new Date().toISOString(),
+  };
+  mockPresets.unshift(preset);
+  return clone(preset);
+}
+
+async function deletePreset(id: string): Promise<void> {
+  const i = mockPresets.findIndex((p) => p.id === id);
+  if (i >= 0) mockPresets.splice(i, 1);
+}
+
 // Anexos em memoria (demo): guarda o arquivo como object URL pra abrir na aba.
 // Some ao recarregar a pagina, e o esperado no modo mock.
 const mockFiles = new Map<string, { file: LeadFile; url: string }[]>();
@@ -237,6 +263,9 @@ export const mockRepo: LeadsRepo = {
   saveProfile,
   countByStatus,
   listCoverage,
+  listPresets,
+  savePreset,
+  deletePreset,
   listActivity,
   listFiles,
   uploadFile,

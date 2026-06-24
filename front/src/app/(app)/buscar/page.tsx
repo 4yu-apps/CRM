@@ -5,6 +5,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import {
   ArrowRight,
+  BookmarkSimple,
   Info,
   MagnifyingGlass,
   MapTrifold,
@@ -23,7 +24,7 @@ import { Dropdown } from "@/components/dropdown";
 import { CityAutocomplete } from "@/components/city-autocomplete";
 import { BairroAutocomplete } from "@/components/bairro-autocomplete";
 import { MultiRamoDropdown } from "@/components/multi-ramo-dropdown";
-import type { ScanCoverage, SearchProfile, ServiceTarget } from "@/lib/types";
+import type { ScanCoverage, SearchPreset, SearchProfile, ServiceTarget } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 // Mapa carregado somente no cliente (Leaflet nao roda no SSR)
@@ -150,6 +151,11 @@ export default function BuscarPage() {
   const [profile, setProfile] = useState<SearchProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [coverage, setCoverage] = useState<ScanCoverage[]>([]);
+  // #8 — presets de busca salvos
+  const [presets, setPresets] = useState<SearchPreset[]>([]);
+  const [savingPreset, setSavingPreset] = useState(false);
+  const [showSavePreset, setShowSavePreset] = useState(false);
+  const [presetName, setPresetName] = useState("");
 
   // niches e um array (multi-selecao)
   const [niches, setNiches] = useState<string[]>([]);
@@ -185,9 +191,86 @@ export default function BuscarPage() {
     return Array.from(new Set([...(profile?.niches ?? []), ...RAMOS_DISPONIVEIS]));
   }, [profile]);
 
+  // #10 — garantia de "nao repetir": cobertura ja registrada pra cidade + nichos
+  // escolhidos. So avisa quando ja houve varredura com pct > 0 naquela zona.
+  const coberturaRegiao = useMemo(() => {
+    if (!city) return null;
+    const key = slugRegion(city, uf);
+    const cityLower = city.toLowerCase();
+    const nicheSet = new Set(niches);
+    const matches = coverage.filter((c) => {
+      const regOk = c.region_key === key || (c.region_name?.toLowerCase().includes(cityLower) ?? false);
+      if (!regOk) return false;
+      if (nicheSet.size === 0) return true;
+      return c.niche == null || nicheSet.has(c.niche);
+    });
+    if (matches.length === 0) return null;
+    const maxPct = Math.max(...matches.map((c) => c.pct ?? 0));
+    if (maxPct <= 0) return null;
+    const totalCount = matches.reduce((s, c) => s + (c.result_count ?? 0), 0);
+    const lastAt = matches.reduce((a, c) => (a > c.covered_at ? a : c.covered_at), matches[0].covered_at);
+    const dias = Math.floor((Date.now() - +new Date(lastAt)) / (24 * 60 * 60 * 1000));
+    return { maxPct, totalCount, dias };
+  }, [city, uf, niches, coverage]);
+
+  // #8 — aplicar / salvar / remover preset
+  const aplicarPreset = useCallback((p: SearchPreset) => {
+    const pa = p.params;
+    setNiches(pa.niches ?? []);
+    setUf(pa.uf ?? "");
+    setCity(pa.city ?? "");
+    setNeighborhood(pa.neighborhood ?? "");
+    setRadius(pa.radius ?? "10km");
+    if (pa.service) setService(pa.service);
+    toast.success(`Preset "${p.name}" aplicado.`);
+  }, []);
+
+  const salvarPreset = useCallback(async () => {
+    if (niches.length === 0 || !city) {
+      toast.warning("Escolha ao menos um ramo e a cidade pra salvar.");
+      return;
+    }
+    if (!presetName.trim()) {
+      toast.warning("Dê um nome pro preset.");
+      return;
+    }
+    setSavingPreset(true);
+    try {
+      const novo = await repo.savePreset({
+        name: presetName.trim(),
+        params: { niches, uf, city, neighborhood, radius, service },
+      });
+      setPresets((ps) => [novo, ...ps]);
+      setPresetName("");
+      setShowSavePreset(false);
+      toast.success("Busca salva.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao salvar preset");
+    } finally {
+      setSavingPreset(false);
+    }
+  }, [niches, uf, city, neighborhood, radius, service, presetName, repo]);
+
+  const removerPreset = useCallback(
+    async (id: string) => {
+      try {
+        await repo.deletePreset(id);
+        setPresets((ps) => ps.filter((p) => p.id !== id));
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Erro ao remover preset");
+      }
+    },
+    [repo],
+  );
+
   const load = useCallback(async () => {
     try {
-      const [p, cov] = await Promise.all([repo.getProfile(), repo.listCoverage()]);
+      const [p, cov, pre] = await Promise.all([
+        repo.getProfile(),
+        repo.listCoverage(),
+        repo.listPresets(),
+      ]);
+      setPresets(pre);
       if (p) {
         setProfile(p);
         // Inicia com o primeiro nicho do perfil (retrocompat: uma selecao)
@@ -566,6 +649,91 @@ export default function BuscarPage() {
               ) : (
                 <ServiceToggle value={service} options={serviceOpts} onChange={setService} />
               )}
+            </div>
+          )}
+
+          {/* #8 — buscas salvas (presets) */}
+          <div className="rounded-[13px] border border-border-2 bg-surface-2 p-3.5">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <span className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wider text-faint">
+                <BookmarkSimple size={14} weight="fill" /> Buscas salvas
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowSavePreset((v) => !v)}
+                className="text-[12px] font-semibold text-brand hover:underline"
+              >
+                {showSavePreset ? "Cancelar" : "Salvar busca atual"}
+              </button>
+            </div>
+
+            {showSavePreset && (
+              <div className="mb-2.5 flex items-center gap-2">
+                <input
+                  type="text"
+                  value={presetName}
+                  onChange={(e) => setPresetName(e.target.value)}
+                  placeholder="Nome (ex: Barbearias centro)"
+                  className="min-w-0 flex-1 rounded-[10px] border border-border-2 bg-card px-3 py-2 text-[13px] outline-none focus:border-brand"
+                />
+                <button
+                  type="button"
+                  onClick={() => void salvarPreset()}
+                  disabled={savingPreset}
+                  className="flex-none rounded-[10px] px-3.5 py-2 text-[13px] font-bold text-white disabled:opacity-50"
+                  style={{ background: "var(--grad)" }}
+                >
+                  {savingPreset ? "..." : "Salvar"}
+                </button>
+              </div>
+            )}
+
+            {presets.length === 0 ? (
+              <p className="text-[12px] text-muted-foreground">
+                Nenhuma busca salva ainda. Monte uma combinação e clique em "Salvar busca atual".
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {presets.map((p) => (
+                  <span
+                    key={p.id}
+                    className="flex items-center gap-1 rounded-full border border-border bg-card py-1 pl-3 pr-1.5 text-[12.5px] font-semibold text-ink-2"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => aplicarPreset(p)}
+                      className="hover:text-brand"
+                      title="Aplicar essa busca"
+                    >
+                      {p.name}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void removerPreset(p.id)}
+                      aria-label={`Remover ${p.name}`}
+                      className="flex size-4 items-center justify-center rounded-full text-faint hover:bg-danger-bg hover:text-danger"
+                    >
+                      <X size={11} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* #10 — aviso de zona ja coberta */}
+          {coberturaRegiao && (
+            <div className="rounded-[13px] border border-amber-300 bg-amber-50 px-4 py-3 text-[13px] leading-relaxed text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+              <div className="flex items-start gap-2">
+                <Info size={16} className="mt-0.5 flex-none" />
+                <span>
+                  <strong>Essa zona já foi garimpada</strong> — até {coberturaRegiao.maxPct}% varrida,{" "}
+                  {coberturaRegiao.totalCount} negócio{coberturaRegiao.totalCount === 1 ? "" : "s"} já trazido
+                  {coberturaRegiao.totalCount === 1 ? "" : "s"}
+                  {coberturaRegiao.dias === 0 ? " hoje" : ` há ${coberturaRegiao.dias} dia${coberturaRegiao.dias === 1 ? "" : "s"}`}.
+                  Pode rodar de novo pra pegar novidades, ou trocar de bairro/cidade pra achar gente nova.
+                </span>
+              </div>
             </div>
           )}
 

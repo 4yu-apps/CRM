@@ -22,6 +22,7 @@ import { fmtRelative } from "@/lib/format";
 import type { Lead, LeadStatus } from "@/lib/types";
 import { RAMOS_DISPONIVEIS } from "@/lib/ramos";
 import { Dropdown, type DropdownOption } from "@/components/dropdown";
+import { matchesSignal, SIGNAL_FILTER_OPTIONS, type SignalFilter } from "@/lib/quality-signals";
 import { cn } from "@/lib/utils";
 import { openWhatsApp } from "@/lib/whatsapp";
 import { ListSkeleton } from "@/components/skeleton";
@@ -128,6 +129,7 @@ export default function ContatosPage() {
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<LeadStatus | "">("");
   const [ramoFilter, setRamoFilter] = useState<string>("");
+  const [sinalFilter, setSinalFilter] = useState<SignalFilter>(""); // #9
   const [showArchived, setShowArchived] = useState(false);
   const [sort, setSort] = useState<SortKey>("recent");
   const [page, setPage] = useState(1);
@@ -147,6 +149,7 @@ export default function ContatosPage() {
       .filter((l) => (showArchived ? true : !l.archived))
       .filter((l) => (statusFilter ? l.status === statusFilter : true))
       .filter((l) => (ramoFilter ? l.category === ramoFilter : true))
+      .filter((l) => (sinalFilter ? matchesSignal(l, sinalFilter) : true))
       .filter((l) => matchesQuery(l, q));
     out.sort((a, b) => {
       if (sort === "name") return (a.business_name ?? "").localeCompare(b.business_name ?? "");
@@ -154,7 +157,7 @@ export default function ContatosPage() {
       return +new Date(b.updated_at) - +new Date(a.updated_at);
     });
     return out;
-  }, [leads, q, statusFilter, ramoFilter, showArchived, sort]);
+  }, [leads, q, statusFilter, ramoFilter, sinalFilter, showArchived, sort]);
 
   // Paginacao da lista filtrada. safePage clampa quando o filtro encurta o total.
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -365,6 +368,13 @@ export default function ContatosPage() {
               options={ramoOptions}
               ariaLabel="Filtrar por ramo"
               className="min-w-[160px]"
+            />
+            <Dropdown
+              value={sinalFilter}
+              onChange={(v) => { setSinalFilter(v as SignalFilter); setPage(1); }}
+              options={SIGNAL_FILTER_OPTIONS}
+              ariaLabel="Filtrar por sinal de qualidade"
+              className="min-w-[170px]"
             />
             <Dropdown
               value={sort}

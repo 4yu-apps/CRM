@@ -1,7 +1,7 @@
 // Implementacao supabase — banco real. Inerte ate existir env + sessao logada.
 // A UI nao muda: mesma interface do mock.
 import { getSupabase } from "../supabase/client";
-import type { ActivityEvent, ActorType, Lead, LeadDetail, LeadEditable, LeadFile, LeadStatus, ScanCoverage, SearchProfile, SearchProfileInput } from "../types";
+import type { ActivityEvent, ActorType, Lead, LeadDetail, LeadEditable, LeadFile, LeadStatus, ScanCoverage, SearchPreset, SearchPresetInput, SearchProfile, SearchProfileInput } from "../types";
 
 // Bucket PRIVADO dos anexos. Path: <uid>/<leadId>/<arquivo>. RLS no banco garante
 // que cada dono so toca a propria pasta; download sai por URL assinada e curta.
@@ -217,6 +217,31 @@ async function fileSignedUrl(path: string): Promise<string> {
   return data.signedUrl;
 }
 
+async function listPresets(): Promise<SearchPreset[]> {
+  const { data, error } = await getSupabase()
+    .from("search_presets")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as SearchPreset[];
+}
+
+async function savePreset(input: SearchPresetInput): Promise<SearchPreset> {
+  // owner_id cai no default do banco (auth.uid()).
+  const { data, error } = await getSupabase()
+    .from("search_presets")
+    .insert(input)
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return data as SearchPreset;
+}
+
+async function deletePreset(id: string): Promise<void> {
+  const { error } = await getSupabase().from("search_presets").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
 export const supabaseRepo: LeadsRepo = {
   list,
   detail,
@@ -230,6 +255,9 @@ export const supabaseRepo: LeadsRepo = {
   saveProfile,
   countByStatus,
   listCoverage,
+  listPresets,
+  savePreset,
+  deletePreset,
   listActivity,
   listFiles,
   uploadFile,

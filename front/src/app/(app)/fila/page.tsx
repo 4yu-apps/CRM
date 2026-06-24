@@ -40,6 +40,7 @@ import { openWhatsApp } from "@/lib/whatsapp";
 import { promptFollowupSuggestion } from "@/lib/followup-prompt";
 import { googleSearchUrl, googleMapsUrl, metaAdsUrl } from "@/lib/links";
 import { siteSignalChips, signalChipClass } from "@/lib/site-signals";
+import { matchesSignal, SIGNAL_FILTER_OPTIONS, type SignalFilter } from "@/lib/quality-signals";
 import { Skeleton } from "@/components/skeleton";
 
 function LeadIcon({ category, size }: { category: string | null; size: number }) {
@@ -151,6 +152,7 @@ export default function FilaPage() {
 
   const [sortBy, setSortBy] = useState<SortKey>("recomendados");
   const [ramo, setRamo] = useState("todos");
+  const [sinal, setSinal] = useState<SignalFilter>(""); // #9 filtro por sinal
 
   // Base: tudo que esta pronto pra revisar (e nao arquivado). Dela saem o filtro
   // de ramo e a ordem.
@@ -169,7 +171,8 @@ export default function FilaPage() {
   // leads "pulados" vao pro fim da fila (revisita depois), sem mexer no banco.
   const [skipped, setSkipped] = useState<string[]>([]);
   const queue = useMemo(() => {
-    const filtrada = ramo === "todos" ? baseQueue : baseQueue.filter((l) => l.category === ramo);
+    let filtrada = ramo === "todos" ? baseQueue : baseQueue.filter((l) => l.category === ramo);
+    if (sinal) filtrada = filtrada.filter((l) => matchesSignal(l, sinal));
     const sorted = sortQueue(filtrada, sortBy);
     if (skipped.length === 0) return sorted;
     const skipSet = new Set(skipped);
@@ -178,7 +181,7 @@ export default function FilaPage() {
       .map((id) => sorted.find((l) => l.id === id))
       .filter((l): l is Lead => Boolean(l));
     return [...front, ...back];
-  }, [baseQueue, ramo, sortBy, skipped]);
+  }, [baseQueue, ramo, sinal, sortBy, skipped]);
 
   const [edits, setEdits] = useState<Record<string, { m1: string; m2: string }>>({});
   const [sendLead, setSendLead] = useState<Lead | null>(null);
@@ -422,6 +425,14 @@ export default function FilaPage() {
             ariaLabel="Filtrar por ramo"
             align="end"
             className="w-[168px]"
+          />
+          <Dropdown
+            value={sinal}
+            onChange={(v) => setSinal(v as SignalFilter)}
+            options={SIGNAL_FILTER_OPTIONS}
+            ariaLabel="Filtrar por sinal de qualidade"
+            align="end"
+            className="w-[180px]"
           />
           <span className="hidden items-center gap-1.5 text-[12px] text-faint md:flex">
             <kbd className="rounded-md border border-border-2 bg-[var(--inset)] px-1.5 py-0.5 font-heading font-semibold text-ink-2">A</kbd>
