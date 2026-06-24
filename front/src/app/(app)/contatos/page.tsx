@@ -139,6 +139,7 @@ export default function ContatosPage() {
 
   // Acoes em massa (sobre a selecao).
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState(0);
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
 
   const filtered = useMemo(() => {
@@ -255,8 +256,15 @@ export default function ContatosPage() {
     if (selected.size === 0) return;
     const ids = [...selected];
     setBulkBusy(true);
+    setBulkProgress(0);
     try {
-      await Promise.all(ids.map((id) => repo.setArchived(id, true)));
+      // Em lotes de 10: evita abrir N conexoes de uma vez (rate-limit) e deixa
+      // mostrar progresso em selecoes grandes.
+      for (let i = 0; i < ids.length; i += 10) {
+        const chunk = ids.slice(i, i + 10);
+        await Promise.all(chunk.map((id) => repo.setArchived(id, true)));
+        setBulkProgress(i + chunk.length);
+      }
       await refresh();
       toast.success(`${ids.length} ${ids.length === 1 ? "contato arquivado" : "contatos arquivados"}`);
       setSelected(new Set());
@@ -264,6 +272,7 @@ export default function ContatosPage() {
       toast.error(e instanceof Error ? e.message : "Erro ao arquivar");
     } finally {
       setBulkBusy(false);
+      setBulkProgress(0);
     }
   }, [selected, repo, refresh]);
 
@@ -272,8 +281,13 @@ export default function ContatosPage() {
     if (selected.size === 0) return;
     const ids = [...selected];
     setBulkBusy(true);
+    setBulkProgress(0);
     try {
-      await Promise.all(ids.map((id) => repo.remove(id)));
+      for (let i = 0; i < ids.length; i += 10) {
+        const chunk = ids.slice(i, i + 10);
+        await Promise.all(chunk.map((id) => repo.remove(id)));
+        setBulkProgress(i + chunk.length);
+      }
       await refresh();
       toast.success(`${ids.length} ${ids.length === 1 ? "contato excluído" : "contatos excluídos"}`);
       setSelected(new Set());
@@ -282,6 +296,7 @@ export default function ContatosPage() {
       toast.error(e instanceof Error ? e.message : "Erro ao excluir");
     } finally {
       setBulkBusy(false);
+      setBulkProgress(0);
     }
   }, [selected, repo, refresh]);
 
@@ -377,7 +392,9 @@ export default function ContatosPage() {
         {selected.size > 0 && (
           <div className="flex flex-wrap items-center gap-2 rounded-xl border border-brand/30 bg-brand-50 px-4 py-3">
             <div className="flex-1 text-sm font-semibold text-brand">
-              {selected.size} selecionado{selected.size !== 1 ? "s" : ""}
+              {bulkBusy
+                ? `Processando ${bulkProgress}/${selected.size}...`
+                : `${selected.size} selecionado${selected.size !== 1 ? "s" : ""}`}
             </div>
             <button
               type="button"

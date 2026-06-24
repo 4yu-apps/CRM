@@ -374,7 +374,7 @@ export default function AdminPage() {
           <div className="flex gap-2.5">
             <button
               type="button"
-              disabled={actionBusy || !inputValue.includes("@")}
+              disabled={actionBusy || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inputValue.trim())}
               onClick={() => void doAction()}
               className="flex flex-1 items-center justify-center gap-2 rounded-[13px] bg-brand p-3 text-sm font-bold text-white disabled:opacity-60"
             >
@@ -396,16 +396,26 @@ export default function AdminPage() {
       {/* Modal: Excluir perfil */}
       {modal?.type === "delete" && (
         <ModalWrapper title="Excluir perfil?" onClose={closeModal}>
-          <p className="mb-5 text-[13.5px] text-muted-foreground">
+          <p className="mb-4 text-[13.5px] text-muted-foreground">
             Você está prestes a excluir <strong className="text-ink">{modal.profile.email ?? modal.profile.owner_id}</strong>.
             Isso apaga permanentemente <strong className="text-ink">todos os leads</strong>, o log de
             atividade, a cobertura de varredura e o perfil de configuração do usuário. A conta de
             acesso também será removida. Esta ação não tem desfazer.
           </p>
+          <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">
+            Pra confirmar, digite o e-mail do perfil
+          </label>
+          <input
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            placeholder={modal.profile.email ?? modal.profile.owner_id}
+            autoFocus
+            className="mb-5 w-full rounded-[12px] border border-border-2 bg-surface-2 px-3.5 py-2.5 text-[13.5px] text-ink outline-none focus:border-brand"
+          />
           <div className="flex gap-2.5">
             <button
               type="button"
-              disabled={actionBusy}
+              disabled={actionBusy || inputValue.trim() !== (modal.profile.email ?? modal.profile.owner_id)}
               onClick={() => void doAction()}
               className="flex flex-1 items-center justify-center gap-2 rounded-[13px] bg-rose-600 p-3 text-sm font-bold text-white disabled:opacity-60"
             >
