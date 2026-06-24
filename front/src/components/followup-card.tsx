@@ -8,20 +8,27 @@ import { BellRinging, Sparkle, ArrowsClockwise } from "@phosphor-icons/react";
 import { getRepo } from "@/lib/repo";
 import { cn } from "@/lib/utils";
 import type { Lead } from "@/lib/types";
+import { CADENCE, proximoToque, dataSugerida } from "@/lib/cadence";
 
-// Cadencia sugerida de follow-up (dias a partir de hoje).
-const CADENCIA = [1, 3, 5, 7, 10];
+// Opcoes rapidas de follow-up avulso (dias a partir de hoje), fora da regua.
+const CADENCIA_AVULSA = [1, 3, 5, 7, 10];
 
-// Regua leve de 3 toques (#2): D0 (envio) -> +3d -> +7d. REGUA_GAPS = dias ate
-// o proximo toque, a cada toque concluido. cadence_step (no lead) guarda o
-// progresso; a data do proximo toque reusa followup_at.
-const REGUA_GAPS = [3, 4];
-const REGUA_TOTAL = REGUA_GAPS.length + 1; // 3 toques
+// Total de toques na regua (derivado do CADENCE central).
+const REGUA_TOTAL = CADENCE.length;
+
+// Sentinel: valor de cadence_step que indica cadencia CONCLUIDA.
+// Usa REGUA_TOTAL + 1 para nao colidir com o ultimo passo valido (REGUA_TOTAL).
+const CADENCE_DONE = REGUA_TOTAL + 1;
+
+// Sugestoes de mensagem por passo da cadencia.
+// Indice 0 = sugestao ao agendar o 2o toque (step 2), etc.
 const REGUA_MSGS = [
-  // sugestao p/ o 2o toque
-  "voltei aqui rapidinho pra saber se voce chegou a ver minha ultima mensagem. se fizer sentido, te mostro como ficaria na pratica, sem compromisso.",
-  // sugestao p/ o 3o toque
-  "prometo que e a ultima vez que insisto por aqui. se nao for o momento agora, sem problema, e so me avisar que eu paro.",
+  // sugestao p/ o 2o toque (step 2, 1o follow-up)
+  "voltei aqui rapidinho pra saber se você chegou a ver minha última mensagem. se fizer sentido, te mostro como ficaria na prática, sem compromisso.",
+  // sugestao p/ o 3o toque (step 3, 2o follow-up)
+  "só passando pra verificar se rolou alguma dúvida sobre o que conversei com você antes. qualquer coisa estou aqui.",
+  // sugestao p/ o 4o toque (step 4, ultimo toque)
+  "prometo que é a última vez que insisto por aqui. se não for o momento agora, sem problema, é só me avisar que eu paro.",
 ];
 
 // Data N dias a frente, fixada ao meio-dia local pra nao escorregar de dia ao
@@ -95,8 +102,13 @@ export function FollowupCard({
     );
   };
 
-  // ----- Regua de 3 toques (#2) -----
+  // ----- Cadencia multi-toque (cadence.ts) -----
+  // cadence_step semantica:
+  //   0            = nao iniciada
+  //   1..REGUA_TOTAL = step atual da cadencia (step N = toques 1..N agendados/feitos)
+  //   CADENCE_DONE   = cadencia encerrada (todos os toques concluidos)
   const step = lead.cadence_step ?? 0;
+
   const olaDe = () => {
     const nome = lead.owner_name?.split(" ")[0];
     return nome ? `oi ${nome}, ` : "oi, ";
@@ -105,60 +117,87 @@ export function FollowupCard({
   const iniciarRegua = async () => {
     setSaving(true);
     try {
-      const novoAt = emDias(REGUA_GAPS[0]).toISOString();
+      // Passo 1 (abertura) foi feito. Agendar passo 2 (1o follow-up).
+      const prox = proximoToque(1);
+      if (!prox) {
+        toast.error("Cadencia nao configurada.");
+        return;
+      }
+      const novoAt = dataSugerida(prox).toISOString();
+      const msg = olaDe() + (REGUA_MSGS[0] ?? "");
       await repo.update(lead.id, {
         cadence_step: 1,
         followup_at: novoAt,
-        followup_note: olaDe() + REGUA_MSGS[0],
+        followup_note: msg,
       });
       setAt(novoAt);
-      setNote(olaDe() + REGUA_MSGS[0]);
-      toast.success("Régua iniciada. Agendei o 2º toque.");
+      setNote(msg);
+      toast.success(`Cadência iniciada. Agendei o ${prox.rotulo.toLowerCase()} para ${fmtDia(novoAt)}.`);
       await onSaved();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erro ao iniciar régua");
+      toast.error(e instanceof Error ? e.message : "Erro ao iniciar cadência");
     } finally {
       setSaving(false);
     }
   };
 
   const concluirToque = async () => {
-    const proximo = step + 1; // toque que acabou de ser concluido vira o atual
     setSaving(true);
     try {
-      if (proximo >= REGUA_TOTAL) {
-        await repo.update(lead.id, { cadence_step: REGUA_TOTAL, followup_at: null, followup_note: null });
+      const prox = proximoToque(step);
+      if (!prox) {
+        // Nao ha proximo toque: marcar cadencia como concluida
+        await repo.update(lead.id, {
+          cadence_step: CADENCE_DONE,
+          followup_at: null,
+          followup_note: null,
+        });
         setAt(null);
         setNote("");
-        toast.success("Régua concluída. Os 3 toques foram dados.");
+        toast.success(`Fim da cadência. Os ${REGUA_TOTAL} toques foram dados.`);
       } else {
-        const novoAt = emDias(REGUA_GAPS[proximo - 1]).toISOString();
-        const msg = olaDe() + (REGUA_MSGS[proximo - 1] ?? "");
-        await repo.update(lead.id, { cadence_step: proximo, followup_at: novoAt, followup_note: msg });
+        const novoAt = dataSugerida(prox).toISOString();
+        // Mensagem sugerida para o proximo toque (REGUA_MSGS[step-1] onde step = toques feitos)
+        const msg = olaDe() + (REGUA_MSGS[step - 1] ?? REGUA_MSGS[REGUA_MSGS.length - 1]);
+        // Avancar cadence_step para o proximo passo: significa "N toques feitos, agendei N+1"
+        await repo.update(lead.id, {
+          cadence_step: prox.step,
+          followup_at: novoAt,
+          followup_note: msg,
+        });
         setAt(novoAt);
         setNote(msg);
-        toast.success(`Toque registrado. Agendei o ${proximo + 1}º toque.`);
+        toast.success(`Toque registrado. Agendei o ${prox.rotulo.toLowerCase()} para ${fmtDia(novoAt)}.`);
       }
       await onSaved();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erro ao avançar a régua");
+      toast.error(e instanceof Error ? e.message : "Erro ao avançar a cadência");
     } finally {
       setSaving(false);
     }
   };
 
-  const pararRegua = async () => {
+  const pararCadencia = async () => {
     setSaving(true);
     try {
       await repo.update(lead.id, { cadence_step: 0 });
-      toast.message("Régua interrompida. O follow-up agendado continua.");
+      toast.message("Cadência interrompida. O follow-up agendado continua.");
       await onSaved();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erro ao parar régua");
+      toast.error(e instanceof Error ? e.message : "Erro ao parar cadência");
     } finally {
       setSaving(false);
     }
   };
+
+  // Rotulo do toque atual (ex: "1º follow-up de 4")
+  const cadenceItem = CADENCE.find((c) => c.step === step);
+  const rotuloAtual = cadenceItem
+    ? `${cadenceItem.rotulo} (${step} de ${REGUA_TOTAL})`
+    : `Toque ${step} de ${REGUA_TOTAL}`;
+
+  // Proximo toque (para hint de "ao concluir, agendarei X")
+  const proxToque = step > 0 && step < CADENCE_DONE ? proximoToque(step) : null;
 
   return (
     <div className="rounded-[14px] border border-border bg-surface-2 p-4">
@@ -170,7 +209,7 @@ export function FollowupCard({
       </p>
 
       <div className="flex flex-wrap gap-1.5">
-        {CADENCIA.map((days) => {
+        {CADENCIA_AVULSA.map((days) => {
           const d = emDias(days);
           const iso = d.toISOString();
           const selecionado = at ? mesmoDia(new Date(at), d) : false;
@@ -242,16 +281,16 @@ export function FollowupCard({
         )}
       </div>
 
-      {/* Regua de 3 toques (#2) */}
+      {/* Cadencia multi-toque (cadence.ts) */}
       <div className="mt-4 border-t border-border pt-3">
         <div className="mb-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-faint">
-          <ArrowsClockwise size={14} weight="bold" /> Régua de {REGUA_TOTAL} toques
+          <ArrowsClockwise size={14} weight="bold" /> Cadencia de {REGUA_TOTAL} toques
         </div>
 
         {step === 0 ? (
           <>
             <p className="mb-2.5 text-[12px] text-muted-foreground">
-              Sequência D0 · +3d · +7d. Ao concluir um toque, agendo o próximo sozinho. Você sempre envia pelo seu WhatsApp.
+              Sequência: Abertura · +2d · +5d · +12d. Ao concluir um toque, agendo o próximo. Você sempre envia pelo seu WhatsApp.
             </p>
             <button
               type="button"
@@ -259,12 +298,14 @@ export function FollowupCard({
               disabled={saving}
               className="rounded-[12px] border border-brand bg-brand-50 px-4 py-2 text-sm font-bold text-brand disabled:opacity-50"
             >
-              Iniciar régua de 3 toques
+              Iniciar cadência de {REGUA_TOTAL} toques
             </button>
           </>
-        ) : step >= REGUA_TOTAL ? (
+        ) : step >= CADENCE_DONE ? (
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[13px] font-semibold text-success">Régua concluída · 3 toques dados</span>
+            <span className="text-[13px] font-semibold text-success">
+              Fim da cadência · {REGUA_TOTAL} toques dados
+            </span>
             <button
               type="button"
               onClick={iniciarRegua}
@@ -277,22 +318,32 @@ export function FollowupCard({
         ) : (
           <>
             <div className="mb-2 flex items-center gap-1.5">
-              {Array.from({ length: REGUA_TOTAL }).map((_, i) => (
+              {CADENCE.map((c) => (
                 <span
-                  key={i}
-                  className={cn("h-1.5 flex-1 rounded-full", i < step ? "bg-brand" : "bg-border")}
+                  key={c.step}
+                  className={cn("h-1.5 flex-1 rounded-full", c.step <= step ? "bg-brand" : "bg-border")}
                 />
               ))}
             </div>
             <p className="text-[12px] text-muted-foreground">
-              Toque {step} de {REGUA_TOTAL} feito.
+              <span className="font-semibold text-ink">{rotuloAtual}</span> em andamento.
               {lead.followup_at && (
                 <>
                   {" "}
-                  Próximo em <strong className="text-ink">{fmtDia(lead.followup_at)}</strong>.
+                  Agendado para <strong className="text-ink">{fmtDia(lead.followup_at)}</strong>.
                 </>
               )}
             </p>
+            {proxToque && (
+              <p className="mt-0.5 text-[11px] text-faint">
+                Ao concluir: agendarei o {proxToque.rotulo.toLowerCase()} automaticamente.
+              </p>
+            )}
+            {!proxToque && step > 0 && step < CADENCE_DONE && (
+              <p className="mt-0.5 text-[11px] text-faint">
+                Este é o último toque. Ao concluir, a cadência se encerra.
+              </p>
+            )}
             <div className="mt-2.5 flex items-center gap-2">
               <button
                 type="button"
@@ -305,11 +356,11 @@ export function FollowupCard({
               </button>
               <button
                 type="button"
-                onClick={pararRegua}
+                onClick={pararCadencia}
                 disabled={saving}
                 className="rounded-[12px] border border-border-2 px-3 py-2 text-sm font-semibold text-ink-2 hover:text-danger disabled:opacity-50"
               >
-                Parar régua
+                Parar cadência
               </button>
             </div>
           </>
