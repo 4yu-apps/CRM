@@ -37,6 +37,7 @@ import type { Lead } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Dropdown } from "@/components/dropdown";
 import { openWhatsApp } from "@/lib/whatsapp";
+import { promptFollowupSuggestion } from "@/lib/followup-prompt";
 import { googleSearchUrl, googleMapsUrl, metaAdsUrl } from "@/lib/links";
 import { siteSignalChips, signalChipClass } from "@/lib/site-signals";
 import { Skeleton } from "@/components/skeleton";
@@ -237,9 +238,12 @@ export default function FilaPage() {
     try {
       await repo.transition(sendLead.id, "enviado", "human");
       setTally((t) => ({ ...t, approved: t.approved + 1 }));
+      const justSent = sendLead;
       setSendLead(null);
       await refresh();
       toast.success("Pronto. Marquei como enviado.");
+      // #1 — oferece agendar o follow-up em 1 toque
+      promptFollowupSuggestion({ lead: justSent, repo, onSaved: refresh });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao marcar enviado");
     } finally {

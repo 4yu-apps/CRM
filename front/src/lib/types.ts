@@ -145,6 +145,10 @@ export interface Lead {
   followup_at?: string | null;
   followup_note?: string | null;
 
+  // Cadencia multi-toque leve (#2): toque atual da regua (0 = sem regua).
+  // A data do proximo toque reusa followup_at.
+  cadence_step?: number | null;
+
   created_at: string;
   updated_at: string;
 
@@ -213,6 +217,7 @@ export type LeadEditable = Partial<
     | "meeting_gcal_event_id"
     | "followup_at"
     | "followup_note"
+    | "cadence_step"
   >
 >;
 

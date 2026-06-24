@@ -14,6 +14,7 @@ import {
   ScanSmiley,
   ChatCircleDots,
   CalendarCheck,
+  Snowflake,
 } from "@phosphor-icons/react";
 import { useLeads } from "@/hooks/use-leads";
 import { useAuth } from "@/lib/auth";
@@ -57,6 +58,9 @@ function inicioMes(): Date {
   d.setHours(0, 0, 0, 0);
   return d;
 }
+
+// #3 — limiar de "esfriando": dias sem nenhum toque pra um lead enviado virar alerta.
+const COOLING_DAYS = 5;
 
 const ACTIVITY_ICON: Record<ActivityType, React.ComponentType<{ size: number }>> = {
   busca: MagnifyingGlass,
@@ -171,7 +175,20 @@ export default function InicioPage() {
     [leads],
   );
   const reunioes = useMemo(() => meetingsWithin(leads, 24), [leads]);
-  const temAcao = precisaResponder.length + followupsDevidos.length + reunioes.length > 0;
+
+  // #3 — Esfriando: enviados/sem resposta, SEM follow-up agendado (senao caem em
+  // Follow-ups) e sem nenhum toque ha COOLING_DAYS+ dias. O ralo silencioso.
+  const esfriando = useMemo(() => {
+    const limite = Date.now() - COOLING_DAYS * 24 * 60 * 60 * 1000;
+    return leads
+      .filter((l) => l.status === "enviado" || l.status === "sem_resposta")
+      .filter((l) => !l.followup_at)
+      .filter((l) => +new Date(l.updated_at) < limite)
+      .sort((a, b) => +new Date(a.updated_at) - +new Date(b.updated_at)); // mais frio primeiro
+  }, [leads]);
+
+  const temAcao =
+    precisaResponder.length + followupsDevidos.length + reunioes.length + esfriando.length > 0;
 
   return (
     <div className="mx-auto flex max-w-[1100px] flex-col gap-6">
@@ -245,7 +262,7 @@ export default function InicioPage() {
           <div className="mb-4 flex items-center gap-2 text-base font-bold">
             <BellRinging size={18} weight="fill" className="text-brand" /> O que fazer agora
           </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <ActionBucket
               icon={<ChatCircleDots size={15} weight="fill" />}
               title="Responderam"
@@ -273,6 +290,16 @@ export default function InicioPage() {
               labelOf={(l) => {
                 const r = reunioes.find((x) => x.lead.id === l.id);
                 return r ? fmtMeetingWhen(r.at) : "";
+              }}
+            />
+            <ActionBucket
+              icon={<Snowflake size={15} weight="fill" />}
+              title={`Esfriando (+${COOLING_DAYS}d)`}
+              tone="sky"
+              leads={esfriando}
+              labelOf={(l) => {
+                const dias = Math.floor((Date.now() - +new Date(l.updated_at)) / (24 * 60 * 60 * 1000));
+                return `há ${dias}d`;
               }}
             />
           </div>
@@ -414,7 +441,7 @@ function ActionBucket({
 }: {
   icon: React.ReactNode;
   title: string;
-  tone: "green" | "amber" | "brand";
+  tone: "green" | "amber" | "brand" | "sky";
   leads: Lead[];
   labelOf: (l: Lead) => string;
 }) {
@@ -424,13 +451,17 @@ function ActionBucket({
       ? "text-emerald-700 dark:text-emerald-400"
       : tone === "amber"
         ? "text-amber-700 dark:text-amber-400"
-        : "text-brand";
+        : tone === "sky"
+          ? "text-sky-700 dark:text-sky-400"
+          : "text-brand";
   const pillClass =
     tone === "green"
       ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
       : tone === "amber"
         ? "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400"
-        : "bg-brand-50 text-brand";
+        : tone === "sky"
+          ? "bg-sky-100 text-sky-700 dark:bg-sky-950/40 dark:text-sky-400"
+          : "bg-brand-50 text-brand";
   return (
     <div className="rounded-[14px] border border-border bg-surface-2 p-4">
       <div className={cn("mb-2.5 flex items-center gap-1.5 text-[13px] font-bold", headClass)}>
