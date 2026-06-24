@@ -20,6 +20,7 @@ interface AdminProfile {
   owner_id: string;
   email: string | null;
   profession: string | null;
+  professions?: string[];
   city: string | null;
   state: string | null;
   autopilot: boolean;
@@ -241,7 +242,7 @@ export default function AdminPage() {
 
                   {/* Area (profession) */}
                   <div className="truncate text-ink-2">
-                    {p.profession ?? <span className="text-faint">-</span>}
+                    {(p.professions?.length ? p.professions.join(", ") : p.profession) ?? <span className="text-faint">-</span>}
                   </div>
 
                   {/* Local */}

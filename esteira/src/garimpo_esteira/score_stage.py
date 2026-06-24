@@ -25,14 +25,17 @@ def _ig_signal(provenance: list[dict]) -> str | None:
     return None
 
 
-def score_one(lead, sink: LeadSink, profession: str | None = None, min_score: int = 0) -> ScoreResult:
+def score_one(
+    lead, sink: LeadSink, profession: str | None = None, min_score: int = 0,
+    *, professions: list[str] | None = None,
+) -> ScoreResult:
     prov = sink.fetch_provenance(lead.id)
     ads_active = _ads_signal(prov)
     ig_status = _ig_signal(prov)
     # sinais tecnicos do site (de graca) entram no score; ads_active tambem pode
     # vir derivado do Pixel detectado no HTML.
     signals = {"ads_active": ads_active, "site": getattr(lead, "site_signals", None) or {}, "instagram_status": ig_status}
-    result = score_lead(lead, signals, profession)
+    result = score_lead(lead, signals, profession, professions=professions)
     # #19: piso de score por dono. Alem do THRESHOLD global, o dono pode exigir
     # uma nota minima maior. min_score=0 (default) = sem filtro extra. Ao rebaixar,
     # sincroniza reason/service_target pra ficha nao mostrar "qualificado" incoerente.
@@ -67,10 +70,10 @@ def score_one(lead, sink: LeadSink, profession: str | None = None, min_score: in
 
 def score_batch(
     sink: LeadSink, *, batch: int = 20, status="enriquecido", owner_id: str | None = None,
-    profession: str | None = None, min_score: int = 0,
+    profession: str | None = None, min_score: int = 0, professions: list[str] | None = None,
 ) -> list[ScoreResult]:
     leads = sink.fetch_by_status(status, batch, owner_id)
-    results = [score_one(lead, sink, profession, min_score) for lead in leads]
+    results = [score_one(lead, sink, profession, min_score, professions=professions) for lead in leads]
     discarded = [r for r in results if r.decision == "descartado"]
     if discarded and leads:
         owner_id = leads[0].owner_id or ""

@@ -8,12 +8,58 @@ def _lead(**kw) -> Lead:
     return Lead(**base)
 
 
-def test_trafego_lead_qualifies_and_targets_trafego():
-    # nota boa, volume ok, sem site, nao anuncia => alvo tráfego
+def test_default_sem_anuncio_puxa_ambos():
+    # #2: sem profissao definida (oferta trafego+automacao) e nao anuncia =>
+    # a maioria dos leads serve pros dois => alvo "ambos".
     r = score_lead(_lead(reviews_count=150, website=None, instagram=None), {"ads_active": False})
     assert r.decision == "qualificado"
-    assert r.service_target == "trafego"
+    assert r.service_target == "ambos"
     assert r.score >= THRESHOLD
+
+
+# ------------------------------------------------------------------
+# #2: classificacao trafego/automacao mais inteligente
+# ------------------------------------------------------------------
+
+def test_oferta_ambos_vira_automacao_quando_anuncia():
+    # ja anuncia => a lacuna vira operacao/atendimento => automacao
+    r = score_lead(
+        _lead(reviews_count=400, category="Clínica odontológica", website="c.com"),
+        {"ads_active": True},
+        professions=["trafego", "automacao"],
+    )
+    assert r.service_target == "automacao"
+
+
+def test_oferta_ambos_ads_desconhecido_puxa_ambos():
+    # ads None ("nao sei" enquanto a API do FB nao liga) => ambos, nao trafego puro
+    r = score_lead(_lead(website=None), {}, professions=["ambos"])
+    assert r.service_target == "ambos"
+
+
+def test_oferta_so_trafego_mantem_trafego():
+    # agencia so faz trafego: alvo continua trafego (nao tem automacao pra ofertar)
+    r = score_lead(_lead(website=None), {"ads_active": False}, professions=["trafego"])
+    assert r.service_target == "trafego"
+
+
+def test_oferta_so_automacao_mantem_automacao():
+    r = score_lead(
+        _lead(reviews_count=500, category="Clínica odontológica"),
+        {"ads_active": False},
+        professions=["automacao"],
+    )
+    assert r.service_target == "automacao"
+
+
+def test_multi_profissao_qualifica_pelo_melhor_lens():
+    # agencia faz trafego E design; lead sem site (mina pra design) qualifica
+    r = score_lead(
+        _lead(website=None, rating=4.6, reviews_count=200),
+        {},
+        professions=["trafego", "design"],
+    )
+    assert r.decision == "qualificado"
 
 
 def test_automacao_lead_targets_automacao():

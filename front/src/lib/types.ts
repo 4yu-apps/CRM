@@ -264,11 +264,14 @@ export interface SearchProfile {
   // nichos sugeridos e o servico-alvo padrao no onboarding. Coluna criada por
   // migracao em outro fluxo; opcional ate todo perfil ter escolhido.
   profession?: string | null;
+  // Lista de profissoes selecionadas (multi-select). Substitui profession no
+  // longo prazo; profession fica como campo primario/back-compat (professions[0]).
+  professions?: string[];
   created_at: string;
   updated_at: string;
 }
 export type SearchProfileInput = Partial<Pick<SearchProfile,
-  "niches" | "city" | "state" | "neighborhood" | "radius" | "default_service_target" | "autopilot" | "profession" | "min_score">>;
+  "niches" | "city" | "state" | "neighborhood" | "radius" | "default_service_target" | "autopilot" | "profession" | "professions" | "min_score">>;
 
 // Template de mensagem (#18).
 export type MessageTemplateKind = "abertura" | "follow_up" | "objecao" | "reativacao";

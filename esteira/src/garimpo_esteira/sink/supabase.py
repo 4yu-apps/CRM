@@ -118,7 +118,7 @@ class SupabaseSink:
                 f"{self.base}/search_profile",
                 params={
                     "owner_id": f"eq.{owner_id}",
-                    "select": "owner_id,niches,city,state,neighborhood,default_service_target,profession,min_score",
+                    "select": "owner_id,niches,city,state,neighborhood,default_service_target,profession,professions,min_score",
                     "limit": "1",
                 },
             )
@@ -135,7 +135,7 @@ class SupabaseSink:
                 f"{self.base}/search_profile",
                 params={
                     "autopilot": "eq.true",
-                    "select": "owner_id,niches,city,state,neighborhood,radius,default_service_target,profession,min_score",
+                    "select": "owner_id,niches,city,state,neighborhood,radius,default_service_target,profession,professions,min_score",
                 },
             )
             r.raise_for_status()

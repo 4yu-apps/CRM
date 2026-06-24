@@ -50,6 +50,18 @@ function focoText(p: Profession): string {
   }
 }
 
+// Derivar servico-alvo a partir do conjunto de profissoes selecionadas.
+function deriveServiceTarget(selected: string[]): ServiceTarget {
+  if (selected.length === 0) return "indefinido";
+  if (
+    selected.includes("ambos") ||
+    (selected.includes("trafego") && selected.includes("automacao"))
+  ) {
+    return "ambos";
+  }
+  return getProfession(selected[0])?.defaultService ?? "indefinido";
+}
+
 export function OnboardingWizard() {
   const repo = getRepo();
   const { refreshProfile, mode } = useAuth();
@@ -60,18 +72,37 @@ export function OnboardingWizard() {
   const [name, setName] = useState("");
 
   // Campos coletados no fluxo.
-  const [profession, setProfession] = useState<string | null>(null);
+  const [professions, setProfessions] = useState<string[]>([]);
   const [niches, setNiches] = useState<string[]>([]);
   const [serviceTarget, setServiceTarget] = useState<ServiceTarget>("indefinido");
   const [state, setState] = useState("");
   const [city, setCity] = useState("");
 
-  // Escolher profissao: guarda o id, pre-seleciona o servico-alvo e sugere os
-  // nichos da area (o usuario pode ajustar depois, na Configuracao).
+  // Escolher profissao: toggle no array. Recomputa servico-alvo e semeia nichos
+  // (uniao das areas escolhidas, sem sobrescrever o que o usuario ja digitou).
   const chooseProfession = useCallback((p: Profession) => {
-    setProfession(p.id);
-    setServiceTarget(p.defaultService);
-    setNiches(p.suggestedNiches);
+    setProfessions((prev) => {
+      const next = prev.includes(p.id)
+        ? prev.filter((id) => id !== p.id)
+        : [...prev, p.id];
+      setServiceTarget(deriveServiceTarget(next));
+      // Semeia nichos ao adicionar uma nova area; nao remove niches existentes.
+      setNiches((prevNiches) => {
+        const allSuggested = next.flatMap(
+          (id) => getProfession(id)?.suggestedNiches ?? [],
+        );
+        // Dedup mantendo a ordem de insercao
+        const deduped = Array.from(new Set(allSuggested));
+        if (prevNiches.length === 0) return deduped;
+        const lower = prevNiches.map((n) => n.toLowerCase());
+        const merged = [...prevNiches];
+        for (const n of deduped) {
+          if (!lower.includes(n.toLowerCase())) merged.push(n);
+        }
+        return merged;
+      });
+      return next;
+    });
   }, []);
 
   const handleCitySelect = useCallback(
@@ -87,13 +118,14 @@ export function OnboardingWizard() {
     setState("");
   }, []);
 
-  const selectedProfession = getProfession(profession);
+  const primaryProfession = getProfession(professions[0]);
 
   const finish = useCallback(async () => {
     setSaving(true);
     try {
       const input: SearchProfileInput = {
-        profession,
+        professions,
+        profession: professions[0] ?? null,
         niches,
         default_service_target: serviceTarget,
         city: city.trim() || null,
@@ -116,9 +148,9 @@ export function OnboardingWizard() {
       toast.error(e instanceof Error ? e.message : "Erro ao salvar. Tenta de novo.");
       setSaving(false);
     }
-  }, [profession, niches, serviceTarget, city, state, name, mode, repo, refreshProfile, router]);
+  }, [professions, niches, serviceTarget, city, state, name, mode, repo, refreshProfile, router]);
 
-  const canAdvance = step !== 0 || !!profession;
+  const canAdvance = step !== 0 || professions.length > 0;
 
   const next = useCallback(() => {
     setStep((s) => Math.min(s + 1, STEPS.length - 1));
@@ -223,24 +255,28 @@ export function OnboardingWizard() {
                 />
               </div>
 
+              <p className="mb-3 text-[12.5px] text-faint">
+                Pode escolher mais de uma.
+              </p>
+
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {PROFESSIONS.map((p) => (
                   <ProfessionCard
                     key={p.id}
                     profession={p}
-                    selected={profession === p.id}
+                    selected={professions.includes(p.id)}
                     onSelect={chooseProfession}
                   />
                 ))}
               </div>
 
-              {selectedProfession && (
+              {primaryProfession && (
                 <div className="mt-4 flex items-start gap-2.5 rounded-[14px] border border-brand/20 bg-brand-50/70 px-4 py-3 text-[13px] leading-relaxed text-ink-2">
                   <Target size={16} className="mt-0.5 flex-none text-brand" />
                   <span>
                     Boa. Você mira em:{" "}
-                    <strong className="font-bold text-brand">{selectedProfession.mira}</strong>{" "}
-                    {focoText(selectedProfession)} Já deixei os nichos dessa área sugeridos,
+                    <strong className="font-bold text-brand">{primaryProfession.mira}</strong>{" "}
+                    {focoText(primaryProfession)} Já deixei os nichos dessa área sugeridos,
                     dá pra ajustar tudo depois na Configuração.
                   </span>
                 </div>
@@ -301,8 +337,8 @@ export function OnboardingWizard() {
                     Pronto. Daqui eu assumo.
                   </h1>
                   <p className="mt-1 text-[14px] leading-relaxed text-muted-foreground">
-                    {selectedProfession
-                      ? `Configurado pra ${selectedProfession.label}.`
+                    {primaryProfession
+                      ? `Configurado pra ${primaryProfession.label}.`
                       : "Tudo certo pra começar."}{" "}
                     Veja como funciona o dia a dia.
                   </p>
@@ -347,7 +383,9 @@ export function OnboardingWizard() {
                   <span>
                     Área:{" "}
                     <strong className="font-bold text-ink">
-                      {selectedProfession?.label ?? "não escolhida"}
+                      {professions.length > 0
+                        ? professions.map((id) => getProfession(id)?.label ?? id).join(", ")
+                        : "não escolhida"}
                     </strong>
                   </span>
                 </div>
@@ -403,7 +441,7 @@ export function OnboardingWizard() {
                 className="flex items-center gap-2 rounded-[14px] px-7 py-3 text-[14px] font-bold text-white shadow-[0_6px_16px_var(--ring)] transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
                 style={{ background: "var(--grad)" }}
               >
-                {step === 0 && !profession ? "Escolha uma área" : "Continuar"}
+                {step === 0 && professions.length === 0 ? "Escolha uma área" : "Continuar"}
                 <ArrowRight size={17} weight="bold" />
               </button>
             ) : (

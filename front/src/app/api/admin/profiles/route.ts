@@ -19,7 +19,7 @@ export async function GET(request: NextRequest): Promise<Response> {
   // a) Todos os perfis
   const { data: profiles, error: profErr } = await sb
     .from("search_profile")
-    .select("owner_id, profession, city, state, autopilot, is_admin, created_at, updated_at")
+    .select("owner_id, profession, professions, city, state, autopilot, is_admin, created_at, updated_at")
     .order("created_at", { ascending: false });
 
   if (profErr) {
@@ -69,6 +69,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     owner_id: p.owner_id as string,
     email: emailById.get(p.owner_id as string) ?? null,
     profession: (p.profession as string | null) ?? null,
+    professions: ((p as Record<string, unknown>).professions as string[] | null) ?? [],
     city: (p.city as string | null) ?? null,
     state: (p.state as string | null) ?? null,
     autopilot: p.autopilot as boolean,

@@ -141,3 +141,32 @@ def test_food_trafego_ifood_e_pergunta_nao_afirmacao():
     """A mensagem com iFood deve ter ponto de interrogacao (e pergunta, nao afirmacao)."""
     m1, m2 = _gen("trafego", category="Hamburgueria")
     assert "?" in m1, f"Esperado '?' em msg1 com iFood mas nao encontrado: {m1!r}"
+
+
+# ---- #3: copy guiada por sinais, humanizada, sem "regiao" ----
+
+def test_copy_nunca_fala_em_regiao():
+    """A busca cobre o Brasil todo: NUNCA dizer 'na regiao' nem 'aqui perto'."""
+    for st in ("trafego", "automacao", "ambos", "design", "marketing", "indefinido"):
+        m1, m2 = _gen(st, category="Salao de Beleza")
+        blob = (m1 + " " + m2).lower()
+        assert "regi" not in blob, f"{st}: copy fala em regiao: {m1!r}"
+        assert "aqui perto" not in blob, f"{st}: copy fala 'aqui perto': {m1!r}"
+
+
+def test_copy_diz_que_encontrou_no_google():
+    m1, _ = _gen("trafego")
+    assert "google" in m1.lower()
+
+
+def test_copy_varia_por_sinal_de_anuncio():
+    """Mesmo servico, sinais diferentes => abertura diferente (copy por situacao)."""
+    anuncia = _gen("ambos", category="Estética", ads_active=True,
+                   website="x.com", instagram="@x")[0]
+    sem = _gen("ambos", category="Estética", website=None, instagram=None)[0]
+    assert anuncia != sem
+
+
+def test_copy_abertura_tem_pergunta_aberta():
+    m1, _ = _gen("ambos", category="Academia")
+    assert "?" in m1

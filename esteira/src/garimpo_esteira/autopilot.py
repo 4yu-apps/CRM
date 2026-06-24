@@ -103,6 +103,7 @@ def run_autopilot(
         city, state = prof.get("city"), prof.get("state")
         neighborhood = prof.get("neighborhood")
         profession = prof.get("profession")  # define a lente do score e a copy
+        professions = list(prof.get("professions") or ([profession] if profession else []))
         min_score = int(prof.get("min_score") or 0)  # #19 piso de score por dono
         rkey = region_key(city, state)
         covered = (
@@ -181,10 +182,11 @@ def run_autopilot(
         try:
             run_pipeline_streaming(
                 sink, sources, provider, batch=batch, delay=delay, owner_id=owner,
-                profession=profession, min_score=min_score, reviews_source=reviews_source,
-                workers=workers,
+                profession=profession, professions=professions,
+                min_score=min_score, reviews_source=reviews_source, workers=workers,
             )
-            score_batch(sink, batch=batch, owner_id=owner, profession=profession, min_score=min_score)
+            score_batch(sink, batch=batch, owner_id=owner, profession=profession,
+                        professions=professions, min_score=min_score)
             draft_batch(sink, provider, batch=batch, owner_id=owner, profession=profession, reviews_source=reviews_source)
         except Exception:
             pass

@@ -196,16 +196,18 @@ def cmd_search(
     term = search_term(niche, city, state, neighborhood)
 
     profession = None
+    professions: list[str] = []
     min_score = 0
     if hasattr(sink, "fetch_profile"):
         try:
             prof = sink.fetch_profile(owner_id) or {}
             profession = prof.get("profession")
+            professions = list(prof.get("professions") or ([profession] if profession else []))
             min_score = int(prof.get("min_score") or 0)
         except Exception:
             profession = None
 
-    print(f"search · owner={owner_id[:8]} term={term!r} prof={profession or '-'}")
+    print(f"search · owner={owner_id[:8]} term={term!r} prof={','.join(professions) or '-'}")
     res = discover(sink, maps, [term], owner_id)
     inserted = int(res.get("inserted", 0))
     print(f"  descobertos {inserted} (dedup {res.get('skipped', 0)})")
@@ -219,7 +221,8 @@ def cmd_search(
     run_pipeline_streaming(
         sink, sources, provider,
         batch=cfg.batch, delay=cfg.delay, owner_id=owner_id,
-        profession=profession, min_score=min_score, reviews_source=reviews_source,
+        profession=profession, professions=professions,
+        min_score=min_score, reviews_source=reviews_source,
         workers=workers,
     )
 

@@ -68,9 +68,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     try {
       const profile = await getRepo().getProfile();
-      // So libera o app quando ha perfil COM profissao escolhida. Perfil sem
-      // profissao (profession null/vazio) cai no onboarding de primeiro acesso.
-      setHasProfile(!!profile && !!profile.profession);
+      // So libera o app quando ha perfil COM profissao escolhida. Aceita tanto
+      // professions[] (multi-select) quanto profession (back-compat).
+      setHasProfile(!!profile && (((profile.professions?.length ?? 0) > 0) || !!profile.profession));
       setIsAdmin(profile?.is_admin === true);
     } catch {
       // erro de leitura do perfil nao bloqueia o app

@@ -210,11 +210,13 @@ def test_score_lead_automacao_profession():
     assert r.reason["lens"] == "automacao"
 
 
-def test_score_lead_none_profession_falls_back_to_auto():
-    """profession=None cai no legado auto."""
+def test_score_lead_none_profession_default_ambos():
+    """#2: profession=None oferta trafego+automacao; sem anuncio conhecido a
+    maioria dos leads serve pros dois => alvo/lente "ambos"."""
     lead = _lead(website=None)
     r = score_lead(lead, profession=None)
-    assert r.reason["lens"] == "auto"
+    assert r.reason["lens"] == "ambos"
+    assert r.service_target == "ambos"
 
 
 def test_score_lead_with_signals_and_trafego_profession():

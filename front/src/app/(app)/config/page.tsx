@@ -138,7 +138,7 @@ export default function ConfigPage() {
   const [minScore, setMinScore] = useState(0); // #19 score minimo pra entrar na fila
   // Espelho do valor JA salvo, pra avisar quando o toggle ainda nao foi salvo.
   const [savedAutopilot, setSavedAutopilot] = useState(false);
-  const [profession, setProfession] = useState<string | null>(null);
+  const [professions, setProfessions] = useState<string[]>([]);
 
   // Listas vindas do IBGE para os selects em cascata (estado -> cidade)
   const [estados, setEstados] = useState<UF[]>([]);
@@ -162,7 +162,13 @@ export default function ConfigPage() {
           setAutopilot(profile.autopilot ?? false);
           setSavedAutopilot(profile.autopilot ?? false);
           setMinScore(profile.min_score ?? 0);
-          setProfession(profile.profession ?? null);
+          setProfessions(
+            profile.professions?.length
+              ? profile.professions
+              : profile.profession
+                ? [profile.profession]
+                : [],
+          );
         }
       } catch {
         // Se falhar, trata como primeiro acesso
@@ -225,18 +231,39 @@ export default function ConfigPage() {
     setNiches((prev) => prev.filter((n) => n !== ramo));
   }, []);
 
-  // Escolher uma profissao: guarda o id, pre-seleciona o servico-alvo e sugere
-  // os nichos da area (preenchendo os chips, que o usuario ainda pode ajustar).
+  // Derivar o servico-alvo a partir do conjunto de profissoes selecionadas.
+  function deriveServiceTarget(selected: string[]): ServiceTarget {
+    if (selected.length === 0) return "indefinido";
+    if (
+      selected.includes("ambos") ||
+      (selected.includes("trafego") && selected.includes("automacao"))
+    ) {
+      return "ambos";
+    }
+    return getProfession(selected[0])?.defaultService ?? "indefinido";
+  }
+
+  // Escolher profissao: toggle no array. Recomputa servico-alvo e mescla nichos
+  // das areas escolhidas sem remover o que o usuario ja adicionou.
   const chooseProfession = useCallback((p: Profession) => {
-    setProfession(p.id);
-    setServiceTarget(p.defaultService);
-    setNiches((prev) => {
-      const lower = prev.map((n) => n.toLowerCase());
-      const merged = [...prev];
-      for (const n of p.suggestedNiches) {
-        if (!lower.includes(n.toLowerCase())) merged.push(n);
-      }
-      return merged;
+    setProfessions((prev) => {
+      const next = prev.includes(p.id)
+        ? prev.filter((id) => id !== p.id)
+        : [...prev, p.id];
+      setServiceTarget(deriveServiceTarget(next));
+      setNiches((prevNiches) => {
+        const allSuggested = next.flatMap(
+          (id) => getProfession(id)?.suggestedNiches ?? [],
+        );
+        const deduped = Array.from(new Set(allSuggested));
+        const lower = prevNiches.map((n) => n.toLowerCase());
+        const merged = [...prevNiches];
+        for (const n of deduped) {
+          if (!lower.includes(n.toLowerCase())) merged.push(n);
+        }
+        return merged;
+      });
+      return next;
     });
   }, []);
 
@@ -252,7 +279,8 @@ export default function ConfigPage() {
         radius,
         default_service_target: serviceTarget,
         autopilot,
-        profession,
+        professions,
+        profession: professions[0] ?? null,
         min_score: minScore,
       };
       await repo.saveProfile(input);
@@ -269,7 +297,7 @@ export default function ConfigPage() {
     } finally {
       setSaving(false);
     }
-  }, [niches, city, state, radius, serviceTarget, autopilot, minScore, profession, repo, refreshProfile, isOnboarding, router]);
+  }, [niches, city, state, radius, serviceTarget, autopilot, minScore, professions, repo, refreshProfile, isOnboarding, router]);
 
   // Ja conectou com o Google? (login via Google => agenda disponivel)
   const meta = session?.user?.app_metadata as { provider?: string; providers?: string[] } | undefined;
@@ -322,7 +350,7 @@ export default function ConfigPage() {
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
-  const selectedProfession = getProfession(profession);
+  const selectedProfession = getProfession(professions[0]);
 
   return (
     <div className="mx-auto max-w-[760px]">
@@ -394,12 +422,13 @@ export default function ConfigPage() {
             sub="Escolha a sua área. Eu uso isso pra sugerir os nichos certos e mirar o serviço que você vende."
             icon={<Briefcase size={20} />}
           >
+            <p className="mb-3 text-[12.5px] text-faint">Pode escolher mais de uma.</p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {PROFESSIONS.map((p) => (
                 <ProfessionCard
                   key={p.id}
                   profession={p}
-                  selected={profession === p.id}
+                  selected={professions.includes(p.id)}
                   onSelect={chooseProfession}
                 />
               ))}
@@ -421,12 +450,13 @@ export default function ConfigPage() {
             sub="A área define os nichos sugeridos e o serviço-alvo. Pode trocar quando quiser."
             icon={<Briefcase size={20} />}
           >
+            <p className="mb-3 text-[12.5px] text-faint">Pode escolher mais de uma.</p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {PROFESSIONS.map((p) => (
                 <ProfessionCard
                   key={p.id}
                   profession={p}
-                  selected={profession === p.id}
+                  selected={professions.includes(p.id)}
                   onSelect={chooseProfession}
                 />
               ))}

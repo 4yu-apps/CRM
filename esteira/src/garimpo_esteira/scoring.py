@@ -361,46 +361,67 @@ def _summary(lens: str, target: ServiceTarget, lead: Lead, signals: dict[str, An
     return "Fora do alvo por agora."
 
 
+def _offered_lenses(professions: list[str]) -> set[str]:
+    """Profissoes do dono -> conjunto de lentes de servico que ele oferta.
+    'ambos' abre em trafego+automacao. Vazio (sem profissao) cai no default
+    trafego+automacao: a maioria dos leads serve pros dois (a API do FB ainda
+    nao liga, entao 'nao sei se anuncia' = candidato aos dois)."""
+    lenses: set[str] = set()
+    for p in professions:
+        lens = _LENS.get((p or "").strip().lower())
+        if lens == "ambos":
+            lenses.update({"trafego", "automacao"})
+        elif lens in ("trafego", "automacao", "design", "marketing"):
+            lenses.add(lens)
+    return lenses or {"trafego", "automacao"}
+
+
 def score_lead(
-    lead: Lead, signals: dict[str, Any] | None = None, profession: str | None = None
+    lead: Lead, signals: dict[str, Any] | None = None, profession: str | None = None,
+    *, professions: list[str] | None = None,
 ) -> ScoreResult:
-    """Pontua o lead pela LENTE da profissao do dono (quem ele e define o que
-    procura). trafego/automacao/ambos mantem os ICPs originais; design/web/
-    branding olham qualidade do site; marketing olha presenca; sem profissao
-    cai no legado (compara trafego x automacao)."""
+    """Pontua o lead pelas LENTES dos servicos que o dono oferta (pode ser mais
+    de um). Qualifica pelo MELHOR encaixe entre as lentes ofertadas.
+
+    Alvo de servico (#2): quando a oferta cobre trafego E automacao, a maioria
+    dos leads e "ambos" (precisam atrair E operar); so vira "automacao" quando o
+    negocio JA anuncia (ja faz trafego, a lacuna passa a ser atendimento). ads
+    desconhecido (None) = ambos. Se a oferta cobre so um eixo, mantem esse eixo;
+    design/marketing entram quando pontuam mais que o eixo trafego/automacao."""
     signals = signals or {}
-    lens = lens_for(profession)
+    profs = professions if professions is not None else ([profession] if profession else [])
+    lenses = _offered_lenses(profs)
 
     t_score, t_crit = score_trafego(lead, signals)
     a_score, a_crit = score_automacao(lead, signals)
     d_score, d_crit = score_design(lead, signals)
     m_score, m_crit = score_marketing(lead, signals)
+    by_lens = {
+        "trafego": (t_score, t_crit), "automacao": (a_score, a_crit),
+        "design": (d_score, d_crit), "marketing": (m_score, m_crit),
+    }
 
-    # escolhe o score e o alvo conforme a lente da profissao
-    if lens == "trafego":
-        best, winning_crit, target = t_score, t_crit, "trafego"
-    elif lens == "automacao":
-        best, winning_crit, target = a_score, a_crit, "automacao"
-    elif lens == "design":
-        best, winning_crit, target = d_score, d_crit, "design"
-    elif lens == "marketing":
-        best, winning_crit, target = m_score, m_crit, "marketing"
-    elif lens == "ambos":
-        best = max(t_score, a_score)
-        if t_score >= AMBOS_BAR and a_score >= AMBOS_BAR:
-            target, winning_crit = "ambos", (t_crit if t_score >= a_score else a_crit)
-        elif t_score >= a_score:
-            target, winning_crit = "trafego", t_crit
+    # qualifica pelo melhor encaixe entre as lentes ofertadas
+    candidates = {k: by_lens[k][0] for k in lenses}
+    best_lens = max(candidates, key=lambda k: candidates[k])
+    best = candidates[best_lens]
+    winning_crit = by_lens[best_lens][1]
+
+    offers_traf = "trafego" in lenses
+    offers_auto = "automacao" in lenses
+    ads = signals.get("ads_active")
+
+    if offers_traf and offers_auto:
+        # eixo trafego+automacao presente: regra #2. So abre pra design/marketing
+        # se um deles pontuar acima do eixo.
+        non_axis = {k: candidates[k] for k in candidates if k in ("design", "marketing")}
+        axis_best = max(t_score, a_score)
+        if non_axis and max(non_axis.values()) > axis_best:
+            target = max(non_axis, key=lambda k: non_axis[k])
         else:
-            target, winning_crit = "automacao", a_crit
-    else:  # auto (legado): compara trafego x automacao
-        best = max(t_score, a_score)
-        if t_score >= AMBOS_BAR and a_score >= AMBOS_BAR:
-            target, winning_crit = "ambos", t_crit
-        elif t_score >= a_score:
-            target, winning_crit = "trafego", t_crit
-        else:
-            target, winning_crit = "automacao", a_crit
+            target = "automacao" if ads is True else "ambos"
+    else:
+        target = best_lens
 
     contactable = is_present("phone", lead.phone)
     if not contactable:
@@ -415,14 +436,17 @@ def score_lead(
         decision = "qualificado"
         verdict = "atingiu o corte do ICP"
 
+    # lente do resumo: design/marketing usam a propria; trafego/automacao/ambos
+    # seguem o alvo (pra _summary escolher o texto certo).
+    lens_label = best_lens if best_lens in ("design", "marketing") else target
     reason = {
         "total": best,
         "threshold": THRESHOLD,
         "decision": decision,
         "verdict": verdict,
-        "lens": lens,
+        "lens": lens_label,
         "service_target": target,
-        "summary": _summary(lens, target, lead, signals),
+        "summary": _summary(lens_label, target, lead, signals),
         "criteria": winning_crit,
         "trafego": {"score": t_score, "criteria": t_crit},
         "automacao": {"score": a_score, "criteria": a_crit},
