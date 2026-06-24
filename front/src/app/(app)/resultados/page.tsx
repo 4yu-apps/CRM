@@ -1,5 +1,5 @@
 "use client";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ChartLineUp,
   PaperPlaneTilt,
@@ -9,10 +9,18 @@ import {
   TrendDown,
   Equals,
   SmileySad,
+  PencilSimple,
+  Check,
+  X,
 } from "@phosphor-icons/react";
 import { useLeads } from "@/hooks/use-leads";
 import { funnel, depth } from "@/lib/funnel";
 import type { Lead, LeadStatus } from "@/lib/types";
+
+// Meta de receita do mes: editavel pelo usuario, guardada na localStorage.
+const GOAL_KEY = "garimpo:goal";
+const brl = (v: number) =>
+  v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
 // ---------- helpers de periodo ----------
 
@@ -242,6 +250,36 @@ export default function ResultadosPage() {
   const funnelBars = useMemo(() => buildFunnelBars(leads), [leads]);
   const meta = useMemo(() => buildMeta(leads), [leads]);
 
+  // Meta de receita editavel (persistida). Hidrata da localStorage no cliente.
+  const [metaReceita, setMetaReceita] = useState(10000);
+  const [editingMeta, setEditingMeta] = useState(false);
+  const [metaInput, setMetaInput] = useState("");
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(GOAL_KEY);
+      if (raw) {
+        const o = JSON.parse(raw);
+        if (typeof o?.meta === "number" && o.meta > 0) {
+          // eslint-disable-next-line react-hooks/set-state-in-effect
+          setMetaReceita(o.meta);
+        }
+      }
+    } catch {
+      /* ignora */
+    }
+  }, []);
+  const saveMeta = () => {
+    const v = Math.max(0, Number(metaInput) || 0);
+    setMetaReceita(v);
+    try {
+      localStorage.setItem(GOAL_KEY, JSON.stringify({ meta: v }));
+    } catch {
+      /* ignora */
+    }
+    setEditingMeta(false);
+  };
+  const metaProgress = metaReceita > 0 ? Math.min(1, meta.receita / metaReceita) : 0;
+
   const totalLeads = leads.length;
   const maxBar = funnelBars[0]?.value ?? 0;
 
@@ -306,7 +344,10 @@ export default function ResultadosPage() {
 
         {/* barras do funil */}
         <div className="fu rounded-[18px] border border-border bg-card p-6 shadow-[var(--shadow)]">
-          <div className="mb-5 text-[16px] font-bold">Da prospecção ao fechamento</div>
+          <div className="mb-5 flex items-baseline justify-between gap-2">
+            <span className="text-[16px] font-bold">Da prospecção ao fechamento</span>
+            <span className="text-[11.5px] text-faint">instantâneo · por status atual</span>
+          </div>
           {loading ? (
             <div className="space-y-3">
               {Array.from({ length: 6 }).map((_, i) => (
@@ -355,8 +396,23 @@ export default function ResultadosPage() {
             style={{ borderColor: "rgba(255,255,255,.18)" }}
           />
           <div className="relative">
-            <div className="text-[13px] font-semibold tracking-[.04em] opacity-85 uppercase">
-              Meta do mês
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-[13px] font-semibold tracking-[.04em] opacity-85 uppercase">
+                Meta do mês
+              </div>
+              {!loading && !editingMeta && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMetaInput(String(metaReceita));
+                    setEditingMeta(true);
+                  }}
+                  aria-label="Editar meta de receita"
+                  className="flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-[12px] font-semibold hover:bg-white/25"
+                >
+                  <PencilSimple size={13} /> Editar meta
+                </button>
+              )}
             </div>
             <div className="mt-3 mb-1 flex items-baseline gap-2">
               <span className="font-heading text-[50px] font-bold leading-none">
@@ -373,9 +429,54 @@ export default function ResultadosPage() {
                 {meta.receitaFmt} em receita
               </div>
             )}
-            <div className="mt-4 text-[13.5px] opacity-90">
-              {meta.mes}
-            </div>
+
+            {!loading && !editingMeta && (
+              <div className="mt-4">
+                <div className="mb-1.5 flex items-baseline justify-between text-[12.5px] opacity-90">
+                  <span>
+                    {brl(meta.receita)} de {brl(metaReceita)}
+                  </span>
+                  <span className="font-bold">{Math.round(metaProgress * 100)}% da meta</span>
+                </div>
+                <div className="h-2.5 overflow-hidden rounded-full bg-white/25">
+                  <div
+                    className="h-full rounded-full bg-white transition-[width] duration-700"
+                    style={{ width: `${metaProgress * 100}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {editingMeta && (
+              <div className="mt-4 flex items-center gap-2">
+                <span className="text-[13px] opacity-90">Meta R$</span>
+                <input
+                  type="number"
+                  value={metaInput}
+                  onChange={(e) => setMetaInput(e.target.value)}
+                  autoFocus
+                  className="w-28 rounded-[8px] border border-white/30 bg-white/20 px-2.5 py-1.5 text-[14px] font-semibold text-white outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={saveMeta}
+                  aria-label="Salvar meta"
+                  className="flex size-8 items-center justify-center rounded-[8px] bg-white text-brand"
+                >
+                  <Check size={16} weight="bold" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingMeta(false)}
+                  aria-label="Cancelar"
+                  className="flex size-8 items-center justify-center rounded-[8px] bg-white/20 text-white"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            )}
+
+            <div className="mt-4 text-[13.5px] opacity-90">{meta.mes}</div>
             {!loading && meta.fechados === 0 && (
               <div className="mt-3 rounded-[12px] bg-white/15 px-4 py-3 text-[13px] leading-relaxed opacity-90">
                 Nenhum lead fechado no mês ainda. Quando fechar o primeiro, aparece aqui.
