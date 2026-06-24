@@ -231,7 +231,7 @@ export default function CelularPage() {
   const [deferred, setDeferred] = useState<string[]>([]);
 
   const queue = useMemo(
-    () => leads.filter((l) => l.status === "rascunho_pronto" || l.status === "aprovado"),
+    () => leads.filter((l) => (l.status === "rascunho_pronto" || l.status === "aprovado") && !l.archived),
     [leads],
   );
 
