@@ -257,9 +257,11 @@ export default function FilaPage() {
   // Abrir o WhatsApp e marcar enviado (compartilhado pelo botao e pela tecla Enter).
   const sendNow = useCallback(() => {
     if (!sendLead) return;
+    // Envia SO a abertura (msg1). O pitch (msg2) e um passo opcional, mandado
+    // depois CASO a pessoa responda (fica disponivel na ficha do lead).
     openWhatsApp(
       sendLead.whatsapp ?? sendLead.phone,
-      [sendLead.draft_msg1, sendLead.draft_msg2].filter(Boolean).join("\n\n"),
+      sendLead.draft_msg1 ?? undefined,
     );
     void markSent();
   }, [sendLead, markSent]);
@@ -662,11 +664,11 @@ export default function FilaPage() {
             </div>
             <div className="px-6 py-4">
               <div className="max-h-40 overflow-auto rounded-[14px] border border-border bg-surface-2 p-4 text-[13.5px] leading-relaxed text-ink-2">
-                {[sendLead.draft_msg1, sendLead.draft_msg2].filter(Boolean).join("\n\n")}
+                {sendLead.draft_msg1}
               </div>
               <div className="mt-3 flex items-center gap-2 text-[12.5px] text-faint">
-                <ShieldCheck size={16} className="text-success" /> Você manda do seu número, com a própria mão. O
-                4YU CRM nunca dispara sozinho.
+                <ShieldCheck size={16} className="text-success" /> Só a abertura vai agora. O pitch fica guardado na
+                ficha, pra você mandar depois se a pessoa responder.
               </div>
             </div>
             <div className="flex flex-col gap-2.5 px-6 pb-6">
@@ -676,7 +678,7 @@ export default function FilaPage() {
                 className="flex w-full items-center justify-center gap-2 rounded-[14px] p-4 text-sm font-bold text-white"
                 style={{ background: "var(--wa)" }}
               >
-                <WhatsappLogo size={20} weight="fill" /> Abrir conversa e enviar
+                <WhatsappLogo size={20} weight="fill" /> Abrir conversa e enviar abertura
               </button>
               <button
                 onClick={markSent}

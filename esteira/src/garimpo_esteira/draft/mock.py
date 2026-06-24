@@ -44,56 +44,55 @@ def _greeting(nome: str) -> str:
     return _GREETINGS[len(nome) % len(_GREETINGS)]
 
 
-def _observacao(b: dict, lead: Lead) -> str:
-    """Uma frase sobre UM sinal real do negocio (a ancora da abertura). Vazio se
-    nao ha sinal concreto."""
-    boa_rep = b["nota"] is not None and b["nota"] >= 4.5
-    if _advertises(lead) and boa_rep:
-        return "Vi que vocês já anunciam e ainda têm uma reputação muito boa."
+def _gancho(b: dict, lead: Lead) -> str:
+    """Clausula curta sobre UM sinal real (a ancora da abertura). Comeca em
+    minuscula, pra emendar em 'Encontrei a X no Google e {gancho}.'. Sem repetir
+    'vi que voces' e enxuto, pra a abertura nao ficar viciosa nem grande."""
+    seg = (b["segmento"] or "").lower()
+    com_seg = f" com {seg}" if seg else ""
+    boa = b["nota"] is not None and b["nota"] >= 4.5
+    if _advertises(lead) and boa:
+        return "vi que já anunciam e ainda têm uma ótima reputação"
     if _advertises(lead):
-        return "Vi que vocês já estão anunciando por aí."
-    if boa_rep and not b["tem_site"]:
-        return "Vocês têm uma reputação muito boa, mas não achei um site de vocês."
+        return "reparei que já estão anunciando"
+    if boa and not b["tem_site"]:
+        return "a reputação de vocês está ótima, mas não achei um site"
     if not b["tem_site"]:
-        return "Gostei do trabalho, mas não encontrei um site de vocês."
+        return f"gostei do trabalho{com_seg}, mas não encontrei um site"
     if not b["tem_instagram"]:
-        return "Procurei vocês no Instagram e não achei nada."
-    if boa_rep:
-        return "Gostei do que vi, a reputação de vocês está ótima."
-    return ""
+        return "procurei no Instagram e não achei nada"
+    if boa:
+        return "gostei do que vi, a reputação está ótima"
+    return f"gostei do trabalho{com_seg}"
 
 
 def _pergunta(b: dict, lead: Lead, service: str) -> str:
     """Pergunta genuina e aberta, ligada ao sinal e ao servico. Quando faz
-    sentido, ja puxa quem cuida daquilo (pra descobrir com quem se fala)."""
+    sentido, ja puxa quem cuida daquilo (pra descobrir com quem se fala). Sempre
+    UMA frase so."""
     if service in ("trafego", "ambos", "indefinido") and _is_food(b):
         return "Vocês já trabalham com iFood ou é mais no salão e entrega própria?"
     if _advertises(lead):
-        return "Quem clica no anúncio e não fecha na hora, vocês conseguem retomar esse contato depois?"
+        return "Quem clica no anúncio e não fecha na hora, dá pra retomar esse contato depois?"
     if not b["tem_site"]:
-        return "Hoje o cliente novo chega mais por indicação e Instagram, ou vocês já divulgam de outro jeito?"
+        return "Hoje o cliente novo chega mais por indicação, ou já fazem alguma divulgação?"
     if not b["tem_instagram"]:
-        return "Vocês trabalham mais no boca a boca, ou já tentaram aparecer nas redes pra atrair gente nova?"
+        return "Trabalham mais no boca a boca, ou já tentaram as redes pra atrair gente nova?"
     if service == "automacao":
-        return "Quem cuida do atendimento e da agenda aí hoje, é tudo na mão pelo WhatsApp?"
+        return "Quem cuida do atendimento e da agenda aí, é tudo na mão pelo WhatsApp?"
     if service == "marketing":
-        return "Quem cuida das redes de vocês hoje, é alguém de fora ou vocês mesmos na correria?"
+        return "Quem cuida das redes aí hoje, é alguém de fora ou vocês mesmos?"
     if service == "design":
-        return "Manter o site no dia a dia dá um trabalho, né? Quem cuida disso aí com vocês?"
-    return "Como o cliente costuma chegar até vocês hoje, é mais indicação ou divulgação?"
+        return "Quem cuida do site de vocês no dia a dia?"
+    return "Como o cliente costuma chegar até aí hoje, mais indicação ou divulgação?"
 
 
 def _abertura(b: dict, lead: Lead, service: str) -> str:
     nome = b["nome"]
-    seg = (b["segmento"] or "")
-    parts = [f"{_greeting(nome)} Encontrei a {nome} no Google agora há pouco."]
-    obs = _observacao(b, lead)
-    if obs:
-        parts.append(obs)
-    if seg:
-        parts.append(f"Vi que vocês trabalham com {seg}, certo?")
-    parts.append(_pergunta(b, lead, service))
-    return " ".join(parts)
+    return (
+        f"{_greeting(nome)} Encontrei a {nome} no Google e {_gancho(b, lead)}. "
+        f"{_pergunta(b, lead, service)}"
+    )
 
 
 # Pitch leve (msg2) por servico. Valor em uma frase + convite aberto, nunca

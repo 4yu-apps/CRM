@@ -817,7 +817,17 @@ export default function FichaPage() {
                       className="flex items-center justify-center gap-2 rounded-[13px] p-3.5 text-sm font-bold text-white"
                       style={{ background: "var(--wa)" }}
                     >
-                      <WhatsappLogo size={18} weight="fill" /> Abrir conversa no WhatsApp
+                      <WhatsappLogo size={18} weight="fill" /> Abrir conversa e enviar abertura
+                    </button>
+                  )}
+                  {/* Pitch e um passo OPCIONAL: so mandar depois, se a pessoa responder. */}
+                  {lead.phone && lead.draft_msg2 && (
+                    <button
+                      type="button"
+                      onClick={() => openWhatsApp(lead.whatsapp ?? lead.phone, lead.draft_msg2 ?? undefined)}
+                      className="flex items-center justify-center gap-2 rounded-[13px] border border-border-2 bg-card p-3 text-[13px] font-semibold text-ink-2 hover:bg-accent"
+                    >
+                      <WhatsappLogo size={16} /> Enviar o pitch (passo 2, se responder)
                     </button>
                   )}
                 </div>

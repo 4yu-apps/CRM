@@ -64,6 +64,14 @@ SYSTEM_INSTRUCTION = (
     "aberto, quem fecha o servico e a conversa depois) + um convite leve ('podemos trocar "
     "uma ideia?', 'posso te mandar um exemplo?'). NAO marque reuniao nem call de cara.\n\n"
 
+    "IMPORTANTE: a msg1 e ENVIADA SOZINHA primeiro (o pitch e um passo opcional, mandado "
+    "depois SO se a pessoa responder). Entao a msg1 tem que se sustentar sem o pitch: uma "
+    "abertura curta que termina numa pergunta genuina, ja convidando a resposta. Faca UMA "
+    "pergunta so (perguntar duas ou tres coisas de uma vez faz a pessoa responder seco). "
+    "Linguagem natural, nao viciosa: NAO repita 'voces' (no maximo 1 ou 2 vezes na abertura), "
+    "nao comece duas frases seguidas com a mesma palavra, e mantenha a abertura curta "
+    "(2 frases, sem encher linguica).\n\n"
+
     "Exemplo de TOM (adapte ao negocio, nao copie):\n"
     "msg1: 'Oi, tudo bem? Encontrei a Clinica Bella no Google e gostei do cuidado que voces "
     "tem com os pacientes. Vi que trabalham com estetica, certo? Quem cuida da agenda de "

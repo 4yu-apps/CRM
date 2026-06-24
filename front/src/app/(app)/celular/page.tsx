@@ -53,7 +53,8 @@ const waLink = (phone: string | null, text: string) => {
 };
 
 function buildMsg(l: Lead): string {
-  return [l.draft_msg1, l.draft_msg2].filter(Boolean).join("\n\n");
+  // Envia SO a abertura (msg1). O pitch (msg2) e passo opcional, na ficha do lead.
+  return l.draft_msg1 ?? "";
 }
 
 // ---- card component ----

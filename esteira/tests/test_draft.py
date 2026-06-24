@@ -170,3 +170,29 @@ def test_copy_varia_por_sinal_de_anuncio():
 def test_copy_abertura_tem_pergunta_aberta():
     m1, _ = _gen("ambos", category="Academia")
     assert "?" in m1
+
+
+def test_abertura_nao_repete_vi_que_voces():
+    """Eduardo: nao repetir 'vi que voces' duas vezes na mesma abertura."""
+    for st in ("trafego", "automacao", "ambos", "design", "marketing"):
+        for kw in ({}, {"website": None, "instagram": None},
+                   {"ads_active": True, "website": "x.com", "instagram": "@x"}):
+            m1, _ = _gen(st, category="Academia", **kw)
+            assert m1.lower().count("vi que voc") <= 1, f"{st}/{kw}: 'vi que voces' repetido: {m1!r}"
+
+
+def test_abertura_nao_abusa_de_voces():
+    """Linguagem nao viciosa: no maximo 2 'voce(s)' na abertura."""
+    for st in ("trafego", "automacao", "ambos", "design", "marketing"):
+        for kw in ({}, {"website": None, "instagram": None},
+                   {"ads_active": True, "website": "x.com", "instagram": "@x"}):
+            m1, _ = _gen(st, category="Estética", **kw)
+            assert m1.lower().count("voc") <= 3, f"{st}/{kw}: 'voce' demais ({m1.lower().count('voc')}): {m1!r}"
+
+
+def test_abertura_curta_no_maximo_tres_frases():
+    """Nao deixar a abertura desnecessariamente grande."""
+    m1, _ = _gen("ambos", category="Academia", website=None, instagram=None)
+    # conta frases pelos terminadores . ? (ignora vazias)
+    frases = [s for s in m1.replace("?", ".").split(".") if s.strip()]
+    assert len(frases) <= 3, f"abertura longa demais ({len(frases)} frases): {m1!r}"
