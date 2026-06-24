@@ -19,13 +19,30 @@ async function list(): Promise<Lead[]> {
   // enxerga todos os donos pela RLS; sem este filtro a fila/funil mostrariam
   // leads de OUTROS donos misturados. A visao cross-dono e so na tela Admin
   // (API propria com service role).
-  const { data, error } = await getSupabase()
-    .from("leads")
-    .select("*")
-    .eq("owner_id", await currentUid())
-    .order("updated_at", { ascending: false });
-  if (error) throw new Error(error.message);
-  return (data ?? []) as Lead[];
+  //
+  // Pagina em lotes ate esgotar: o PostgREST corta em ~1000 linhas por padrao,
+  // entao um unico select truncava a base SILENCIOSAMENTE acima disso (leads
+  // somem sem aviso). Aqui acumulamos pagina a pagina ate vir um lote curto.
+  // Ordena por updated_at + id (desempate estavel) pra paginacao nao repetir
+  // nem pular linhas com a mesma data.
+  const sb = getSupabase();
+  const uid = await currentUid();
+  const PAGE = 1000;
+  const all: Lead[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await sb
+      .from("leads")
+      .select("*")
+      .eq("owner_id", uid)
+      .order("updated_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(error.message);
+    const batch = (data ?? []) as Lead[];
+    all.push(...batch);
+    if (batch.length < PAGE) break;
+  }
+  return all;
 }
 
 async function detail(id: string): Promise<LeadDetail> {
