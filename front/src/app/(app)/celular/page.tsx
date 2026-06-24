@@ -26,6 +26,7 @@ import { useLeads } from "@/hooks/use-leads";
 import { fmtPhone } from "@/lib/format";
 import type { Lead } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { promptFollowupSuggestion } from "@/lib/followup-prompt";
 
 // ---- helpers ----
 
@@ -112,6 +113,8 @@ function LeadCard({ lead, onSent, repo, refresh }: CardProps) {
       await refresh();
       onSent(lead.id);
       toast.success("Marcado como enviado.");
+      // #1 — oferece agendar o follow-up em 1 toque
+      promptFollowupSuggestion({ lead, repo, onSaved: refresh });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao marcar enviado");
     } finally {
