@@ -40,6 +40,8 @@ import { meetingsWithin, meetingModality, fmtMeetingWhen } from "@/lib/meetings"
 import { buildNotifications, groupNotifications, type NotifKind } from "@/lib/notifications";
 import type { Lead } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { searchLeads } from "@/lib/lead-search";
+import { CommandPalette } from "@/components/command-palette";
 import {
   Sheet,
   SheetContent,
@@ -116,30 +118,8 @@ function titleFor(pathname: string): [string, string] {
   return TITLES[pathname] ?? ["", ""];
 }
 
-// Acha contatos por nome/cidade/telefone para a busca rapida. Compartilhado
-// entre a busca de desktop e o overlay do mobile.
-function searchLeads(leads: Lead[], q: string): Lead[] {
-  if (q.trim().length < 2) return [];
-  const needle = q.trim().toLowerCase();
-  const num = needle.replace(/\D/g, "");
-  return leads
-    .filter((l) => {
-      const hay = [l.business_name, l.city, l.state, l.owner_name]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      if (hay.includes(needle)) return true;
-      if (num) {
-        const p = (l.phone ?? "").replace(/\D/g, "");
-        const w = (l.whatsapp ?? "").replace(/\D/g, "");
-        if (p.includes(num) || w.includes(num)) return true;
-      }
-      return false;
-    })
-    .slice(0, 7);
-}
-
 // Cada resultado da busca: clica e abre a ficha do lead.
+// searchLeads foi extraido para @/lib/lead-search e importado acima.
 function SearchResult({ lead, onPick }: { lead: Lead; onPick: () => void }) {
   return (
     <button
@@ -410,6 +390,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   // Quando o usuario viu a fila por ultimo (ms). Leads prontos com updated_at
   // depois disso = "novos chegaram" (sinal cross-pagina apos a busca).
   const [lastSeenFila, setLastSeenFila] = useState<number | null>(null);
@@ -434,6 +415,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       /* ignora */
     }
   }, [pathname]);
+
+  // Atalho global Ctrl+K / Cmd+K para abrir o command palette.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPaletteOpen((o) => !o);
+      }
+      if (e.key === "Escape") {
+        setPaletteOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
   const toggleCollapsed = () =>
     setCollapsed((c) => {
       const next = !c;
@@ -740,6 +737,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           )}
         </div>
       </div>
+
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        navItems={navItems}
+        leads={leads}
+      />
     </div>
   );
 }
