@@ -193,6 +193,91 @@
     return activeDataSource(cfg) === "supabase" ? supabaseRepo(cfg) : mockRepo();
   }
 
+  // src/lib/anexos.mjs
+  var BUCKET = "lead-anexos";
+  var MAX_BYTES = 25 * 1024 * 1024;
+  function uidFromToken(token) {
+    if (!token) return null;
+    try {
+      let p = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+      p += "=".repeat((4 - p.length % 4) % 4);
+      return JSON.parse(atob(p)).sub || null;
+    } catch {
+      return null;
+    }
+  }
+  function storageBase(cfg) {
+    return cfg.supabaseUrl.replace(/\/$/, "") + "/storage/v1";
+  }
+  function authHeaders(cfg) {
+    return { apikey: cfg.anonKey, Authorization: `Bearer ${cfg.accessToken || cfg.anonKey}` };
+  }
+  function leadPrefix(cfg, leadId) {
+    const uid = uidFromToken(cfg && cfg.accessToken);
+    return uid ? `${uid}/${leadId}` : null;
+  }
+  async function listAnexos(cfg, leadId) {
+    const prefix = leadPrefix(cfg, leadId);
+    if (!prefix) return [];
+    const r = await fetch(`${storageBase(cfg)}/object/list/${BUCKET}`, {
+      method: "POST",
+      headers: { ...authHeaders(cfg), "Content-Type": "application/json" },
+      body: JSON.stringify({ prefix, limit: 100, sortBy: { column: "created_at", order: "desc" } })
+    });
+    if (!r.ok) throw new Error(`list ${r.status}`);
+    const data = await r.json();
+    return (Array.isArray(data) ? data : []).filter((o) => o && o.id !== null && o.name).map((o) => ({
+      name: o.name,
+      path: `${prefix}/${o.name}`,
+      size: o.metadata && o.metadata.size || 0
+    }));
+  }
+  async function uploadAnexo(cfg, leadId, file) {
+    const prefix = leadPrefix(cfg, leadId);
+    if (!prefix) throw new Error("Fa\xE7a login pra anexar.");
+    const safe = file.name.replace(/[^\w.\-]+/g, "_").slice(-120) || "arquivo";
+    const path = `${prefix}/${Date.now()}-${safe}`;
+    const r = await fetch(`${storageBase(cfg)}/object/${BUCKET}/${encodeURI(path)}`, {
+      method: "POST",
+      headers: {
+        ...authHeaders(cfg),
+        "Content-Type": file.type || "application/octet-stream",
+        "x-upsert": "false"
+      },
+      body: file
+    });
+    if (!r.ok) throw new Error(`upload ${r.status}`);
+  }
+  async function signAnexo(cfg, path) {
+    const r = await fetch(`${storageBase(cfg)}/object/sign/${BUCKET}/${encodeURI(path)}`, {
+      method: "POST",
+      headers: { ...authHeaders(cfg), "Content-Type": "application/json" },
+      body: JSON.stringify({ expiresIn: 60 })
+    });
+    if (!r.ok) throw new Error(`sign ${r.status}`);
+    const d = await r.json();
+    return storageBase(cfg) + d.signedURL;
+  }
+  async function deleteAnexo(cfg, path) {
+    const r = await fetch(`${storageBase(cfg)}/object/${BUCKET}/${encodeURI(path)}`, {
+      method: "DELETE",
+      headers: authHeaders(cfg)
+    });
+    if (!r.ok) throw new Error(`delete ${r.status}`);
+  }
+  function humanSize(bytes) {
+    if (!bytes) return "";
+    const u = ["B", "KB", "MB"];
+    let i = 0;
+    let n = bytes;
+    while (n >= 1024 && i < u.length - 1) {
+      n /= 1024;
+      i += 1;
+    }
+    const dec = i > 0 && n < 10 && !Number.isInteger(n) ? 1 : 0;
+    return `${n.toFixed(dec)} ${u[i]}`;
+  }
+
   // src/lib/normalize.mjs
   function onlyDigits(value) {
     return (value || "").replace(/\D/g, "");
@@ -371,15 +456,25 @@
     // { nomeDaConversa: telefone }: casamento por numero, lembrado
   };
   var EDIT_FIELDS = [
-    { key: "owner_name", label: "Dono / respons\xE1vel", type: "text" },
-    { key: "phone", label: "Telefone", type: "text" },
-    { key: "whatsapp", label: "WhatsApp", type: "text" },
-    { key: "email", label: "E-mail", type: "text" },
-    { key: "instagram", label: "Instagram", type: "text" },
-    { key: "deal_value", label: "Or\xE7amento (R$)", type: "number" },
-    { key: "meeting_link", label: "Link da reuni\xE3o (online)", type: "text" },
-    { key: "meeting_location", label: "Local (presencial)", type: "text" }
+    { key: "owner_name", label: "Dono / respons\xE1vel", type: "text", icon: "person" },
+    { key: "phone", label: "Telefone", type: "text", icon: "phone" },
+    { key: "whatsapp", label: "WhatsApp", type: "text", icon: "whatsapp" },
+    { key: "email", label: "E-mail", type: "text", icon: "email" },
+    { key: "instagram", label: "Instagram", type: "text", icon: "instagram" },
+    { key: "deal_value", label: "Or\xE7amento", type: "number" },
+    { key: "meeting_link", label: "Link da reuni\xE3o (online)", type: "text", icon: "link" },
+    { key: "meeting_location", label: "Local (presencial)", type: "text", icon: "pin" }
   ];
+  var ICONS = {
+    person: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>',
+    phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h4l2 5-3 2a14 14 0 0 0 6 6l2-3 5 2v4a2 2 0 0 1-2 2A18 18 0 0 1 3 5a2 2 0 0 1 2-2"/></svg>',
+    whatsapp: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15l-1.3 4.6 4.8-1.3A10 10 0 1 0 12 2m0 2a8 8 0 0 1 5.7 13.6 8 8 0 0 1-9.8 1.2l-.4-.2-2.4.6.6-2.3-.2-.4A8 8 0 0 1 12 4m-3.1 4c-.2 0-.4 0-.6.4-.3.4-.9 1-.9 2.2s.9 2.5 1 2.7c.2.2 1.8 3 4.5 4 .6.3 1.1.4 1.5.3.5-.1 1.4-.6 1.6-1.2.2-.6.2-1 .1-1.2l-.7-.3-1.4-.7c-.2-.1-.4-.1-.5.1l-.6.8c-.1.2-.3.2-.5.1a6 6 0 0 1-2.9-2.6c-.1-.2 0-.4.1-.5l.4-.5c.1-.2.1-.3 0-.5l-.7-1.4c-.1-.3-.3-.3-.4-.3z"/></svg>',
+    email: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>',
+    instagram: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1.1" fill="currentColor" stroke="none"/></svg>',
+    link: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 15 15 9"/><path d="M11 6.5 13 4.5a4 4 0 0 1 6 6l-2 2"/><path d="M13 17.5 11 19.5a4 4 0 0 1-6-6l2-2"/></svg>',
+    pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6-7-11a7 7 0 0 1 14 0c0 5-7 11-7 11"/><circle cx="12" cy="10" r="2.5"/></svg>',
+    calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/></svg>'
+  };
   function waCheck(phone) {
     return new Promise((resolve) => {
       const reqId = `chk-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -570,6 +665,44 @@
     const wrap = el("label", { className: "gp-field" });
     wrap.append(el("span", { className: "gp-flabel", textContent: label }), inputEl);
     return wrap;
+  }
+  function iconEl(name) {
+    const s = el("span", { className: "gp-ic" });
+    s.innerHTML = ICONS[name] || "";
+    return s;
+  }
+  function fieldPrefixed(label, control, opts = {}) {
+    const wrap = el("label", { className: "gp-field" });
+    wrap.append(el("span", { className: "gp-flabel", textContent: label }));
+    if (opts.icon || opts.text) {
+      const inwrap = el("div", { className: "gp-inwrap" });
+      control.classList.add("gp-input--pad");
+      const pfx = opts.text ? el("span", { className: "gp-pfx", textContent: opts.text }) : iconEl(opts.icon);
+      inwrap.append(pfx, control);
+      wrap.append(inwrap);
+    } else {
+      wrap.append(control);
+    }
+    return wrap;
+  }
+  function formatBRL(cents) {
+    const s = (cents / 100).toFixed(2);
+    const [intp, dec] = s.split(".");
+    return `${intp.replace(/\B(?=(\d{3})+(?!\d))/g, ".")},${dec}`;
+  }
+  function brlInput(initialReais) {
+    const inp = el("input", { className: "gp-input", type: "text", inputMode: "numeric" });
+    let cents = 0;
+    const hadValue = initialReais != null && initialReais !== "" && !Number.isNaN(Number(initialReais));
+    if (hadValue) cents = Math.round(Number(initialReais) * 100);
+    inp.value = hadValue ? formatBRL(cents) : "";
+    inp.addEventListener("input", () => {
+      const digits = inp.value.replace(/\D/g, "");
+      cents = digits ? parseInt(digits, 10) : 0;
+      inp.value = digits ? formatBRL(cents) : "";
+    });
+    inp.getReais = () => inp.value === "" ? null : cents / 100;
+    return inp;
   }
   function mountPanel() {
     if (document.getElementById(PANEL_ID)) return;
@@ -825,17 +958,23 @@
     const form = el("div", { className: "gp-edit" });
     const inputs = {};
     for (const f of EDIT_FIELDS) {
+      if (f.key === "deal_value") {
+        const inp2 = brlInput(lead.deal_value);
+        inputs.deal_value = inp2;
+        form.append(fieldPrefixed(f.label, inp2, { text: "R$" }));
+        continue;
+      }
       const inp = el("input", {
         className: "gp-input",
         type: f.type,
         value: lead[f.key] != null ? String(lead[f.key]) : ""
       });
       inputs[f.key] = inp;
-      form.append(field(f.label, inp));
+      form.append(fieldPrefixed(f.label, inp, { icon: f.icon }));
     }
     const mAt = el("input", { className: "gp-input", type: "datetime-local", value: toLocalInput(lead.meeting_at) });
     inputs.meeting_at = mAt;
-    form.append(field("Reuni\xE3o (data/hora)", mAt));
+    form.append(fieldPrefixed("Reuni\xE3o (data/hora)", mAt, { icon: "calendar" }));
     const notes = el("textarea", { className: "gp-input gp-textarea", rows: 3 });
     notes.value = lead.notes || "";
     inputs.notes = notes;
@@ -844,6 +983,11 @@
     save.addEventListener("click", async () => {
       const patch = {};
       for (const f of EDIT_FIELDS) {
+        if (f.key === "deal_value") {
+          const nv = inputs.deal_value.getReais();
+          if (nv !== (lead.deal_value ?? null)) patch.deal_value = nv;
+          continue;
+        }
         const raw = inputs[f.key].value.trim();
         const cur = lead[f.key] != null ? String(lead[f.key]) : "";
         if (raw === cur) continue;
@@ -870,7 +1014,101 @@
       }
     });
     form.append(save);
+    form.append(anexosSection(lead));
     return form;
+  }
+  function anexosSection(lead) {
+    const wrap = el("div", { className: "gp-anexos" });
+    wrap.append(el("span", { className: "gp-flabel", textContent: "Anexos" }));
+    if (!state.cfg || !state.cfg.accessToken) {
+      wrap.append(el("div", { className: "gp-muted", textContent: "Entre na sua conta pra anexar arquivos." }));
+      return wrap;
+    }
+    const fileInput = el("input", { type: "file", multiple: true, className: "gp-file-hidden" });
+    const drop = el("div", { className: "gp-drop", textContent: "Arraste arquivos aqui ou clique pra anexar" });
+    const list = el("div", { className: "gp-anexo-list" });
+    wrap.append(drop, fileInput, list);
+    const reset = () => {
+      drop.classList.remove("gp-busy");
+      drop.textContent = "Arraste arquivos aqui ou clique pra anexar";
+    };
+    async function refresh() {
+      list.textContent = "";
+      let items = [];
+      try {
+        items = await listAnexos(state.cfg, lead.id);
+      } catch {
+        list.append(el("div", { className: "gp-muted", textContent: "N\xE3o consegui listar os anexos." }));
+        return;
+      }
+      for (const it of items) {
+        const row = el("div", { className: "gp-anexo" });
+        const name = el("button", { className: "gp-anexo-name", title: "Baixar", textContent: it.name });
+        name.addEventListener("click", async () => {
+          try {
+            const url = await signAnexo(state.cfg, it.path);
+            window.open(url, "_blank", "noopener");
+          } catch {
+            toast("N\xE3o consegui abrir o anexo.", true);
+          }
+        });
+        const size = el("span", { className: "gp-anexo-size", textContent: humanSize(it.size) });
+        const del = el("button", { className: "gp-anexo-del", title: "Remover", textContent: "\xD7" });
+        del.addEventListener("click", async () => {
+          del.disabled = true;
+          try {
+            await deleteAnexo(state.cfg, it.path);
+            await refresh();
+            toast("Anexo removido.");
+          } catch {
+            toast("N\xE3o consegui remover.", true);
+            del.disabled = false;
+          }
+        });
+        row.append(name, size, del);
+        list.append(row);
+      }
+    }
+    async function uploadFiles(files) {
+      drop.classList.add("gp-busy");
+      for (const file of files) {
+        if (file.size > MAX_BYTES) {
+          toast(`${file.name}: passa de 25 MB.`, true);
+          continue;
+        }
+        drop.textContent = `Enviando ${file.name}...`;
+        try {
+          await uploadAnexo(state.cfg, lead.id, file);
+        } catch {
+          toast(`Falha ao enviar ${file.name}.`, true);
+        }
+      }
+      reset();
+      await refresh();
+    }
+    drop.addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", () => {
+      if (fileInput.files && fileInput.files.length) void uploadFiles([...fileInput.files]);
+      fileInput.value = "";
+    });
+    ["dragenter", "dragover"].forEach(
+      (ev) => drop.addEventListener(ev, (e) => {
+        e.preventDefault();
+        drop.classList.add("gp-drag");
+      })
+    );
+    ["dragleave", "drop"].forEach(
+      (ev) => drop.addEventListener(ev, (e) => {
+        e.preventDefault();
+        drop.classList.remove("gp-drag");
+      })
+    );
+    drop.addEventListener("drop", (e) => {
+      const fs = e.dataTransfer && e.dataTransfer.files;
+      if (fs && fs.length) void uploadFiles([...fs]);
+    });
+    void refresh();
+    return wrap;
   }
   function toLocalInput(iso) {
     if (!iso) return "";
