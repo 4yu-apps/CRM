@@ -54,6 +54,25 @@ export function siteSignalChips(signals: SiteSignals | null | undefined): Signal
   if (signals.stack) chips.push({ label: `Feito em ${signals.stack}`, variant: "neutral" });
   if (signals.https === false) chips.push({ label: "Site sem HTTPS", variant: "warn" });
 
+  if (signals.email_provider === "google_workspace" || signals.email_provider === "microsoft365") {
+    chips.push({ label: "E-mail profissional", variant: "positive" });
+  } else if (signals.email_provider === "outro") {
+    chips.push({ label: "E-mail em domínio próprio", variant: "neutral" });
+  } else if (signals.email_provider === "gratuito") {
+    chips.push({ label: "E-mail gratuito", variant: "neutral" });
+  }
+
+  if (typeof signals.domain_age_days === "number") {
+    const anos = Math.floor(signals.domain_age_days / 365);
+    chips.push(anos >= 1
+      ? { label: `Domínio há ${anos} ${anos > 1 ? "anos" : "ano"}`, variant: "neutral" }
+      : { label: "Domínio novo (menos de 1 ano)", variant: "warn" });
+  }
+
+  if (signals.phone_type === "fixo") {
+    chips.push({ label: "Telefone fixo, provável sem WhatsApp", variant: "warn" });
+  }
+
   return chips;
 }
 

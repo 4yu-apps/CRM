@@ -47,11 +47,14 @@ export function fmtDateTime(iso: string): string {
 
 const SOURCE_LABELS: Record<string, string> = {
   google_maps: "Google Maps",
+  openstreetmap: "OpenStreetMap",
   cnpj_brasilapi: "CNPJ · BrasilAPI",
   cnpj_ws: "CNPJ · CNPJ.ws",
+  cnpj_lookup: "CNPJ · Receita",
   instagram: "Instagram",
   website: "Site",
   meta_ad_library: "Meta Ad Library",
+  biz_signals: "Sinais públicos",
   manual: "Manual",
   extension: "Extensao",
 };

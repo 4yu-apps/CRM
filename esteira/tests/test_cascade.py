@@ -126,6 +126,42 @@ def test_social_signals_agrega_instagram_e_anuncios_sem_apagar_existente(tmp_pat
     assert social["ad_platforms"] == ["meta"]
 
 
+def test_site_signals_faz_merge_de_fontes_e_preserva_existente(tmp_path):
+    class SiteSource:
+        name = "website"
+
+        def enrich(self, lead):
+            return [Finding("site_signals", "website", json.dumps({"slow": True}), 0.8)]
+
+    class BizSource:
+        name = "biz_signals"
+
+        def enrich(self, lead):
+            return [
+                Finding(
+                    "site_signals",
+                    "biz_signals",
+                    json.dumps({"phone_type": "celular"}),
+                    0.8,
+                )
+            ]
+
+    sink = _sink(tmp_path)
+    lid = sink.insert_lead(Lead(
+        id="", owner_id="o", status="rascunho_pronto",
+        site_signals={"https": True},
+    ))
+    enrich_lead(
+        sink.get_lead(lid),
+        [SiteSource(), BizSource()],
+        sink,
+        advance_status=False,
+    )
+
+    signals = sink.get_lead(lid).site_signals
+    assert signals == {"https": True, "slow": True, "phone_type": "celular"}
+
+
 def _sources_offline(html=None, ad_probe=None):
     # WebsiteSource com fetch injetado pra nao tocar a rede nos testes.
     return [

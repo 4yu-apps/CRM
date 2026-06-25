@@ -20,11 +20,14 @@ export type LeadStatus =
 
 export type LeadSource =
   | "google_maps"
+  | "openstreetmap"
   | "cnpj_brasilapi"
   | "cnpj_ws"
+  | "cnpj_lookup"
   | "instagram"
   | "website"
   | "meta_ad_library"
+  | "biz_signals"
   | "manual"
   | "extension";
 
@@ -71,6 +74,11 @@ export interface SiteSignals {
   perf_slow?: boolean;
   lcp_ms?: number;
   speed_category?: string; // FAST | AVERAGE | SLOW (Chrome UX)
+  // sinais gratuitos de maturidade (BizSignalsSource).
+  email_provider?: string; // google_workspace | microsoft365 | gratuito | outro
+  domain_created?: string;
+  domain_age_days?: number;
+  phone_type?: string; // celular | fixo
 }
 
 export interface SocialSignals {

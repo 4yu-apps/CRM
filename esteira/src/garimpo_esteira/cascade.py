@@ -72,9 +72,18 @@ def enrich_lead(
             # e o retrato mais novo do site). Nao passa pelo gate de ENRICHABLE.
             if f.field_name == "site_signals" and f.value:
                 try:
-                    column_updates["site_signals"] = json.loads(f.value)
-                    setattr(lead, "site_signals", column_updates["site_signals"])
-                    platforms = column_updates["site_signals"].get("ad_platforms") or []
+                    incoming = json.loads(f.value)
+                    if not isinstance(incoming, dict):
+                        continue
+                    base = (
+                        column_updates.get("site_signals")
+                        or getattr(lead, "site_signals", None)
+                        or {}
+                    )
+                    merged = {**base, **incoming}
+                    column_updates["site_signals"] = merged
+                    setattr(lead, "site_signals", merged)
+                    platforms = merged.get("ad_platforms") or []
                     if platforms:
                         social["ad_platforms"] = list(dict.fromkeys(platforms))
                         social_changed = True

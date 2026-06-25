@@ -197,7 +197,11 @@ def build_sources(cfg: Config) -> list[Source]:
         from .sources.cnpj_name import CnpjNameSource
 
         sources.append(CnpjNameSource(lookup, request_limit=cfg.cnpj_lookup_limit))
-    sources += [CnpjSource(), ig, ad]
+    # BizSignals fica por ultimo para enxergar telefone/e-mail/site encontrados
+    # por qualquer fonte anterior no mesmo processamento.
+    from .sources.biz_signals import BizSignalsSource
+
+    sources += [CnpjSource(), ig, ad, BizSignalsSource()]
     return sources
 
 
