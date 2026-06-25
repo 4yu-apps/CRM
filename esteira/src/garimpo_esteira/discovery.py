@@ -67,7 +67,7 @@ class MapsSource(Protocol):
         ...
 
 
-def result_to_lead(raw: dict, owner_id: str) -> tuple[Lead, list[Finding]]:
+def result_to_lead(raw: dict, owner_id: str, source: str = "google_maps") -> tuple[Lead, list[Finding]]:
     name = raw.get("name")
     phone = clean("phone", raw.get("formatted_phone_number") or raw.get("phone"))
     website = clean("website", raw.get("website"))
@@ -92,17 +92,20 @@ def result_to_lead(raw: dict, owner_id: str) -> tuple[Lead, list[Finding]]:
     )
     findings: list[Finding] = []
     if name:
-        findings.append(Finding("business_name", "google_maps", name, 1.0))
+        findings.append(Finding("business_name", source, name, 1.0))
     if phone:
-        findings.append(Finding("phone", "google_maps", phone, 0.9))
+        findings.append(Finding("phone", source, phone, 0.9))
     if website:
-        findings.append(Finding("website", "google_maps", website, 0.95))
+        findings.append(Finding("website", source, website, 0.95))
     if nb:
-        findings.append(Finding("neighborhood", "google_maps", nb, 0.85))
+        findings.append(Finding("neighborhood", source, nb, 0.85))
     return lead, findings
 
 
 def discover(sink, maps_source: MapsSource, terms: Iterable[str], owner_id: str) -> dict:
+    # proveniencia da fonte de descoberta (google_maps por padrao; openstreetmap
+    # no Overpass). Cada achado leva quem o achou.
+    prov_source = getattr(maps_source, "provenance_source", "google_maps")
     inserted, skipped = 0, 0
     for term in terms:
         results = maps_source.search(term)
@@ -116,7 +119,7 @@ def discover(sink, maps_source: MapsSource, terms: Iterable[str], owner_id: str)
             if country and country != "BR":
                 skipped += 1
                 continue
-            lead, findings = result_to_lead(raw, owner_id)
+            lead, findings = result_to_lead(raw, owner_id, prov_source)
             if geo.looks_foreign(lead.state, lead.address):
                 skipped += 1
                 continue

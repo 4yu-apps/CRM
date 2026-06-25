@@ -12,7 +12,7 @@ LeadStatus = Literal[
 ]
 
 LeadSource = Literal[
-    "google_maps", "cnpj_brasilapi", "cnpj_ws", "instagram",
+    "google_maps", "openstreetmap", "cnpj_brasilapi", "cnpj_ws", "instagram",
     "website", "meta_ad_library", "manual", "extension",
 ]
 

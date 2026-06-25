@@ -47,7 +47,7 @@ class Config:
     # (gratis); modelo rapido/barato basta. Liga sozinho quando ha GROQ_API_KEY.
     llm_extract: bool = True
     extract_model: str = "llama-3.1-8b-instant"
-    maps_mode: str = "fixture"        # fixture | places
+    maps_mode: str = "fixture"        # fixture | places | overpass (OSM, gratis)
     maps_key: str | None = None
     maps_pages: int = 3               # paginas do Places por busca (~20 cada)
     extra_niches: int = 0             # nichos aleatorios extras por run (variedade)
@@ -274,4 +274,9 @@ def build_maps_source(cfg: Config) -> MapsSource:
         from .discovery import PlacesMapsSource
 
         return PlacesMapsSource(cfg.maps_key, max_pages=cfg.maps_pages)
+    if cfg.maps_mode == "overpass":
+        # descoberta gratis via OpenStreetMap/Overpass (sem chave, sem custo).
+        from .sources.overpass import OverpassSource
+
+        return OverpassSource()
     return FixtureMapsSource(FIXTURES_DIR / "maps_results.json")
