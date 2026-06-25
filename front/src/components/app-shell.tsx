@@ -36,7 +36,7 @@ import { useAuth } from "@/lib/auth";
 import { useT } from "@/lib/i18n";
 import { useLeads } from "@/hooks/use-leads";
 import { STATUS_META } from "@/lib/state-machine";
-import { meetingsWithin, meetingModality, fmtMeetingWhen } from "@/lib/meetings";
+import { meetingModality } from "@/lib/meetings";
 import {
   buildNotifications,
   groupNotifications,
@@ -228,7 +228,6 @@ function MobileSearch({ leads, t }: { leads: Lead[]; t: (key: string, fallback?:
             <div className="relative flex-1">
               <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-faint" />
               <input
-                // eslint-disable-next-line jsx-a11y/no-autofocus
                 autoFocus
                 value={q}
                 onChange={(e) => setQ(e.target.value)}

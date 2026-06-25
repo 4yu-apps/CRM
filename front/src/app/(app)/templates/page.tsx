@@ -30,6 +30,8 @@ export default function TemplatesPage() {
   }, [repo]);
 
   useEffect(() => {
+    // Carga inicial do repositorio; load controla os estados de resultado/loading.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load]);
 

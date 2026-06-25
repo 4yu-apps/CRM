@@ -26,7 +26,7 @@ from .sources.base import Source
 def process_one_lead(
     lead, sources: Sequence[Source], provider: DraftProvider, sink: LeadSink, *,
     profession: str | None = None, min_score: int = 0, reviews_source=None,
-    professions: list[str] | None = None,
+    professions: list[str] | None = None, sender_name: str | None = None,
 ) -> dict:
     """Roda enrich -> score -> draft para UM lead. Retorna o que aconteceu:
     {"enriched": bool, "discarded": bool, "drafted": bool}."""
@@ -34,7 +34,10 @@ def process_one_lead(
     result = score_one(lead, sink, profession, min_score, professions=professions)  # -> qualificado | descartado
     drafted = False
     if result.decision == "qualificado":
-        if draft_one(lead, provider, sink, profession, reviews_source=reviews_source):
+        if draft_one(
+            lead, provider, sink, profession,
+            reviews_source=reviews_source, sender_name=sender_name,
+        ):
             drafted = True  # -> rascunho_pronto (entra na fila agora)
     return {
         "enriched": True,
@@ -48,6 +51,7 @@ def run_pipeline_streaming(
     batch: int = 20, delay: float = 0.0, owner_id: str | None = None,
     profession: str | None = None, min_score: int = 0, reviews_source=None,
     status: LeadStatus = "bruto", workers: int = 1, professions: list[str] | None = None,
+    sender_name: str | None = None,
 ) -> dict:
     """Busca leads 'bruto' (ordem de descoberta: created_at.asc) e processa cada
     um por inteiro, com try/except POR LEAD. Acumula as contagens e emite no fim
@@ -67,7 +71,7 @@ def run_pipeline_streaming(
         return process_one_lead(
             lead, sources, provider, sink,
             profession=profession, min_score=min_score, reviews_source=reviews_source,
-            professions=professions,
+            professions=professions, sender_name=sender_name,
         )
 
     def _tally(r) -> None:

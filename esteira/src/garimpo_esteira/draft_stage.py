@@ -15,12 +15,14 @@ from .sink.base import LeadSink
 
 def draft_one(
     lead, provider: DraftProvider, sink: LeadSink, profession: str | None = None,
-    reviews_source=None,
+    reviews_source=None, sender_name: str | None = None,
 ) -> tuple[str, str] | None:
     if lead.opt_out:
         return None  # LGPD: nao rascunha contato pra quem pediu opt-out
     if profession:
         setattr(lead, "profession", profession)
+    if sender_name:
+        setattr(lead, "sender_name", sender_name)
     if reviews_source is not None:
         try:
             for f in reviews_source.enrich(lead):
@@ -89,12 +91,15 @@ def redraft_batch(
 def draft_batch(
     sink: LeadSink, provider: DraftProvider, *, batch: int = 20, status="qualificado",
     owner_id: str | None = None, profession: str | None = None,
-    reviews_source=None,
+    reviews_source=None, sender_name: str | None = None,
 ) -> list[tuple[str, tuple[str, str]]]:
     leads = sink.fetch_by_status(status, batch, owner_id)
     out: list[tuple[str, tuple[str, str]]] = []
     for lead in leads:
-        result = draft_one(lead, provider, sink, profession, reviews_source=reviews_source)
+        result = draft_one(
+            lead, provider, sink, profession,
+            reviews_source=reviews_source, sender_name=sender_name,
+        )
         if result:
             out.append((lead.id, result))
     if out and leads:

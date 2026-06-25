@@ -86,6 +86,17 @@ function fmtBRL(value: number): string {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 }
 
+function fmtDateOnly(value?: string | null): string {
+  if (!value) return "-";
+  const date = new Date(value.length === 10 ? `${value}T12:00:00` : value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("pt-BR");
+}
+
+function fmtNumber(value?: number | null): string {
+  return value == null ? "-" : new Intl.NumberFormat("pt-BR").format(value);
+}
+
 function dealBillingLabel(billing: DealBilling | null | undefined, months: number | null | undefined): string {
   if (billing === "por_prazo") return `Por prazo${months ? ` (${months} meses)` : ""}`;
   if (billing === "mensal_fixo") return "Mensal fixo";
@@ -253,6 +264,105 @@ function SiteSignalsPanel({ signals, since }: { signals: SiteSignals; since?: st
         ))}
       </div>
     </div>
+  );
+}
+
+function RawSignalsPanel({ lead }: { lead: Lead }) {
+  const social = lead.social_signals ?? {};
+  const platforms = social.ad_platforms ?? lead.site_signals?.ad_platforms ?? [];
+  const platformLabels: Record<string, string> = {
+    meta: "Meta",
+    google: "Google Ads",
+    tiktok: "TikTok",
+  };
+  const channels = [
+    ...(lead.site_signals?.has_tiktok ? ["TikTok"] : []),
+    ...(lead.site_signals?.has_youtube ? ["YouTube"] : []),
+    ...(lead.site_signals?.has_linkedin ? ["LinkedIn"] : []),
+  ];
+  const adsActive = social.ads_active ?? lead.ads_active;
+  const coords = lead.lat != null && lead.lng != null
+    ? `${lead.lat.toFixed(5)}, ${lead.lng.toFixed(5)}`
+    : "-";
+  const mapHref = lead.lat != null && lead.lng != null
+    ? `https://www.google.com/maps?q=${lead.lat},${lead.lng}`
+    : undefined;
+
+  const groups = [
+    {
+      title: "Reputação",
+      rows: [
+        ["Nota no Google", lead.rating == null ? "-" : `${lead.rating.toLocaleString("pt-BR")} / 5`],
+        ["Avaliações", fmtNumber(lead.reviews_count)],
+      ],
+    },
+    {
+      title: "Social",
+      rows: [
+        ["Seguidores", fmtNumber(social.followers)],
+        ["Frequência", social.post_freq_label ?? "-"],
+        ["Última postagem", fmtDateOnly(social.last_post)],
+        ["Instagram", social.ig_status === "parado" ? "Parado" : social.ig_status === "ativo" ? "Ativo" : "Não sei"],
+        ["Interações médias", fmtNumber(social.engagement)],
+        ["Outros canais", channels.length ? channels.join(", ") : "-"],
+      ],
+    },
+    {
+      title: "Anúncio",
+      rows: [
+        ["Anuncia?", adsActive == null ? "Não sei" : adsActive ? "Sim" : "Ainda não"],
+        ["Anúncios ativos", fmtNumber(social.ads_count)],
+        ["Desde quando", fmtDateOnly(social.ads_since)],
+        ["Plataformas", platforms.length ? platforms.map((p) => platformLabels[p] ?? p).join(", ") : "-"],
+      ],
+    },
+    {
+      title: "Negócio",
+      rows: [
+        ["Data de abertura", fmtDateOnly(lead.opened_on)],
+        ["Situação cadastral", lead.company_status ?? "-"],
+        ["Categoria / CNAE", lead.category ?? "-"],
+        ["Funcionamento", lead.opening_hours ?? "-"],
+      ],
+    },
+    {
+      title: "Contato",
+      rows: [
+        ["Dono (anotado)", lead.owner_name ?? "-"],
+        ["Telefone", fmtPhone(lead.phone)],
+        ["WhatsApp", lead.whatsapp ? fmtPhone(lead.whatsapp) : "-"],
+        ["E-mail", lead.email ?? "-"],
+        ["Site", lead.website ?? "Não tem"],
+      ],
+    },
+  ];
+
+  return (
+    <section className="overflow-hidden rounded-[16px] border border-border bg-card shadow-[var(--shadow-sm)]">
+      <div className="flex items-center gap-2 border-b border-border bg-surface-2 px-4 py-3">
+        <Info size={16} weight="fill" className="text-brand" />
+        <h2 className="text-[12px] font-bold uppercase tracking-wider text-ink">Sinais do lead</h2>
+        <span className="ml-auto text-[11px] text-faint">dados brutos, sem IA</span>
+      </div>
+      <div className="grid grid-cols-1 gap-px bg-border sm:grid-cols-2">
+        {groups.map((group) => (
+          <div key={group.title} className="bg-card">
+            <div className="border-b border-border bg-surface-2/70 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-faint">
+              {group.title}
+            </div>
+            {group.rows.map(([label, value]) => (
+              <DataRow key={label} label={label} value={value} />
+            ))}
+          </div>
+        ))}
+        <div className="bg-card sm:col-span-2">
+          <div className="border-b border-border bg-surface-2/70 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-faint">
+            Mapa
+          </div>
+          <DataRow label="Coordenadas" value={coords} href={mapHref} />
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -694,6 +804,8 @@ export default function FichaPage() {
 
           {/* Coluna direita: sinais + abordagem */}
           <div className="flex flex-col gap-5">
+            <RawSignalsPanel lead={lead} />
+
             {/* Sinais / score */}
             {lead.score_reason && (
               <div className="rounded-[14px] border border-brand-100 bg-brand-50 p-4">

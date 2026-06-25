@@ -88,6 +88,9 @@ class Lead:
     # sinais tecnicos do site, extraidos de graca do HTML (pixel, widget de chat,
     # form, mobile, peso, stack, og...). Alimentam o score por profissao e a ficha.
     site_signals: dict[str, Any] | None = None
+    # retrato agregado de Instagram + anuncios para exibicao direta na ficha.
+    # A proveniencia continua sendo a fonte auditavel campo a campo.
+    social_signals: dict[str, Any] | None = None
     # cobertura de contatos achados no enriquecimento (0..1). Badge de "lead pobre".
     match_rate: float | None = None
 

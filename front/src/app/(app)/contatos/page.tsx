@@ -213,6 +213,8 @@ export default function ContatosPage() {
   }, [leads]);
   // se a tag filtrada deixou de existir, limpa pra nao prender a lista em vazio
   useEffect(() => {
+    // Sincroniza um filtro controlado com opcoes que chegam do repositorio.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (tagFilter && !tagOptions.some((o) => o.value === tagFilter)) setTagFilter("");
   }, [tagOptions, tagFilter]);
 

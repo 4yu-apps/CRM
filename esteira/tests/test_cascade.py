@@ -1,7 +1,7 @@
 import json
 
 from garimpo_esteira.cascade import enrich_batch, enrich_lead
-from garimpo_esteira.models import Lead
+from garimpo_esteira.models import Finding, Lead
 from garimpo_esteira.sink import JsonFileSink
 from garimpo_esteira.sources import AdLibrarySource, CnpjSource, InstagramSource, WebsiteSource
 
@@ -92,6 +92,38 @@ def test_ad_library_signal_is_provenance_not_set_by_enrichment(tmp_path):
     # ads_active virou coluna (B1), mas o enriquecimento NAO a preenche:
     # quem promove o sinal pra coluna do lead e o estagio de score.
     assert db["leads"][lid].get("ads_active") is None
+
+
+def test_social_signals_agrega_instagram_e_anuncios_sem_apagar_existente(tmp_path):
+    class SocialSource:
+        name = "instagram"
+
+        def enrich(self, lead):
+            return [
+                Finding("instagram_followers", "instagram", "1200", 0.8),
+                Finding("instagram_last_post", "instagram", "2026-06-20T10:00:00+0000", 0.8),
+                Finding("instagram_post_freq", "instagram", "3.5", 0.7),
+                Finding("instagram_post_freq_label", "instagram", "≈4x/semana", 0.7),
+                Finding("instagram_status", "instagram", "ativo", 0.7),
+                Finding("ads_active", "meta_ad_library", "sim", 0.7),
+                Finding("ads_count", "meta_ad_library", "8", 0.7),
+            ]
+
+    sink = _sink(tmp_path)
+    lid = sink.insert_lead(Lead(
+        id="", owner_id="o", status="rascunho_pronto",
+        social_signals={"ads_since": "2025-01-01"},
+    ))
+    enrich_lead(sink.get_lead(lid), [SocialSource()], sink, advance_status=False)
+
+    social = sink.get_lead(lid).social_signals
+    assert social["followers"] == 1200
+    assert social["post_freq"] == 3.5
+    assert social["post_freq_label"] == "≈4x/semana"
+    assert social["ads_active"] is True
+    assert social["ads_count"] == 8
+    assert social["ads_since"] == "2025-01-01"
+    assert social["ad_platforms"] == ["meta"]
 
 
 def _sources_offline(html=None, ad_probe=None):

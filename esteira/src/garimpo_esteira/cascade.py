@@ -18,6 +18,35 @@ from .models import ENRICHABLE_FIELDS, EnrichResult, Lead, LeadStatus
 from .sink.base import LeadSink
 from .sources.base import Source
 
+_SOCIAL_FIELDS = {
+    "instagram_followers": ("followers", int),
+    "instagram_media_count": ("media_count", int),
+    "instagram_last_post": ("last_post", str),
+    "instagram_post_freq": ("post_freq", float),
+    "instagram_post_freq_label": ("post_freq_label", str),
+    "instagram_engagement": ("engagement", float),
+    "instagram_status": ("ig_status", str),
+    "ads_count": ("ads_count", int),
+    "ads_since": ("ads_since", str),
+}
+
+
+def _social_value(field_name: str, value: str | None):
+    if field_name == "ads_active":
+        if value == "sim":
+            return True
+        if value == "nao":
+            return False
+        return None
+    spec = _SOCIAL_FIELDS.get(field_name)
+    if not spec or value is None:
+        return None
+    _, cast = spec
+    try:
+        return cast(value)
+    except (TypeError, ValueError):
+        return None
+
 
 def enrich_lead(
     lead: Lead, sources: Sequence[Source], sink: LeadSink, *, advance_status: bool = True
@@ -27,6 +56,8 @@ def enrich_lead(
     mexer no status (usado pelo backfill de leads ja avancados)."""
     all_findings = []
     column_updates: dict[str, object] = {}
+    social = dict(getattr(lead, "social_signals", None) or {})
+    social_changed = False
 
     for src in sources:
         try:
@@ -43,9 +74,28 @@ def enrich_lead(
                 try:
                     column_updates["site_signals"] = json.loads(f.value)
                     setattr(lead, "site_signals", column_updates["site_signals"])
+                    platforms = column_updates["site_signals"].get("ad_platforms") or []
+                    if platforms:
+                        social["ad_platforms"] = list(dict.fromkeys(platforms))
+                        social_changed = True
                 except (ValueError, TypeError):
                     pass
                 continue
+            if f.field_name == "ads_active":
+                value = _social_value(f.field_name, f.value)
+                if value is not None:
+                    social["ads_active"] = value
+                    if value is True and f.source == "meta_ad_library":
+                        social["ad_platforms"] = list(dict.fromkeys([
+                            *(social.get("ad_platforms") or []), "meta",
+                        ]))
+                    social_changed = True
+            elif f.field_name in _SOCIAL_FIELDS:
+                key = _SOCIAL_FIELDS[f.field_name][0]
+                value = _social_value(f.field_name, f.value)
+                if value is not None:
+                    social[key] = value
+                    social_changed = True
             # preenche coluna real só se estiver vazia (não sobrescreve edição humana)
             if f.field_name in ENRICHABLE_FIELDS and f.value and not lead.get(f.field_name):
                 column_updates[f.field_name] = f.value
@@ -54,6 +104,9 @@ def enrich_lead(
     rate = match_rate(lead)
     # persiste a cobertura de contatos (badge de "lead pobre" na fila/ficha)
     column_updates["match_rate"] = round(rate, 2)
+    if social_changed:
+        column_updates["social_signals"] = social
+        setattr(lead, "social_signals", social)
 
     if column_updates:
         sink.update_lead_fields(lead.id, column_updates)

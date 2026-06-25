@@ -170,3 +170,15 @@ def test_process_one_lead_retorna_resultado(tmp_path):
 
     assert r == {"enriched": True, "discarded": False, "drafted": True}
     assert sink.get_lead(lead_id).status == "rascunho_pronto"
+
+
+def test_pipeline_injeta_sender_name_no_rascunho(tmp_path):
+    sink = _sink(tmp_path)
+    lead_id = sink.insert_lead(_forte("44999990001"))
+
+    run_pipeline_streaming(
+        sink, [], MockDraftProvider(), owner_id="o",
+        profession="trafego", sender_name="Gabriel",
+    )
+
+    assert "Me chamo Gabriel" in sink.get_lead(lead_id).draft_msg1

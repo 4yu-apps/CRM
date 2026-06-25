@@ -238,6 +238,9 @@ def build_prompt(lead: Lead) -> str:
         sinais.append("site lento no celular (PageSpeed baixo)")
     if not b["tem_instagram"]:
         sinais.append("sem presenca no Instagram")
+    social = getattr(lead, "social_signals", None) or {}
+    if social.get("ig_status") == "parado":
+        sinais.append("Instagram parado")
     extra_ch = [c for c, on in (
         ("TikTok", sig.get("has_tiktok")),
         ("YouTube", sig.get("has_youtube")),
@@ -255,7 +258,7 @@ def build_prompt(lead: Lead) -> str:
     # "Ja anuncia?": define o angulo de trafego (otimizar x comecar). ad_platforms
     # diz EM QUE plataforma. Mantem o angulo condicional do anuncio-sem-site.
     ads = getattr(lead, "ads_active", None)
-    plats = sig.get("ad_platforms") or []
+    plats = social.get("ad_platforms") or sig.get("ad_platforms") or []
     onde = f" ({', '.join(plats)})" if plats else ""
     ja_anuncia = ads is True or bool(plats)
     if ja_anuncia and not b["tem_site"]:
@@ -267,6 +270,14 @@ def build_prompt(lead: Lead) -> str:
         sinais.append(f"ja investe em anuncio{onde} (da pra otimizar o que ja roda)")
     elif ads is False:
         sinais.append("nao anuncia ainda (oportunidade de comecar)")
+    if key in ("trafego", "ambos") and ja_anuncia:
+        intensidade = []
+        if isinstance(social.get("ads_count"), int):
+            intensidade.append(f"{social['ads_count']} anuncios ativos")
+        if social.get("ads_since"):
+            intensidade.append(f"anuncia desde {social['ads_since']}")
+        if intensidade:
+            sinais.append("intensidade de anuncio: " + ", ".join(intensidade))
 
     # angulo condicional: base fiel grande que nao consegue rechamar quem ja foi
     nota = b["nota"]

@@ -22,7 +22,7 @@ _LEAD_COLS = (
     "category", "address", "neighborhood", "city", "state", "owner_name", "opt_out",
     "opened_on", "company_status",
     "score", "score_reason", "service_target", "ads_active",
-    "site_signals", "match_rate",
+    "site_signals", "social_signals", "match_rate",
     "suggested_value", "suggested_value_reason",
     "draft_msg1", "draft_msg2", "draft_model", "draft_generated_at",
     "backfilled_at", "places_detailed_at",
@@ -120,7 +120,7 @@ class SupabaseSink:
                 f"{self.base}/search_profile",
                 params={
                     "owner_id": f"eq.{owner_id}",
-                    "select": "owner_id,niches,city,state,neighborhood,default_service_target,profession,professions,min_score",
+                    "select": "owner_id,niches,city,state,neighborhood,default_service_target,profession,professions,min_score,sender_name",
                     "limit": "1",
                 },
             )
@@ -137,7 +137,7 @@ class SupabaseSink:
                 f"{self.base}/search_profile",
                 params={
                     "autopilot": "eq.true",
-                    "select": "owner_id,niches,city,state,neighborhood,radius,default_service_target,profession,professions,min_score",
+                    "select": "owner_id,niches,city,state,neighborhood,radius,default_service_target,profession,professions,min_score,sender_name",
                 },
             )
             r.raise_for_status()

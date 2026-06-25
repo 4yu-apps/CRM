@@ -73,6 +73,20 @@ export interface SiteSignals {
   speed_category?: string; // FAST | AVERAGE | SLOW (Chrome UX)
 }
 
+export interface SocialSignals {
+  followers?: number;
+  media_count?: number;
+  last_post?: string;
+  post_freq?: number;
+  post_freq_label?: string;
+  engagement?: number;
+  ig_status?: "ativo" | "parado";
+  ads_active?: boolean;
+  ads_count?: number;
+  ads_since?: string;
+  ad_platforms?: string[];
+}
+
 // score_reason (jsonb): score explicavel. summary = o "porque" em PT (motivo);
 // criteria = os sinais lidos (cada um com nota curta).
 export interface ScoreReason {
@@ -99,6 +113,9 @@ export interface Lead {
 
   maps_place_id: string | null;
   maps_url: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  opening_hours?: string | null;
   rating: number | null;
   reviews_count: number | null;
   category: string | null;
@@ -110,6 +127,7 @@ export interface Lead {
   owner_name: string | null;
   // Data de abertura da empresa (BrasilAPI). Alimenta o sinal "negocio novo".
   opened_on?: string | null;
+  company_status?: string | null;
 
   score: number | null;
   score_reason: ScoreReason | null;
@@ -161,6 +179,7 @@ export interface Lead {
 
   // Sinais do site e taxa de correspondencia de contatos (enriquecedor).
   site_signals?: SiteSignals | null;
+  social_signals?: SocialSignals | null;
   match_rate?: number | null;
 
   // Tags manuais (#20): etiquetas livres pra segmentar.

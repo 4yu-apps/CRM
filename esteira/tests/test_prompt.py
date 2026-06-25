@@ -159,6 +159,35 @@ def test_sinal_site_lento_pagespeed():
     assert "site lento no celular" in p
 
 
+def test_prompt_alimenta_instagram_parado():
+    lead = _lead(
+        instagram="@x",
+        service_target="marketing",
+        social_signals={"ig_status": "parado"},
+    )
+    assert "Instagram parado" in build_prompt(lead)
+
+
+def test_prompt_intensidade_ads_so_em_trafego_ou_ambos():
+    social = {"ads_active": True, "ads_count": 8, "ads_since": "2025-01-01"}
+    trafego = _lead(
+        ads_active=True, website="https://x.com",
+        service_target="trafego", social_signals=social,
+    )
+    assert "8 anuncios ativos" in build_prompt(trafego)
+
+    design = _lead(
+        ads_active=True, website="https://x.com",
+        service_target="design", social_signals=social,
+    )
+    assert "8 anuncios ativos" not in build_prompt(design)
+
+
+def test_prompt_nao_usa_owner_name():
+    prompt = build_prompt(_lead(owner_name="Pessoa Sensivel"))
+    assert "Pessoa Sensivel" not in prompt
+
+
 # --- voz humana com auto-apresentacao (2026-06-24) ---
 
 def test_self_desc_por_profissao():

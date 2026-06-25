@@ -204,12 +204,14 @@ def cmd_search(
     profession = None
     professions: list[str] = []
     min_score = 0
+    sender_name = None
     if hasattr(sink, "fetch_profile"):
         try:
             prof = sink.fetch_profile(owner_id) or {}
             profession = prof.get("profession")
             professions = list(prof.get("professions") or ([profession] if profession else []))
             min_score = int(prof.get("min_score") or 0)
+            sender_name = prof.get("sender_name")
         except Exception:
             profession = None
 
@@ -229,6 +231,7 @@ def cmd_search(
         batch=cfg.batch, delay=cfg.delay, owner_id=owner_id,
         profession=profession, professions=professions,
         min_score=min_score, reviews_source=reviews_source,
+        sender_name=sender_name,
         workers=workers,
     )
 

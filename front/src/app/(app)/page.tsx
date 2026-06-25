@@ -123,6 +123,8 @@ export default function InicioPage() {
   }, []);
 
   useEffect(() => {
+    // Carga inicial de uma fonte externa; o callback atualiza loading/resultado.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadActivity();
   }, [loadActivity]);
 
@@ -179,17 +181,18 @@ export default function InicioPage() {
     [leads],
   );
   const reunioes = useMemo(() => meetingsWithin(leads, 24), [leads]);
+  const [renderedAt] = useState(() => Date.now());
 
   // #3 — Esfriando: enviados/sem resposta, SEM follow-up agendado (senao caem em
   // Follow-ups) e sem nenhum toque ha COOLING_DAYS+ dias. O ralo silencioso.
   const esfriando = useMemo(() => {
-    const limite = Date.now() - COOLING_DAYS * 24 * 60 * 60 * 1000;
+    const limite = renderedAt - COOLING_DAYS * 24 * 60 * 60 * 1000;
     return leads
       .filter((l) => l.status === "enviado" || l.status === "sem_resposta")
       .filter((l) => !l.followup_at)
       .filter((l) => +new Date(l.updated_at) < limite)
       .sort((a, b) => +new Date(a.updated_at) - +new Date(b.updated_at)); // mais frio primeiro
-  }, [leads]);
+  }, [leads, renderedAt]);
 
   const temAcao =
     precisaResponder.length + followupsDevidos.length + reunioes.length + esfriando.length > 0;

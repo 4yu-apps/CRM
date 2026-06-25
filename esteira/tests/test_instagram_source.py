@@ -8,6 +8,7 @@ from garimpo_esteira.sources.instagram import (
     InstagramSource,
     business_discovery_probe,
     instagram_status,
+    post_frequency,
 )
 
 NOW = datetime(2026, 6, 22, tzinfo=timezone.utc)
@@ -69,6 +70,36 @@ def test_status_exatamente_no_limite_e_parado():
     assert instagram_status(post_61, now=NOW) == "parado"
 
 
+def test_frequencia_semanal_com_12_posts():
+    posts = [
+        f"2026-06-{day:02d}T10:00:00+0000"
+        for day in (21, 19, 17, 15, 13, 11, 9, 7, 5, 3, 1)
+    ] + ["2026-05-30T10:00:00+0000"]
+    freq, label = post_frequency(posts, now=NOW)
+    assert freq is not None and 3.0 < freq < 4.0
+    assert label == "≈4x/semana"
+
+
+def test_frequencia_mensal():
+    freq, label = post_frequency([
+        "2026-06-10T10:00:00+0000",
+        "2026-05-10T10:00:00+0000",
+        "2026-04-10T10:00:00+0000",
+    ], now=NOW)
+    assert freq is not None and freq < 0.5
+    assert label == "≈1x/mês"
+
+
+def test_frequencia_parada_prioriza_recencia_no_label():
+    freq, label = post_frequency([
+        "2026-03-20T10:00:00+0000",
+        "2026-03-13T10:00:00+0000",
+        "2026-03-06T10:00:00+0000",
+    ], now=NOW)
+    assert freq == 1.0
+    assert label == "parado há ~3 meses"
+
+
 # ------------------------------------------------------------------
 # business_discovery_probe
 # ------------------------------------------------------------------
@@ -102,6 +133,7 @@ def test_probe_monta_campo_e_parseia_resultado():
     assert "clinicabella" in field_param
     assert "followers_count" in field_param
     assert "timestamp" in field_param
+    assert "media.limit(12)" in field_param
 
 
 def test_probe_tira_arroba_do_handle():
@@ -195,6 +227,7 @@ def test_source_com_probe_emite_todos_os_findings():
     assert "instagram_followers" in field_names
     assert "instagram_media_count" in field_names
     assert "instagram_status" in field_names
+    assert "instagram_last_post" in field_names
 
 
 def test_source_com_probe_valores_corretos():

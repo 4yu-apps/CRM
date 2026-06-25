@@ -105,6 +105,7 @@ def run_autopilot(
         profession = prof.get("profession")  # define a lente do score e a copy
         professions = list(prof.get("professions") or ([profession] if profession else []))
         min_score = int(prof.get("min_score") or 0)  # #19 piso de score por dono
+        sender_name = prof.get("sender_name")
         rkey = region_key(city, state)
         covered = (
             {(rk, slug(nn)) for rk, nn in sink.fetch_covered_keys(owner)}
@@ -184,10 +185,14 @@ def run_autopilot(
                 sink, sources, provider, batch=batch, delay=delay, owner_id=owner,
                 profession=profession, professions=professions,
                 min_score=min_score, reviews_source=reviews_source, workers=workers,
+                sender_name=sender_name,
             )
             score_batch(sink, batch=batch, owner_id=owner, profession=profession,
                         professions=professions, min_score=min_score)
-            draft_batch(sink, provider, batch=batch, owner_id=owner, profession=profession, reviews_source=reviews_source)
+            draft_batch(
+                sink, provider, batch=batch, owner_id=owner, profession=profession,
+                reviews_source=reviews_source, sender_name=sender_name,
+            )
         except Exception:
             pass
 
@@ -221,17 +226,21 @@ def run_drain(
         profession = prof.get("profession")
         professions = list(prof.get("professions") or ([profession] if profession else []))
         min_score = int(prof.get("min_score") or 0)
+        sender_name = prof.get("sender_name")
         try:
             counts = run_pipeline_streaming(
                 sink, sources, provider, batch=batch, delay=delay, owner_id=owner,
                 profession=profession, professions=professions, min_score=min_score,
                 reviews_source=reviews_source, workers=workers,
+                sender_name=sender_name,
             )
             # mop-up: termina quem ficou em enriquecido/qualificado de runs anteriores
             score_batch(sink, batch=batch, owner_id=owner, profession=profession,
                         professions=professions, min_score=min_score)
-            draft_batch(sink, provider, batch=batch, owner_id=owner, profession=profession,
-                        reviews_source=reviews_source)
+            draft_batch(
+                sink, provider, batch=batch, owner_id=owner, profession=profession,
+                reviews_source=reviews_source, sender_name=sender_name,
+            )
             summary.append({"owner_id": owner, **counts})
         except Exception:
             pass

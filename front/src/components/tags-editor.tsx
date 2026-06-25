@@ -15,6 +15,8 @@ export function TagsEditor({ lead, onSaved }: { lead: Lead; onSaved: () => void 
 
   // reflete mudancas externas (refresh da ficha) sem perder o estado otimista local
   useEffect(() => {
+    // Sincroniza o estado editavel com o lead recarregado pelo repositorio.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTags(lead.tags ?? []);
   }, [lead.tags]);
 

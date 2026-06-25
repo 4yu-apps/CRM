@@ -3,7 +3,7 @@
 // Tudo derivado de status/deal_* existentes (sem schema). Cliente = lead fechado.
 import { useMemo } from "react";
 import Link from "next/link";
-import { Handshake, ArrowClockwise, SmileySad, Warning, CurrencyDollar } from "@phosphor-icons/react";
+import { Handshake, ArrowClockwise, SmileySad, Warning } from "@phosphor-icons/react";
 import { useLeads } from "@/hooks/use-leads";
 import { isClient, renewalDate, daysUntilRenewal, isColdReactivatable, daysCold } from "@/lib/clients";
 import type { Lead } from "@/lib/types";

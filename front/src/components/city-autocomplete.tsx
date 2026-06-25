@@ -147,7 +147,6 @@ export function CityAutocomplete({
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (open) setActiveIndex(suggestions.length > 0 ? 0 : -1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, suggestions]);
 
   // Navegacao por teclado: setas, Home/End e Enter (Esc ja fecha no efeito acima).
