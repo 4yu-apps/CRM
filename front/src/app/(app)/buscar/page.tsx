@@ -18,7 +18,7 @@ import { getRepo } from "@/lib/repo";
 import { useAuth } from "@/lib/auth";
 import { useLeads } from "@/hooks/use-leads";
 import { fetchEstados, fetchMunicipios } from "@/lib/ibge";
-import { geocodeCity, geocodeNeighborhood, stateCenter, type GeoPoint } from "@/lib/geocode";
+import { geocodeCity, stateCenter, type GeoPoint } from "@/lib/geocode";
 import { serviceOptionsForProfile } from "@/lib/professions";
 import { SERVICE_META } from "@/lib/service";
 import { RAMOS_DISPONIVEIS } from "@/lib/ramos";
@@ -42,6 +42,12 @@ const CoverageMap = dynamic(() => import("@/components/coverage-map"), {
 
 // Centro padrao do Brasil (usado quando sem coordenadas no perfil)
 const BRASIL_CENTER = { lat: -14.235, lng: -51.925, zoom: 4 };
+
+// Dias desde uma data ISO. Em escopo de modulo (nao inline no componente) pra o
+// lint de pureza nao acusar Date.now() durante o render.
+function daysSinceISO(iso: string): number {
+  return Math.floor((Date.now() - +new Date(iso)) / (24 * 60 * 60 * 1000));
+}
 
 const RADIUS_OPTIONS = [
   { value: "1km", label: "Até 1 km (bairro)" },
@@ -216,7 +222,7 @@ export default function BuscarPage() {
     if (maxPct <= 0) return null;
     const totalCount = matches.reduce((s, c) => s + (c.result_count ?? 0), 0);
     const lastAt = matches.reduce((a, c) => (a > c.covered_at ? a : c.covered_at), matches[0].covered_at);
-    const dias = Math.floor((Date.now() - +new Date(lastAt)) / (24 * 60 * 60 * 1000));
+    const dias = daysSinceISO(lastAt);
     return { maxPct, totalCount, dias };
   }, [city, uf, niches, coverage]);
 
@@ -260,7 +266,7 @@ export default function BuscarPage() {
     try {
       const novo = await repo.savePreset({
         name: presetName.trim(),
-        params: { niches, uf, city, neighborhood, radius, service },
+        params: { niches, uf, city, neighborhood: bairroPoint ? neighborhood.trim() : "", radius, service },
       });
       setPresets((ps) => [novo, ...ps]);
       setPresetName("");
@@ -271,7 +277,7 @@ export default function BuscarPage() {
     } finally {
       setSavingPreset(false);
     }
-  }, [niches, uf, city, neighborhood, radius, service, presetName, repo]);
+  }, [niches, uf, city, neighborhood, radius, service, presetName, repo, bairroPoint]);
 
   const removerPreset = useCallback(
     async (id: string) => {
@@ -341,19 +347,17 @@ export default function BuscarPage() {
       return;
     }
     let ativo = true;
-    const bairro = neighborhood.trim();
-    const buscar = () => {
-      const p = bairro ? geocodeNeighborhood(bairro, city, uf) : geocodeCity(city, uf);
-      p.then((ponto) => {
+    // O centro do BAIRRO vem da coordenada exata do dropdown (bairroPoint). Aqui
+    // so geocodamos a CIDADE; texto livre de bairro nao move o mapa nem a busca.
+    geocodeCity(city, uf)
+      .then((ponto) => {
         if (ativo && ponto) setCityPoint(ponto);
-      }).catch(() => null);
-    };
-    const t = setTimeout(buscar, bairro ? 600 : 0);
+      })
+      .catch(() => null);
     return () => {
       ativo = false;
-      clearTimeout(t);
     };
-  }, [city, uf, neighborhood]);
+  }, [city, uf]);
 
   // Acompanhamento ao vivo da busca
   useEffect(() => {
@@ -467,7 +471,7 @@ export default function BuscarPage() {
         niches: niches.length > 0 ? niches : profile?.niches ?? [],
         city: city || null,
         state: uf || null,
-        neighborhood: neighborhood.trim() || null,
+        neighborhood: (bairroPoint ? neighborhood.trim() : "") || null,
         radius,
         default_service_target: serviceOpts.length === 0 ? "indefinido" : service,
       });
@@ -485,7 +489,7 @@ export default function BuscarPage() {
             niche: nicho,
             city: city || null,
             state: uf || null,
-            neighborhood: neighborhood.trim() || null,
+            neighborhood: (bairroPoint ? neighborhood.trim() : "") || null,
           }),
         })
           .then((res) =>
@@ -514,13 +518,12 @@ export default function BuscarPage() {
     } finally {
       setSaving(false);
     }
-  }, [saving, repo, niches, profile, city, uf, neighborhood, radius, service, serviceOpts, user]);
+  }, [saving, repo, niches, profile, city, uf, neighborhood, radius, service, serviceOpts, user, bairroPoint]);
 
   // Coordenadas para o mapa.
   const mapCenter = (() => {
     if (bairroPoint) return { lat: bairroPoint.lat, lng: bairroPoint.lng, zoom: 14 };
-    if (cityPoint)
-      return { lat: cityPoint.lat, lng: cityPoint.lng, zoom: neighborhood.trim() ? 14 : 12 };
+    if (cityPoint) return { lat: cityPoint.lat, lng: cityPoint.lng, zoom: 12 };
     // So o estado escolhido (sem cidade ainda): centra na UF com zoom estadual.
     const sc = stateCenter(uf);
     if (sc) return { lat: sc.lat, lng: sc.lng, zoom: 6 };
@@ -528,6 +531,10 @@ export default function BuscarPage() {
     if (first) return { lat: first.center_lat!, lng: first.center_lng!, zoom: 12 };
     return BRASIL_CENTER;
   })();
+
+  // Bairro EFETIVO: so vale quando escolhido no dropdown (tem coordenada). Texto
+  // livre nao selecionado e ignorado — busca e foca a cidade toda.
+  const bairro = bairroPoint ? neighborhood.trim() : "";
 
   // Cobertura mostrada: filtrada pela cidade escolhida.
   const covFiltered = useMemo(() => {
@@ -664,8 +671,13 @@ export default function BuscarPage() {
               disabled={!city}
             />
             <p className="mt-1.5 text-[12px] text-faint">
-              Comece a digitar e escolha o bairro da cidade. O mapa foca ali e o robô afunila a busca.
+              Escolha um bairro da lista pra afunilar e focar o mapa nele. Texto que não está na lista é ignorado (busca a cidade toda).
             </p>
+            {neighborhood.trim() && !bairroPoint && (
+              <p className="mt-1 text-[12px] font-semibold text-amber-600">
+                O bairro digitado não é da lista — vou buscar a cidade toda. Selecione um sugerido pra focar.
+              </p>
+            )}
           </div>
 
           {/* Raio */}
@@ -738,7 +750,7 @@ export default function BuscarPage() {
 
             {presets.length === 0 ? (
               <p className="text-[12px] text-muted-foreground">
-                Nenhuma busca salva ainda. Monte uma combinação e clique em "Salvar busca atual".
+                Nenhuma busca salva ainda. Monte uma combinação e clique em &ldquo;Salvar busca atual&rdquo;.
               </p>
             ) : (
               <div className="flex flex-wrap gap-1.5">
@@ -858,8 +870,8 @@ export default function BuscarPage() {
             <div className="text-[17px] font-bold">Cobertura por região</div>
             {city && (
               <span className="text-[12px] font-semibold text-faint">
-                {neighborhood.trim()
-                  ? `${neighborhood.trim()}, ${city}${uf ? ` / ${uf}` : ""}`
+                {bairro
+                  ? `${bairro}, ${city}${uf ? ` / ${uf}` : ""}`
                   : uf
                     ? `${city} / ${uf}`
                     : city}
@@ -896,7 +908,7 @@ export default function BuscarPage() {
               zoom={mapCenter.zoom}
               cityName={city || undefined}
               stateName={uf || undefined}
-              neighborhood={neighborhood.trim() || undefined}
+              neighborhood={bairro || undefined}
               radiusKm={radiusKm}
             />
           </div>

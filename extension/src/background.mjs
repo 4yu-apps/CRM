@@ -31,6 +31,32 @@ chrome.runtime.onInstalled.addListener(() => {
   chrome.alarms.create("gp-followups", { periodInMinutes: 60 });
 });
 
+// Reinjeta os content scripts nas abas JA ABERTAS quando a extensao (re)carrega.
+// Sem isso, depois de recarregar a extensao o script da aba do CRM fica ORFAO
+// (contexto invalidado): o pedido de "abrir conversa" nao e repassado e o CRM
+// cai em abrir uma aba nova do WhatsApp. Reinjetar restaura o bridge vivo sem o
+// usuario precisar recarregar a aba na mao. (Precisa da permissao "scripting".)
+const CRM_URLS = ["https://crm.4yumkt.com.br/*", "https://*.vercel.app/*", "http://localhost/*"];
+function reinjectInto(urls, file) {
+  if (!chrome.scripting) return;
+  chrome.tabs.query({ url: urls }, (tabs) => {
+    for (const tab of tabs || []) {
+      if (tab.id == null) continue;
+      chrome.scripting
+        .executeScript({ target: { tabId: tab.id }, files: [file] })
+        .catch(() => {
+          /* aba protegida/descarregada: ignora */
+        });
+    }
+  });
+}
+function reinjectBridges() {
+  reinjectInto(CRM_URLS, "crm-bridge.bundle.js");
+  reinjectInto(["https://web.whatsapp.com/*"], "wa-relay.bundle.js");
+}
+chrome.runtime.onInstalled.addListener(reinjectBridges);
+chrome.runtime.onStartup.addListener(reinjectBridges);
+
 // Verifica follow-ups e dispara notificacao se necessario.
 async function checkFollowups() {
   // Monta config e token; se nao ha sessao, sai silenciosamente.

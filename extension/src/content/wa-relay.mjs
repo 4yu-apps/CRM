@@ -3,7 +3,11 @@
 // relay repassa pro glue (que usa o WPP) e devolve se conseguiu (sem reload). Se
 // nao responder a tempo, devolve ok:false -> o background navega (fallback).
 
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+// Guarda contra reinjecao (o background reinjeta este relay quando a extensao
+// recarrega): o flag evita registrar o listener duas vezes num contexto vivo.
+if (!window.__garimpoWaRelay) {
+  window.__garimpoWaRelay = true;
+  chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (!msg || msg.type !== "garimpo_switch_chat") return;
   const reqId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
@@ -26,4 +30,5 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   window.addEventListener("message", onMsg);
   window.postMessage({ source: "garimpo-sw", type: "open_chat", phone: msg.phone, text: msg.text, reqId }, "*");
   return true; // resposta assincrona
-});
+  });
+}

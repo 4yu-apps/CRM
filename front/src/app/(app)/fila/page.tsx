@@ -411,53 +411,67 @@ export default function FilaPage() {
 
   return (
     <div className="mx-auto max-w-[1180px]">
-      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex items-center gap-3.5">
-          <div className="text-sm text-muted-foreground">
-            Revisando <strong className="text-foreground">{cur ? reviewed + 1 : reviewed} de {total}</strong>
+      <div className="mb-4 flex flex-col gap-2.5">
+        {/* Linha 1: status da revisao (esquerda) + ordenar/filtrar (direita) */}
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="text-sm text-muted-foreground">
+              Revisando <strong className="text-foreground">{cur ? reviewed + 1 : reviewed} de {total}</strong>
+            </div>
+            <div className="h-1.5 w-[140px] overflow-hidden rounded-full bg-[var(--inset)]">
+              <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: "var(--grad)" }} />
+            </div>
+            {sendCount > 0 && (
+              <span className="rounded-full bg-[var(--inset)] px-2.5 py-0.5 text-[11.5px] font-semibold text-faint">
+                {sendCount} enviado{sendCount !== 1 ? "s" : ""} hoje
+              </span>
+            )}
           </div>
-          <div className="h-1.5 w-[160px] overflow-hidden rounded-full bg-[var(--inset)]">
-            <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: "var(--grad)" }} />
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[12.5px] font-semibold text-faint">Ordenar por</span>
+            <Dropdown
+              value={sortBy}
+              onChange={(v) => setSortBy(v as SortKey)}
+              options={SORT_OPTIONS}
+              ariaLabel="Ordenar a fila"
+              align="end"
+              className="w-[188px]"
+            />
+            <Dropdown
+              value={ramo}
+              onChange={setRamo}
+              options={ramoOptions}
+              ariaLabel="Filtrar por ramo"
+              align="end"
+              className="w-[168px]"
+            />
+            <Dropdown
+              value={sinal}
+              onChange={(v) => setSinal(v as SignalFilter)}
+              options={SIGNAL_FILTER_OPTIONS}
+              ariaLabel="Filtrar por sinal de qualidade"
+              align="end"
+              className="w-[180px]"
+            />
           </div>
-          {sendCount > 0 && (
-            <span className="text-[11.5px] text-faint">
-              {sendCount} enviado{sendCount !== 1 ? "s" : ""} hoje
-            </span>
-          )}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[12.5px] font-semibold text-faint">Ordenar por</span>
-          <Dropdown
-            value={sortBy}
-            onChange={(v) => setSortBy(v as SortKey)}
-            options={SORT_OPTIONS}
-            ariaLabel="Ordenar a fila"
-            align="end"
-            className="w-[188px]"
-          />
-          <Dropdown
-            value={ramo}
-            onChange={setRamo}
-            options={ramoOptions}
-            ariaLabel="Filtrar por ramo"
-            align="end"
-            className="w-[168px]"
-          />
-          <Dropdown
-            value={sinal}
-            onChange={(v) => setSinal(v as SignalFilter)}
-            options={SIGNAL_FILTER_OPTIONS}
-            ariaLabel="Filtrar por sinal de qualidade"
-            align="end"
-            className="w-[180px]"
-          />
-          <span className="hidden items-center gap-1.5 text-[12px] text-faint md:flex">
+
+        {/* Linha 2: atalhos de teclado — legenda discreta, separada dos controles */}
+        <div className="hidden flex-wrap items-center gap-x-4 gap-y-1 border-t border-border pt-2 text-[12px] text-faint md:flex">
+          <span className="text-[11px] font-bold uppercase tracking-wider">Atalhos</span>
+          <span className="flex items-center gap-1.5">
             <kbd className="rounded-md border border-border-2 bg-[var(--inset)] px-1.5 py-0.5 font-heading font-semibold text-ink-2">A</kbd>
             aprovar
+          </span>
+          <span className="flex items-center gap-1.5">
             <kbd className="rounded-md border border-border-2 bg-[var(--inset)] px-1.5 py-0.5 font-heading font-semibold text-ink-2">S</kbd>
             arquivar
+          </span>
+          <span className="flex items-center gap-1.5">
             <kbd className="rounded-md border border-border-2 bg-[var(--inset)] px-1.5 py-0.5 font-heading font-semibold text-ink-2">D</kbd>
             descartar
+          </span>
+          <span className="flex items-center gap-1.5">
             <kbd className="rounded-md border border-border-2 bg-[var(--inset)] px-1.5 py-0.5 font-heading font-semibold text-ink-2">→</kbd>
             pular
           </span>

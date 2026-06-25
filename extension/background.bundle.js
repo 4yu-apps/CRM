@@ -193,6 +193,23 @@
   chrome.runtime.onInstalled.addListener(() => {
     chrome.alarms.create("gp-followups", { periodInMinutes: 60 });
   });
+  var CRM_URLS = ["https://crm.4yumkt.com.br/*", "https://*.vercel.app/*", "http://localhost/*"];
+  function reinjectInto(urls, file) {
+    if (!chrome.scripting) return;
+    chrome.tabs.query({ url: urls }, (tabs) => {
+      for (const tab of tabs || []) {
+        if (tab.id == null) continue;
+        chrome.scripting.executeScript({ target: { tabId: tab.id }, files: [file] }).catch(() => {
+        });
+      }
+    });
+  }
+  function reinjectBridges() {
+    reinjectInto(CRM_URLS, "crm-bridge.bundle.js");
+    reinjectInto(["https://web.whatsapp.com/*"], "wa-relay.bundle.js");
+  }
+  chrome.runtime.onInstalled.addListener(reinjectBridges);
+  chrome.runtime.onStartup.addListener(reinjectBridges);
   async function checkFollowups() {
     const cfg = await getConfig();
     const token = await ensureFreshToken(cfg);
