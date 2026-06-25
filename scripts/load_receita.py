@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
 """Carrega o subset da Receita (Dados Abertos) na tabela receita_estabelecimento.
 
-OPERACIONAL: rode LOCAL (nao no cron). Baixe os zips de
-https://dadosabertos.rfb.gov.br/CNPJ/ (Estabelecimentos*, Empresas*, Municipios)
-e aponte este script pra eles. Ele filtra pelos municipios que voce prospecta e
-faz upsert no Supabase (le SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY do .env).
+ONLINE: roda no GitHub Actions (workflow load-receita.yml), sem PC do dono. Baixa
+cada zip da Receita, processa em streaming e apaga (pico de disco ~1 zip), filtra
+pelos municipios que voce prospecta e faz upsert no Supabase.
 
-Exemplo:
-  python scripts/load_receita.py --uf PR --cities "MARINGA,SARANDI" \
-      --municipios Municipios.zip \
-      --estab "Estabelecimentos*.zip" --empresas "Empresas*.zip"
+Cidades: por padrao puxa do search_profile (--from-profiles); ou passe --cities.
+Arquivos: --base-url (pasta do mes na Receita) baixa Municipios/Estabelecimentos/
+Empresas; ou passe caminhos/URLs locais via --municipios/--estab/--empresas.
 
-Cada arquivo pode ser .zip (1 CSV dentro) ou .csv (latin-1, ;-sep, aspas).
+Le SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY do ambiente (.env / secrets).
 """
 from __future__ import annotations
 
@@ -19,6 +17,7 @@ import argparse
 import glob
 import os
 import sys
+import tempfile
 import unicodedata
 import zipfile
 from pathlib import Path
@@ -33,6 +32,8 @@ from garimpo_esteira.receita_load import (  # noqa: E402
 )
 
 BATCH = 500
+_ESTAB_NAMES = [f"Estabelecimentos{i}.zip" for i in range(10)]
+_EMPRESA_NAMES = [f"Empresas{i}.zip" for i in range(10)]
 
 
 def _norm(s: str) -> str:
@@ -41,97 +42,166 @@ def _norm(s: str) -> str:
     return " ".join(s.upper().split())
 
 
-def _iter_lines(path: str):
-    """Linhas (latin-1) de um .zip (1 CSV dentro) ou .csv."""
-    if path.lower().endswith(".zip"):
-        with zipfile.ZipFile(path) as z:
-            for name in z.namelist():
-                with z.open(name) as fh:
-                    for raw in io_textwrap(fh):
-                        yield raw
-    else:
-        with open(path, encoding="latin-1") as fh:
-            for raw in fh:
-                yield raw.rstrip("\n")
+# ---- aquisicao (URL ou caminho local), processando um arquivo por vez ----------
+def _download(url: str, dest: Path) -> Path:
+    print(f"  baixando {url} ...")
+    with httpx.stream("GET", url, timeout=None, follow_redirects=True) as r:
+        r.raise_for_status()
+        with open(dest, "wb") as fh:
+            for chunk in r.iter_bytes(1 << 20):
+                fh.write(chunk)
+    return dest
 
 
-def io_textwrap(fh):
-    for raw in fh:
-        yield raw.decode("latin-1").rstrip("\n")
+def _lines_of(src: str, tmpdir: Path):
+    """Linhas (latin-1) de um src (URL .zip ou caminho .zip/.csv). Baixa pra tmp,
+    le e apaga o que baixou (mantem o disco baixo)."""
+    downloaded = None
+    try:
+        if src.startswith("http://") or src.startswith("https://"):
+            downloaded = _download(src, tmpdir / Path(src).name)
+            path = str(downloaded)
+        else:
+            path = src
+        if path.lower().endswith(".zip"):
+            with zipfile.ZipFile(path) as z:
+                for name in z.namelist():
+                    with z.open(name) as fh:
+                        for raw in fh:
+                            yield raw.decode("latin-1").rstrip("\n")
+        else:
+            with open(path, encoding="latin-1") as fh:
+                for raw in fh:
+                    yield raw.rstrip("\n")
+    finally:
+        if downloaded and downloaded.exists():
+            downloaded.unlink()
 
 
-def _expand(patterns: list[str]) -> list[str]:
-    out: list[str] = []
-    for p in patterns:
-        out.extend(sorted(glob.glob(p)))
-    return out
+def _sources(explicit: list[str] | None, base_url: str | None, names: list[str]) -> list[str]:
+    if explicit:
+        out: list[str] = []
+        for p in explicit:
+            out.extend(sorted(glob.glob(p)) if not p.startswith("http") else [p])
+        return out
+    if base_url:
+        b = base_url.rstrip("/") + "/"
+        return [b + n for n in names]
+    return []
+
+
+# ---- alvos (UF, cidade-normalizada) --------------------------------------------
+def _from_profiles(url: str, key: str) -> set[tuple[str, str]]:
+    r = httpx.get(
+        url.rstrip("/") + "/rest/v1/search_profile?select=state,city",
+        headers={"apikey": key, "Authorization": f"Bearer {key}"}, timeout=30.0,
+    )
+    r.raise_for_status()
+    targets = set()
+    for row in r.json() or []:
+        uf, city = row.get("state"), row.get("city")
+        if uf and city:
+            targets.add((uf.upper(), _norm(city)))
+    return targets
+
+
+def _resolve_targets(args, url, key) -> set[tuple[str, str]]:
+    if args.cities:
+        # formato "UF:Cidade;UF:Cidade" ou, com --uf, "Cidade;Cidade"
+        out = set()
+        for item in args.cities.split(";"):
+            item = item.strip()
+            if not item:
+                continue
+            if ":" in item:
+                uf, city = item.split(":", 1)
+            else:
+                uf, city = args.uf or "", item
+            out.add((uf.upper(), _norm(city)))
+        return out
+    return _from_profiles(url, key)
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--uf", required=True)
-    ap.add_argument("--cities", required=True, help="nomes separados por virgula")
-    ap.add_argument("--municipios", required=True)
-    ap.add_argument("--estab", nargs="+", required=True)
-    ap.add_argument("--empresas", nargs="+", required=True)
+    ap.add_argument("--base-url", help="pasta do mes na Receita (baixa os zips)")
+    ap.add_argument("--municipios")
+    ap.add_argument("--estab", nargs="+")
+    ap.add_argument("--empresas", nargs="+")
+    ap.add_argument("--from-profiles", action="store_true", help="cidades do search_profile")
+    ap.add_argument("--uf", help="UF padrao quando --cities nao traz UF")
+    ap.add_argument("--cities", help='"UF:Cidade;UF:Cidade" (senao usa --from-profiles)')
+    ap.add_argument("--tmpdir", default=os.getenv("RUNNER_TEMP") or tempfile.gettempdir())
     args = ap.parse_args()
 
     url = os.getenv("SUPABASE_URL")
     key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
     if not url or not key:
-        print("defina SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (.env)")
+        print("defina SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY")
         return 1
 
-    uf = args.uf.upper()
-    wanted_cities = {_norm(c) for c in args.cities.split(",") if c.strip()}
+    tmpdir = Path(args.tmpdir)
+    tmpdir.mkdir(parents=True, exist_ok=True)
 
-    code_to_name = parse_municipios(_iter_lines(args.municipios))
-    target_codes = {code: name for code, name in code_to_name.items() if _norm(name) in wanted_cities}
-    if not target_codes:
-        print(f"nenhum municipio casou com {wanted_cities} na lista da Receita")
+    targets = _resolve_targets(args, url, key)
+    if not targets:
+        print("nenhuma cidade alvo (passe --cities ou tenha search_profile)")
         return 1
-    print(f"municipios alvo: {sorted(target_codes.values())} ({len(target_codes)} codigos)")
+    print(f"alvos: {sorted(targets)}")
 
-    # Pass 1: estabelecimentos filtrados por UF + municipio alvo
+    muni_src = ([args.municipios] if args.municipios else
+                _sources(None, args.base_url, ["Municipios.zip"]))
+    if not muni_src:
+        print("faltou Municipios (--municipios ou --base-url)")
+        return 1
+    code_to_name: dict[str, str] = {}
+    for s in muni_src:
+        code_to_name.update(parse_municipios(_lines_of(s, tmpdir)))
+    # codigos cujos (uf, nome) estao nos alvos sao resolvidos por linha (uf vem do
+    # estabelecimento); aqui so guardamos code->name pra montar o registro.
+
+    estab_src = _sources(args.estab, args.base_url, _ESTAB_NAMES)
     records: dict[str, dict] = {}
-    for path in _expand(args.estab):
-        print(f"lendo estab {path} ...")
-        for line in _iter_lines(path):
+    for s in estab_src:
+        print(f"estab: {s}")
+        for line in _lines_of(s, tmpdir):
             rec = parse_estabelecimento(line)
-            if not rec or rec["uf"] != uf or rec["municipio_code"] not in target_codes:
+            if not rec:
                 continue
-            rec["municipio"] = target_codes[rec["municipio_code"]]
+            name = code_to_name.get(rec["municipio_code"] or "")
+            if not name or (rec["uf"] or "", _norm(name)) not in targets:
+                continue
+            rec["municipio"] = name
             rec.pop("municipio_code", None)
             records[rec["cnpj"]] = rec
     print(f"estabelecimentos no alvo: {len(records)}")
+    if not records:
+        return 0
 
-    # Pass 2: razao social (so pros basicos que entraram)
     basicos = {c[:8] for c in records}
     razao: dict[str, str] = {}
-    for path in _expand(args.empresas):
-        print(f"lendo empresas {path} ...")
-        razao.update(parse_empresas_razao(_iter_lines(path), basicos))
+    for s in _sources(args.empresas, args.base_url, _EMPRESA_NAMES):
+        print(f"empresas: {s}")
+        razao.update(parse_empresas_razao(_lines_of(s, tmpdir), basicos))
     for cnpj, rec in records.items():
         rec["razao_social"] = razao.get(cnpj[:8])
 
     _upsert(url, key, list(records.values()))
-    print(f"OK: {len(records)} estabelecimentos no Supabase.")
+    print(f"OK: {len(records)} no Supabase.")
     return 0
 
 
 def _upsert(url: str, key: str, rows: list[dict]) -> None:
     endpoint = url.rstrip("/") + "/rest/v1/receita_estabelecimento?on_conflict=cnpj"
     headers = {
-        "apikey": key,
-        "Authorization": f"Bearer {key}",
+        "apikey": key, "Authorization": f"Bearer {key}",
         "Content-Type": "application/json",
         "Prefer": "resolution=merge-duplicates,return=minimal",
     }
-    with httpx.Client(timeout=60.0, headers=headers) as c:
+    with httpx.Client(timeout=120.0, headers=headers) as c:
         for i in range(0, len(rows), BATCH):
             chunk = rows[i:i + BATCH]
-            r = c.post(endpoint, json=chunk)
-            r.raise_for_status()
+            c.post(endpoint, json=chunk).raise_for_status()
             print(f"  upsert {i + len(chunk)}/{len(rows)}")
 
 

@@ -1,0 +1,36 @@
+name: Carregar Receita (CNPJ por nome)
+
+# Online, sob demanda (nada local): baixa os Dados Abertos da Receita do mes,
+# filtra os municipios que voce prospecta (do search_profile) e carrega o subset
+# na tabela receita_estabelecimento. Rode 1x/mes quando a Receita atualiza.
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "URL da pasta do mes na Receita (ex.: https://arquivos.receitafederal.gov.br/dados/cnpj/dados_abertos_cnpj/2026-05/)"
+        required: true
+      cities:
+        description: 'Opcional: "UF:Cidade;UF:Cidade". Vazio = puxa do search_profile.'
+        required: false
+        default: ""
+
+jobs:
+  load:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install -e ./esteira
+      - name: Carregar subset da Receita
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          if [ -n "${{ github.event.inputs.cities }}" ]; then
+            python scripts/load_receita.py --base-url "${{ github.event.inputs.base_url }}" --cities "${{ github.event.inputs.cities }}"
+          else
+            python scripts/load_receita.py --base-url "${{ github.event.inputs.base_url }}" --from-profiles
+          fi

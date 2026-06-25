@@ -105,6 +105,11 @@ jobs:
           # PageSpeed Insights (Google, gratis): performance do site no celular.
           # Liga sozinho quando o secret existe (chave gratuita, sem cobranca).
           PAGESPEED_API_KEY: ${{ secrets.PAGESPEED_API_KEY }}
+          # CNPJ por nome (Fase 5.5): provider Receita local (tabela no Supabase,
+          # carregada pelo workflow load-receita.yml). Liga com a var/secret =1.
+          # Sem dados carregados a fonte e inerte (RPC vazia, nao inventa CNPJ).
+          GARIMPO_CNPJ_LOOKUP: ${{ vars.GARIMPO_CNPJ_LOOKUP }}
+          GARIMPO_CNPJ_LOOKUP_PROVIDER: ${{ vars.GARIMPO_CNPJ_LOOKUP_PROVIDER || 'receita' }}
         # No cron (sem input): autopilot (descobre + pipeline dos novos) E depois
         # um backfill que re-enriquece uma fatia rotativa dos leads antigos
         # incompletos. Tudo autonomo, sem PC ligado. Dispatch manual com
