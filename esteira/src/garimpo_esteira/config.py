@@ -53,6 +53,10 @@ class Config:
     # teto de custo POR RUN do Places Text Search (SKU pago). 0 = sem teto. Protege
     # a fatura de runaway; mensal fica coberto pelo cron diario + scan_coverage.
     places_search_limit: int = 150
+    # CNPJ por nome (Fase 5.5): lookup reverso num agregador gray. DESLIGADO por
+    # padrao (ToS-cinza); liga com GARIMPO_CNPJ_LOOKUP=1. Teto por-run separado.
+    cnpj_lookup_enabled: bool = False
+    cnpj_lookup_limit: int = 50
     extra_niches: int = 0             # nichos aleatorios extras por run (variedade)
     ig_business_id: str | None = None
     ig_token: str | None = None
@@ -99,6 +103,8 @@ class Config:
             maps_key=os.getenv("GOOGLE_MAPS_API_KEY"),
             maps_pages=int(os.getenv("GARIMPO_MAPS_PAGES", "3")),
             places_search_limit=int(os.getenv("GARIMPO_PLACES_SEARCH_LIMIT", "150")),
+            cnpj_lookup_enabled=os.getenv("GARIMPO_CNPJ_LOOKUP", "0") in ("1", "true", "True"),
+            cnpj_lookup_limit=int(os.getenv("GARIMPO_CNPJ_LOOKUP_LIMIT", "50")),
             extra_niches=int(os.getenv("GARIMPO_EXTRA_NICHES", "0")),
             ig_business_id=os.getenv("INSTAGRAM_BUSINESS_ID"),
             ig_token=os.getenv("INSTAGRAM_TOKEN") or os.getenv("META_AD_LIBRARY_TOKEN"),
@@ -180,13 +186,15 @@ def build_sources(cfg: Config) -> list[Source]:
 
     # Ordem importa: WebsiteSource primeiro raspa o CNPJ do site (rodape) e o
     # facebook (que o AdLibrary precisa); o CnpjSource em seguida usa esse CNPJ no
-    # mesmo passo pra trazer dono, data de abertura e situacao cadastral.
-    return [
-        WebsiteSource(llm_extract=llm_extract, pagespeed=pagespeed),
-        CnpjSource(),
-        ig,
-        ad,
-    ]
+    # mesmo passo pra trazer dono, data de abertura e situacao cadastral. Entre os
+    # dois, opcional, o lookup de CNPJ por nome (so quando o site nao deu CNPJ).
+    sources: list[Source] = [WebsiteSource(llm_extract=llm_extract, pagespeed=pagespeed)]
+    if cfg.cnpj_lookup_enabled:
+        from .sources.cnpj_name import CnpjNameSource, casadosdados_lookup
+
+        sources.append(CnpjNameSource(casadosdados_lookup, request_limit=cfg.cnpj_lookup_limit))
+    sources += [CnpjSource(), ig, ad]
+    return sources
 
 
 def gemini_keys(cfg: Config) -> list[str]:

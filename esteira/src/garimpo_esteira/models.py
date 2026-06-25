@@ -12,8 +12,8 @@ LeadStatus = Literal[
 ]
 
 LeadSource = Literal[
-    "google_maps", "openstreetmap", "cnpj_brasilapi", "cnpj_ws", "instagram",
-    "website", "meta_ad_library", "manual", "extension",
+    "google_maps", "openstreetmap", "cnpj_brasilapi", "cnpj_ws", "cnpj_lookup",
+    "instagram", "website", "meta_ad_library", "manual", "extension",
 ]
 
 # Servico-alvo do lead, dirigido pela profissao do dono: trafego/automacao/ambos

@@ -25,6 +25,20 @@ CNPJ (quase nenhum de Maps/OSM). Agora:
   menos guardado), espelhando o do Places Details.
 - Contar Reviews no orçamento Places (ou manter travado).
 
+## Fase 5.5 — CNPJ por nome (reverso) com validação cruzada
+Quando o lead não tem CNPJ (sem site, ou site sem CNPJ), acha o CNPJ por
+nome+cidade e valida cruzando. Roda na cascata entre Website e CnpjSource; pula
+se o site já deu CNPJ. Só descobre o CNPJ; BrasilAPI/ReceitaWS confirmam o resto.
+
+- **5.5a (FEITA):** `pick_cnpj` (validador precision-first: telefone forte; sem
+  telefone exige cidade+bairro/rua+nome alto; só aceita se 1 único CNPJ passa,
+  senão vazio) + `CnpjNameSource` (gated, teto por-run) + enum `cnpj_lookup` +
+  wiring. Provider injetável. **Adapter casadosdados bateu em Cloudflare 403** (não
+  roda headless) → fonte nasce gated-off; o validador/source são o que vale.
+- **5.5b (próxima, provider real):** Dados Abertos da Receita, subset dos
+  municípios prospectados, tabela no Supabase + índice trigram → `nome+cidade→CNPJ`
+  local, legal, robusto. Mesmo `pick_cnpj`, mesma `CnpjNameSource`.
+
 ## Fase 6 — Ad Library: bool → intensidade (grátis, token live)
 - Capturar nº de anúncios ativos + desde quando + plataformas → intensidade no
   lens trafego. Token Meta já validado (renovar antes de 2026-08-24).
