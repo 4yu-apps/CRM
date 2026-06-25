@@ -41,6 +41,34 @@ Testes: `python -m pytest` (49 testes, offline).
 | **Instagram** | normaliza handle existente | grátis |
 | **Meta Ad Library** | "já anuncia?" (sinal, proveniência) | grátis c/ token |
 
+### Meta Ad Library — token, cobertura e o que NÃO fazer
+
+O sinal "já anuncia?" usa a Ad Library API por `search_page_ids` (confiável). O
+token (`META_AD_LIBRARY_TOKEN`) é um user token de longa duração (60 dias),
+gerado pela troca `fb_exchange_token`; renovar antes de expirar. Vive no `.env`
+local e no secret do GitHub Actions (o cron lê de lá). App Meta: `claude-garimpo`.
+
+Cobertura: só resolve quando o facebook do lead já é **page_id numérico**. Quando
+vem como **slug** (`facebook.com/nomedaloja`), resolver slug→id exige
+`pages_read_engagement` / **Page Public Content Access (PPCA)** — sem isso a fonte
+devolve `None` (desconhecido, nunca falso-positivo).
+
+**NÃO pedir PPCA por app review para este projeto.** Investigado e descartado:
+
+1. O único uso permitido do PPCA é "analisar e/ou exibir publicações e interações
+   nas Páginas". Resolver id para checar anúncio (prospecção) não é isso →
+   rejeição quase certa.
+2. Os Platform Terms da Meta proíbem montar base/serviço de prospecção sobre dado
+   da plataforma e transferir dado coletado a terceiros.
+3. O app que pediria o PPCA é o **mesmo** que carrega o token do Ad Library já
+   funcionando; um caso de uso de prospecção rejeitado pode sinalizar/derrubar o
+   app e quebrar o motor que já roda.
+
+Lead com slug fica neutro de propósito. Brecha futura de baixa prioridade:
+scraping **deslogado** do page_id (decisão *Meta v. Bright Data*, jan/2024, fora
+dos Termos) — mas bate em login wall, exige browser headless e é frágil; contra a
+regra offline-first. Não vale agora.
+
 Maps (descoberta) tem o `grid.py` (contorna o teto de ~120 resultados via
 subdivisão adaptativa) — lógica pura, usada pela captação.
 
