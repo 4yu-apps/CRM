@@ -128,6 +128,10 @@ export interface Lead {
   // Data de abertura da empresa (BrasilAPI). Alimenta o sinal "negocio novo".
   opened_on?: string | null;
   company_status?: string | null;
+  // firmografia gratis da BrasilAPI.
+  porte?: string | null;
+  capital_social?: number | null;
+  socios_count?: number | null;
 
   score: number | null;
   score_reason: ScoreReason | null;

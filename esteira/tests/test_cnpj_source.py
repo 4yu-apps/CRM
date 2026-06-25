@@ -1,5 +1,6 @@
 from garimpo_esteira.models import Lead
 from garimpo_esteira.sources import CnpjSource
+from garimpo_esteira.sources.cnpj import _parse_brasilapi
 
 FAKE = {
     "11222333000144": {
@@ -23,6 +24,21 @@ def test_cnpj_source_yields_findings():
     assert by_field["phone"].source == "cnpj_brasilapi"
     assert by_field["owner_name"].value == "Marina Alves"
     assert by_field["email"].value == "contato@studiobella.com.br"
+
+
+def test_brasilapi_extrai_firmografia():
+    data = {
+        "porte": "ME",
+        "capital_social": 5000,
+        "qsa": [{"nome_socio": "Joao"}, {"nome_socio": "Maria"}],
+    }
+    fields = {
+        f.field_name: f.value
+        for f in _parse_brasilapi(data, "cnpj_brasilapi")
+    }
+    assert fields["porte"] == "ME"
+    assert fields["capital_social"] == "5000"
+    assert fields["socios_count"] == "2"
 
 
 def test_cnpj_source_without_cnpj_is_silent():

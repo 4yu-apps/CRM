@@ -20,7 +20,7 @@ _LEAD_COLS = (
     "instagram", "facebook", "website", "maps_place_id", "maps_url", "rating", "reviews_count",
     "lat", "lng", "opening_hours",
     "category", "address", "neighborhood", "city", "state", "owner_name", "opt_out",
-    "opened_on", "company_status",
+    "opened_on", "company_status", "porte", "capital_social", "socios_count",
     "score", "score_reason", "service_target", "ads_active",
     "site_signals", "social_signals", "match_rate",
     "suggested_value", "suggested_value_reason",

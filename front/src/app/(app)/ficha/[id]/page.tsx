@@ -18,7 +18,6 @@ import {
   ForkKnife,
   Hamburger,
   Info,
-  MagnifyingGlass,
   MapPin,
   NotePencil,
   PawPrint,
@@ -195,9 +194,6 @@ function fbUrl(handle?: string | null): string | undefined {
   if (!h) return undefined;
   return /^https?:\/\//i.test(h) ? h : `https://facebook.com/${h}`;
 }
-// Biblioteca de Anuncios da Meta JA pesquisada pelo negocio (Brasil, todos os
-// anuncios). Sem API: e a checagem manual — abre o site publico (sem login) com
-// o nome do negocio (ou @ do Instagram) pro Eduardo ver se o lead anuncia.
 function adLibraryUrl(lead: { business_name: string | null; instagram: string | null }): string | undefined {
   const term = (lead.business_name || lead.instagram || "").replace(/^@/, "").trim();
   if (!term) return undefined;
@@ -267,6 +263,47 @@ function SiteSignalsPanel({ signals, since }: { signals: SiteSignals; since?: st
   );
 }
 
+type SignalFact = {
+  label: string;
+  value: string;
+  href?: string;
+};
+
+function SignalSection({ title, facts }: { title: string; facts: SignalFact[] }) {
+  if (facts.length === 0) return null;
+  return (
+    <div className="border-t border-border first:border-t-0">
+      <div className="bg-surface-2/65 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-faint">
+        {title}
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2">
+        {facts.map((fact) => (
+          <div
+            key={fact.label}
+            className="min-w-0 border-t border-border px-4 py-3 first:border-t-0 sm:[&:nth-child(-n+2)]:border-t-0 sm:[&:nth-child(even)]:border-l"
+          >
+            <div className="text-[11.5px] text-muted-foreground">{fact.label}</div>
+            {fact.href ? (
+              <a
+                href={fact.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-0.5 block truncate text-[13.5px] font-semibold text-brand hover:underline"
+              >
+                {fact.value}
+              </a>
+            ) : (
+              <div className="mt-0.5 break-words text-[13.5px] font-semibold text-ink">
+                {fact.value}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function RawSignalsPanel({ lead }: { lead: Lead }) {
   const social = lead.social_signals ?? {};
   const platforms = social.ad_platforms ?? lead.site_signals?.ad_platforms ?? [];
@@ -281,87 +318,94 @@ function RawSignalsPanel({ lead }: { lead: Lead }) {
     ...(lead.site_signals?.has_linkedin ? ["LinkedIn"] : []),
   ];
   const adsActive = social.ads_active ?? lead.ads_active;
-  const coords = lead.lat != null && lead.lng != null
-    ? `${lead.lat.toFixed(5)}, ${lead.lng.toFixed(5)}`
-    : "-";
+  const adHref = adLibraryUrl(lead);
   const mapHref = lead.lat != null && lead.lng != null
     ? `https://www.google.com/maps?q=${lead.lat},${lead.lng}`
     : undefined;
 
-  const groups = [
-    {
-      title: "Reputação",
-      rows: [
-        ["Nota no Google", lead.rating == null ? "-" : `${lead.rating.toLocaleString("pt-BR")} / 5`],
-        ["Avaliações", fmtNumber(lead.reviews_count)],
-      ],
-    },
-    {
-      title: "Social",
-      rows: [
-        ["Seguidores", fmtNumber(social.followers)],
-        ["Frequência", social.post_freq_label ?? "-"],
-        ["Última postagem", fmtDateOnly(social.last_post)],
-        ["Instagram", social.ig_status === "parado" ? "Parado" : social.ig_status === "ativo" ? "Ativo" : "Não sei"],
-        ["Interações médias", fmtNumber(social.engagement)],
-        ["Outros canais", channels.length ? channels.join(", ") : "-"],
-      ],
-    },
-    {
-      title: "Anúncio",
-      rows: [
-        ["Anuncia?", adsActive == null ? "Não sei" : adsActive ? "Sim" : "Ainda não"],
-        ["Anúncios ativos", fmtNumber(social.ads_count)],
-        ["Desde quando", fmtDateOnly(social.ads_since)],
-        ["Plataformas", platforms.length ? platforms.map((p) => platformLabels[p] ?? p).join(", ") : "-"],
-      ],
-    },
-    {
-      title: "Negócio",
-      rows: [
-        ["Data de abertura", fmtDateOnly(lead.opened_on)],
-        ["Situação cadastral", lead.company_status ?? "-"],
-        ["Categoria / CNAE", lead.category ?? "-"],
-        ["Funcionamento", lead.opening_hours ?? "-"],
-      ],
-    },
-    {
-      title: "Contato",
-      rows: [
-        ["Dono (anotado)", lead.owner_name ?? "-"],
-        ["Telefone", fmtPhone(lead.phone)],
-        ["WhatsApp", lead.whatsapp ? fmtPhone(lead.whatsapp) : "-"],
-        ["E-mail", lead.email ?? "-"],
-        ["Site", lead.website ?? "Não tem"],
-      ],
-    },
+  const reputation: SignalFact[] = [
+    ...(lead.rating != null
+      ? [{ label: "Nota no Google", value: `${lead.rating.toLocaleString("pt-BR")} / 5` }]
+      : []),
+    ...(lead.reviews_count != null
+      ? [{ label: "Avaliações", value: fmtNumber(lead.reviews_count) }]
+      : []),
   ];
+  const socialFacts: SignalFact[] = [
+    ...(social.followers != null
+      ? [{ label: "Seguidores", value: fmtNumber(social.followers) }]
+      : []),
+    ...(social.post_freq_label
+      ? [{ label: "Ritmo de publicação", value: social.post_freq_label }]
+      : []),
+    ...(social.last_post
+      ? [{ label: "Última postagem", value: fmtDateOnly(social.last_post) }]
+      : []),
+    ...(social.ig_status
+      ? [{ label: "Saúde do perfil", value: social.ig_status === "parado" ? "Parado" : "Ativo" }]
+      : []),
+    ...(social.engagement != null
+      ? [{ label: "Interações médias", value: fmtNumber(social.engagement) }]
+      : []),
+    ...(channels.length
+      ? [{ label: "Outros canais", value: channels.join(", ") }]
+      : []),
+  ];
+  const adFacts: SignalFact[] = [
+    ...(adsActive != null
+      ? [{ label: "Anuncia?", value: adsActive ? "Sim" : "Ainda não" }]
+      : []),
+    ...(social.ads_count != null
+      ? [{ label: "Anúncios ativos", value: fmtNumber(social.ads_count) }]
+      : []),
+    ...(social.ads_since
+      ? [{ label: "Anuncia desde", value: fmtDateOnly(social.ads_since) }]
+      : []),
+    ...(platforms.length
+      ? [{ label: "Plataformas", value: platforms.map((p) => platformLabels[p] ?? p).join(", ") }]
+      : []),
+    ...(adHref
+      ? [{ label: "Verificação manual", value: "Conferir na Biblioteca da Meta", href: adHref }]
+      : []),
+  ];
+  const businessFacts: SignalFact[] = [
+    ...(lead.opened_on
+      ? [{ label: "Data de abertura", value: fmtDateOnly(lead.opened_on) }]
+      : []),
+    ...(lead.company_status
+      ? [{ label: "Situação cadastral", value: lead.company_status }]
+      : []),
+    ...(lead.porte ? [{ label: "Porte", value: lead.porte }] : []),
+    ...(lead.capital_social != null
+      ? [{ label: "Capital social", value: fmtBRL(lead.capital_social) }]
+      : []),
+    ...(lead.socios_count != null
+      ? [{ label: "Sócios", value: fmtNumber(lead.socios_count) }]
+      : []),
+    ...(lead.opening_hours
+      ? [{ label: "Funcionamento", value: lead.opening_hours }]
+      : []),
+  ];
+  const mapFacts: SignalFact[] = lead.lat != null && lead.lng != null
+    ? [{
+        label: "Localização",
+        value: `${lead.lat.toFixed(5)}, ${lead.lng.toFixed(5)}`,
+        href: mapHref,
+      }]
+    : [];
 
   return (
     <section className="overflow-hidden rounded-[16px] border border-border bg-card shadow-[var(--shadow-sm)]">
       <div className="flex items-center gap-2 border-b border-border bg-surface-2 px-4 py-3">
         <Info size={16} weight="fill" className="text-brand" />
         <h2 className="text-[12px] font-bold uppercase tracking-wider text-ink">Sinais do lead</h2>
-        <span className="ml-auto text-[11px] text-faint">dados brutos, sem IA</span>
+        <span className="ml-auto text-[11px] text-faint">dados complementares, sem IA</span>
       </div>
-      <div className="grid grid-cols-1 gap-px bg-border sm:grid-cols-2">
-        {groups.map((group) => (
-          <div key={group.title} className="bg-card">
-            <div className="border-b border-border bg-surface-2/70 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-faint">
-              {group.title}
-            </div>
-            {group.rows.map(([label, value]) => (
-              <DataRow key={label} label={label} value={value} />
-            ))}
-          </div>
-        ))}
-        <div className="bg-card sm:col-span-2">
-          <div className="border-b border-border bg-surface-2/70 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-faint">
-            Mapa
-          </div>
-          <DataRow label="Coordenadas" value={coords} href={mapHref} />
-        </div>
-      </div>
+      <SignalSection title="Reputação" facts={reputation} />
+      <SignalSection title="Presença social" facts={socialFacts} />
+      <SignalSection title="Anúncios" facts={adFacts} />
+      <SignalSection title="Empresa" facts={businessFacts} />
+      <SignalSection title="Mapa" facts={mapFacts} />
     </section>
   );
 }
@@ -746,27 +790,8 @@ export default function FichaPage() {
                 <DataRow label="Instagram" value={lead.instagram ?? "-"} href={igUrl(lead.instagram)} prov={provOf(provenance, "instagram")} />
                 <DataRow label="Facebook" value={lead.facebook ?? "-"} href={fbUrl(lead.facebook)} prov={provOf(provenance, "facebook")} />
                 <DataRow label="CNPJ" value={fmtCnpj(lead.cnpj)} prov={provOf(provenance, "cnpj")} />
+                <DataRow label="Categoria / CNAE" value={lead.category ?? "-"} prov={provOf(provenance, "category")} />
                 <DataRow label="Site" value={lead.website ? lead.website : "Não tem"} href={siteUrl(lead.website)} prov={provOf(provenance, "website")} />
-                <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
-                  <span className="text-[13.5px] text-muted-foreground">Já anuncia?</span>
-                  <div className="flex items-center gap-2 text-right">
-                    <span className="text-[13.5px] font-semibold text-ink">
-                      {lead.ads_active == null ? "Não sei" : lead.ads_active ? "Sim" : "Ainda não"}
-                    </span>
-                    {adLibraryUrl(lead) && (
-                      <a
-                        href={adLibraryUrl(lead)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title="Conferir na Biblioteca de Anúncios da Meta (busca pelo nome do negócio)"
-                        aria-label="Conferir na Biblioteca de Anúncios da Meta"
-                        className="flex size-6 items-center justify-center rounded-md text-faint transition-colors hover:bg-accent hover:text-brand"
-                      >
-                        <MagnifyingGlass size={14} weight="bold" />
-                      </a>
-                    )}
-                  </div>
-                </div>
                 <DataRow label="Endereço" value={lead.address ?? "-"} prov={provOf(provenance, "address")} />
                 <DataRow label="Bairro" value={lead.neighborhood ?? "-"} prov={provOf(provenance, "neighborhood")} />
                 <DataRow label="Cidade / UF" value={[lead.city, lead.state].filter(Boolean).join(" / ") || "-"} />

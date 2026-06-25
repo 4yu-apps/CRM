@@ -111,6 +111,18 @@ def _parse_brasilapi(data: dict, source: str) -> list[Finding]:
     if cnae:
         findings.append(Finding("category", source, cnae, 0.6))
 
+    porte = str(data.get("porte") or data.get("descricao_porte") or "").strip()
+    if porte:
+        findings.append(Finding("porte", source, porte, 1.0))
+
+    capital = data.get("capital_social")
+    if capital not in (None, ""):
+        findings.append(Finding("capital_social", source, str(capital), 1.0))
+
+    qsa = data.get("qsa") or data.get("socios") or []
+    if isinstance(qsa, list) and qsa:
+        findings.append(Finding("socios_count", source, str(len(qsa)), 1.0))
+
     return findings
 
 

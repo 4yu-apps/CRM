@@ -24,7 +24,7 @@ ServiceTarget = Literal["trafego", "automacao", "ambos", "design", "marketing", 
 ENRICHABLE_FIELDS = (
     "phone", "whatsapp", "email", "instagram", "facebook", "website",
     "owner_name", "cnpj", "places_detailed_at", "opened_on",
-    "company_status", "category",
+    "company_status", "category", "porte", "capital_social", "socios_count",
 )
 
 
@@ -76,6 +76,10 @@ class Lead:
     # situacao cadastral na Receita (ATIVA/BAIXADA/INAPTA/SUSPENSA/NULA). Empresa
     # nao-ATIVA = corte duro no score (nao prospectar negocio morto).
     company_status: str | None = None
+    # firmografia gratis da BrasilAPI (ja vinha na resposta, era descartada).
+    porte: str | None = None
+    capital_social: float | None = None
+    socios_count: int | None = None
     # carimbo do enriquecimento via Google Places Details (contador da cota diaria)
     places_detailed_at: str | None = None
 
