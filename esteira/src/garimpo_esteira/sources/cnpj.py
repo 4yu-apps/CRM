@@ -1,7 +1,11 @@
-"""Fonte CNPJ — BrasilAPI (pública, gratuita). Núcleo do enriquecimento.
+"""Fonte CNPJ — waterfall de APIs publicas gratuitas. Nucleo do enriquecimento.
 
-Entrega telefone, e-mail e nome do sócio a partir do CNPJ. É o que cumpre os
-critérios de aceite: >=80% com telefone e meta de nome do dono.
+Entrega telefone, e-mail, nome do socio e data de abertura a partir do CNPJ.
+E o que cumpre os criterios de aceite: >=80% com telefone e meta de nome do dono.
+
+O3 (waterfall): tenta BrasilAPI primeiro; se ela cair ou bater limite, cai pra
+ReceitaWS (cnpj_ws). Tudo gratis. A proveniencia segue por fonte: cada achado
+leva o nome de quem o achou (cnpj_brasilapi | cnpj_ws).
 """
 from __future__ import annotations
 
@@ -14,16 +18,28 @@ from ..normalize import normalize_cnpj
 from ..validation import clean
 
 BRASILAPI_URL = "https://brasilapi.com.br/api/cnpj/v1/{cnpj}"
+RECEITAWS_URL = "https://receitaws.com.br/v1/cnpj/{cnpj}"
 
 # fetch(cnpj_14_digitos) -> dict bruto da API | None
 FetchFn = Callable[[str], dict | None]
+# provedor da cascata: (nome_da_fonte, fetch). O nome escolhe o parser e vira a
+# proveniencia do achado.
+Provider = tuple[str, FetchFn]
 
 
 def brasilapi_fetch(cnpj: str, *, client: httpx.Client | None = None, timeout: float = 10.0) -> dict | None:
+    return _get_json(BRASILAPI_URL.format(cnpj=cnpj), client=client, timeout=timeout)
+
+
+def receitaws_fetch(cnpj: str, *, client: httpx.Client | None = None, timeout: float = 10.0) -> dict | None:
+    return _get_json(RECEITAWS_URL.format(cnpj=cnpj), client=client, timeout=timeout)
+
+
+def _get_json(url: str, *, client: httpx.Client | None, timeout: float) -> dict | None:
     own = client is None
     client = client or httpx.Client(timeout=timeout, headers={"User-Agent": "garimpo-esteira"})
     try:
-        resp = client.get(BRASILAPI_URL.format(cnpj=cnpj))
+        resp = client.get(url)
         if resp.status_code != 200:
             return None
         return resp.json()
@@ -37,45 +53,95 @@ def brasilapi_fetch(cnpj: str, *, client: httpx.Client | None = None, timeout: f
 class CnpjSource:
     name = "cnpj_brasilapi"
 
-    def __init__(self, fetch: FetchFn | None = None):
-        self._fetch = fetch or brasilapi_fetch
+    def __init__(self, fetch: FetchFn | None = None, *, providers: list[Provider] | None = None):
+        if providers is not None:
+            self._providers = list(providers)
+        elif fetch is not None:
+            # fetch injetado = um provedor so (fixture/teste), parseado como BrasilAPI
+            self._providers = [("cnpj_brasilapi", fetch)]
+        else:
+            # waterfall real: BrasilAPI primeiro, ReceitaWS (cnpj_ws) de reserva
+            self._providers = [
+                ("cnpj_brasilapi", brasilapi_fetch),
+                ("cnpj_ws", receitaws_fetch),
+            ]
 
     def enrich(self, lead: Lead) -> list[Finding]:
         cnpj = normalize_cnpj(lead.cnpj)
         if not cnpj:
             return []
-        data = self._fetch(cnpj)
-        if not data:
-            return []
+        for source, fetch in self._providers:
+            try:
+                data = fetch(cnpj)
+            except Exception:
+                data = None  # provedor instavel nao derruba a cascata: tenta o proximo
+            if not data:
+                continue
+            findings = _PARSERS[source](data, source)
+            if findings:
+                return findings
+        return []
 
-        findings: list[Finding] = []
 
-        phone_raw = data.get("ddd_telefone_1") or data.get("ddd_telefone_2")
-        phone = clean("phone", phone_raw)
-        if phone:
-            findings.append(Finding("phone", self.name, phone, 0.8))
+def _parse_brasilapi(data: dict, source: str) -> list[Finding]:
+    findings: list[Finding] = []
 
-        email = clean("email", data.get("email"))
-        if email:
-            findings.append(Finding("email", self.name, email, 0.6))
+    phone = clean("phone", data.get("ddd_telefone_1") or data.get("ddd_telefone_2"))
+    if phone:
+        findings.append(Finding("phone", source, phone, 0.8))
 
-        owner = _first_partner(data) or data.get("razao_social")
-        owner = clean("owner_name", owner)
-        if owner:
-            conf = 0.85 if _first_partner(data) else 0.5
-            findings.append(Finding("owner_name", self.name, owner, conf))
+    email = clean("email", data.get("email"))
+    if email:
+        findings.append(Finding("email", source, email, 0.6))
 
-        # data de abertura (O1 "negocio novo"): vem em data_inicio_atividade.
-        opened = _normalize_open_date(data.get("data_inicio_atividade"))
-        if opened:
-            findings.append(Finding("opened_on", self.name, opened, 1.0))
+    partner = _first_partner(data)
+    owner = clean("owner_name", partner or data.get("razao_social"))
+    if owner:
+        findings.append(Finding("owner_name", source, owner, 0.85 if partner else 0.5))
 
-        return findings
+    opened = _normalize_open_date(data.get("data_inicio_atividade"))
+    if opened:
+        findings.append(Finding("opened_on", source, opened, 1.0))
+
+    return findings
+
+
+def _parse_receitaws(data: dict, source: str) -> list[Finding]:
+    # ReceitaWS: status OK/ERROR; campos telefone, email, nome (razao social),
+    # qsa[].nome, abertura (DD/MM/YYYY). Status ERROR = CNPJ recusado/limite.
+    if not isinstance(data, dict) or str(data.get("status", "")).upper() == "ERROR":
+        return []
+    findings: list[Finding] = []
+
+    phone = clean("phone", data.get("telefone"))
+    if phone:
+        findings.append(Finding("phone", source, phone, 0.8))
+
+    email = clean("email", data.get("email"))
+    if email:
+        findings.append(Finding("email", source, email, 0.6))
+
+    partner = _first_partner(data)
+    owner = clean("owner_name", partner or data.get("nome"))
+    if owner:
+        findings.append(Finding("owner_name", source, owner, 0.85 if partner else 0.5))
+
+    opened = _normalize_open_date(data.get("abertura"))
+    if opened:
+        findings.append(Finding("opened_on", source, opened, 1.0))
+
+    return findings
+
+
+_PARSERS: dict[str, Callable[[dict, str], list[Finding]]] = {
+    "cnpj_brasilapi": _parse_brasilapi,
+    "cnpj_ws": _parse_receitaws,
+}
 
 
 def _normalize_open_date(raw: str | None) -> str | None:
     """Normaliza a data de abertura pra ISO YYYY-MM-DD. Aceita ISO (BrasilAPI)
-    e DD/MM/YYYY. Qualquer coisa fora disso vira None (campo ausente, nao erro)."""
+    e DD/MM/YYYY (ReceitaWS). Fora disso vira None (campo ausente, nao erro)."""
     if not raw or not isinstance(raw, str):
         return None
     s = raw.strip()[:10]

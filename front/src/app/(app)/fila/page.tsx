@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import {
   ArrowRight,
   Archive,
+  BellSlash,
   Check,
   CheckCircle,
   SkipForward,
@@ -157,8 +158,10 @@ export default function FilaPage() {
 
   // Base: tudo que esta pronto pra revisar (e nao arquivado). Dela saem o filtro
   // de ramo e a ordem.
+  // O6 (LGPD): quem pediu pra nao receber (opt_out) sai da fila. O banco ja trava
+  // o envio; aqui tiramos da vista pra ninguem revisar/aprovar por engano.
   const baseQueue = useMemo(
-    () => leads.filter((l) => l.status === "rascunho_pronto" && !l.archived),
+    () => leads.filter((l) => l.status === "rascunho_pronto" && !l.archived && !l.opt_out),
     [leads],
   );
   const ramoOptions = useMemo(() => {
@@ -302,6 +305,29 @@ export default function FilaPage() {
       });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao arquivar");
+    }
+  }, [cur, repo, refresh]);
+
+  // O6 "nao perturbar" (LGPD): marca opt_out. O lead sai da fila na hora, o banco
+  // trava qualquer envio e o backfill/rascunho ja o ignoram. Reversivel pelo desfazer.
+  const naoPerturbar = useCallback(async () => {
+    if (!cur) return;
+    const target = cur;
+    try {
+      await repo.setOptOut(target.id, true);
+      await refresh();
+      toast.success("Marcado como não perturbar. Sai da fila e não recebe contato.", {
+        action: {
+          label: "Desfazer",
+          onClick: async () => {
+            await repo.setOptOut(target.id, false);
+            await refresh();
+            toast.message("Voltou pra fila.");
+          },
+        },
+      });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao marcar não perturbar");
     }
   }, [cur, repo, refresh]);
 
@@ -657,6 +683,13 @@ export default function FilaPage() {
                 className="flex flex-1 items-center justify-center gap-2 rounded-[14px] border border-border-2 bg-card p-3 text-[13.5px] font-semibold text-ink-2 transition-colors hover:bg-surface-2"
               >
                 <Archive size={16} weight="bold" /> Arquivar
+              </button>
+              <button
+                onClick={() => void naoPerturbar()}
+                title="Não perturbar (LGPD): sai da fila e não recebe contato"
+                className="flex flex-1 items-center justify-center gap-2 rounded-[14px] border border-border-2 bg-card p-3 text-[13.5px] font-semibold text-ink-2 transition-colors hover:bg-surface-2"
+              >
+                <BellSlash size={16} weight="bold" /> Não perturbar
               </button>
             </div>
             {/* linha principal: descartar + aprovar */}
