@@ -11,6 +11,7 @@ import {
   X,
   UserCircle,
   ClockCounterClockwise,
+  WarningCircle,
 } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth";
@@ -178,6 +179,25 @@ export default function AdminPage() {
             {profiles.length} {profiles.length === 1 ? "perfil" : "perfis"}
           </span>
         )}
+      </div>
+
+      {/* Lembrete: tokens Meta de 60 dias (Ad Library + Instagram).
+          Ao renovar, atualize a data abaixo e o esteira/README.md. */}
+      <div className="mb-6 flex flex-col gap-3 rounded-[14px] border border-amber-200 bg-amber-50 px-5 py-4 sm:flex-row sm:items-center">
+        <WarningCircle size={20} weight="fill" className="flex-none text-amber-500" />
+        <div className="flex-1 text-[13px] leading-snug text-amber-900">
+          <span className="font-bold">Integrações Meta:</span> os tokens do Ad Library e do
+          Instagram expiram a cada ~60 dias (próximo vencimento{" "}
+          <strong>~24/08/2026</strong>). Revalide antes pra não parar o enriquecimento da esteira.
+        </div>
+        <a
+          href="https://developers.facebook.com/tools/explorer/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex-none rounded-[11px] border border-amber-300 bg-card px-3.5 py-2 text-[12.5px] font-semibold text-amber-900 transition-colors hover:bg-amber-100"
+        >
+          Revalidar token →
+        </a>
       </div>
 
       {/* Estado de loading */}

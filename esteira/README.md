@@ -69,6 +69,35 @@ scraping **deslogado** do page_id (decisão *Meta v. Bright Data*, jan/2024, for
 dos Termos) — mas bate em login wall, exige browser headless e é frágil; contra a
 regra offline-first. Não vale agora.
 
+### Instagram Business Discovery — token e conta
+
+Sinal "seguidores + ativo/parado" via `business_discovery`. App Meta **SEPARADO**
+(`garimpo-rede social`, não o do Ad Library). Conta relay = @4yumkt (Business),
+vinculada a uma Página FB. Envs `INSTAGRAM_BUSINESS_ID` + `INSTAGRAM_TOKEN`.
+Pegadinhas que travaram a 1ª vez: (1) precisa `instagram_manage_insights` além
+de `instagram_basic` (só o basic dá `#10`); (2) Página na "nova experiência" não
+sai no `me/accounts` — pega o id pelo nó da Página
+(`/{page_id}?fields=instagram_business_account`).
+
+### Renovar os tokens Meta (a cada ~60 dias)
+
+Ad Library e Instagram usam **user tokens de 60 dias**. Vencimento atual:
+**~2026-08-24**. Expirado, a fonte fica inerte (não quebra, só para de emitir o
+sinal). Pra renovar cada um:
+
+1. Graph API Explorer (https://developers.facebook.com/tools/explorer/) → escolhe
+   o app (Ad Library = `claude-garimpo`; IG = `garimpo-rede social`) → marca as
+   permissões → **Generate Access Token** (IG: re-seleciona a Página).
+2. Troca curto → longo:
+   `GET /oauth/access_token?grant_type=fb_exchange_token&client_id=APP_ID&client_secret=APP_SECRET&fb_exchange_token=TOKEN_CURTO`
+   (ids/secrets no `.env`: `FACEBOOK_*` / `IG_*`).
+3. Põe o token longo no `.env` **e** no secret do GitHub (`META_AD_LIBRARY_TOKEN`
+   / `INSTAGRAM_TOKEN`). Confere a validade no debugger:
+   https://developers.facebook.com/tools/debug/accesstoken/
+
+O CRM mostra um lembrete na área **Admin** com o link de revalidação. Ao renovar,
+atualize a data nesse aviso (`front/src/app/(app)/admin/page.tsx`) e aqui.
+
 Maps (descoberta) tem o `grid.py` (contorna o teto de ~120 resultados via
 subdivisão adaptativa) — lógica pura, usada pela captação.
 
