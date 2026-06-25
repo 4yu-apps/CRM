@@ -10,6 +10,8 @@ export interface AuthUser {
   // Nome de exibicao (do user_metadata, coletado no onboarding). Usado na
   // saudacao em vez de derivar do e-mail.
   name: string | null;
+  // Foto de perfil (user_metadata.avatar_url). null = mostra iniciais.
+  avatar_url: string | null;
 }
 
 interface AuthContextValue {
@@ -24,6 +26,8 @@ interface AuthContextValue {
   isAdmin: boolean;
   // Reavalia o perfil (chamar depois de salvar a Configuracao pra liberar o gate)
   refreshProfile: () => Promise<void>;
+  // Recarrega o usuario da sessao (chamar depois de mudar nome/foto na conta)
+  refreshUser: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
@@ -33,7 +37,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 // No modo mock nao ha login real: entra como usuario demo.
-const DEMO_USER: AuthUser = { id: "demo", email: "demo@garimpo.local", name: null };
+const DEMO_USER: AuthUser = { id: "demo", email: "demo@garimpo.local", name: null, avatar_url: null };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const mode = activeDataSource();
@@ -157,9 +161,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsAdmin(false);
   };
 
+  // Re-le o usuario da sessao apos editar nome/foto na pagina de conta, pra a
+  // UI (saudacao, avatar no app-shell) refletir na hora.
+  const refreshUser = useCallback(async () => {
+    if (mode !== "supabase") return;
+    const { data } = await getSupabase().auth.getUser();
+    setUser(data.user ? toUser({ user: data.user }) : null);
+  }, [mode]);
+
   return (
     <AuthContext.Provider
-      value={{ user, session, loading, mode, hasProfile, isAdmin, refreshProfile, signIn, signUp, signInWithGoogle, signOut }}
+      value={{ user, session, loading, mode, hasProfile, isAdmin, refreshProfile, refreshUser, signIn, signUp, signInWithGoogle, signOut }}
     >
       {children}
     </AuthContext.Provider>
@@ -167,13 +179,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 }
 
 function toUser(
-  sess: { user: { id: string; email?: string; user_metadata?: { full_name?: string | null } } } | null,
+  sess: {
+    user: {
+      id: string;
+      email?: string;
+      user_metadata?: { full_name?: string | null; avatar_url?: string | null };
+    };
+  } | null,
 ): AuthUser | null {
   return sess
     ? {
         id: sess.user.id,
         email: sess.user.email ?? null,
         name: sess.user.user_metadata?.full_name ?? null,
+        avatar_url: sess.user.user_metadata?.avatar_url ?? null,
       }
     : null;
 }

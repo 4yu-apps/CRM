@@ -581,13 +581,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
           {collapsed ? (
             <div className="flex flex-col items-center gap-2">
-              <div
-                className="flex size-9 flex-none items-center justify-center rounded-full text-sm font-bold text-white"
-                style={{ background: "var(--grad)" }}
-                title={user?.email ?? "demo"}
+              <Link
+                href="/conta"
+                title="Minha conta"
+                aria-label="Minha conta"
+                className="flex size-9 flex-none items-center justify-center overflow-hidden rounded-full text-sm font-bold text-white transition-transform hover:-translate-y-0.5"
+                style={
+                  user?.avatar_url
+                    ? { backgroundImage: `url("${user.avatar_url}")`, backgroundSize: "cover", backgroundPosition: "center" }
+                    : { background: "var(--grad)" }
+                }
               >
-                {(user?.email ?? "?").slice(0, 2).toUpperCase()}
-              </div>
+                {!user?.avatar_url && (user?.email ?? "?").slice(0, 2).toUpperCase()}
+              </Link>
               <button
                 type="button"
                 aria-label="Sair"
@@ -600,16 +606,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           ) : (
             <div className="flex items-center gap-2 px-2.5 py-2">
-              <div
-                className="flex size-9 flex-none items-center justify-center rounded-full text-sm font-bold text-white"
-                style={{ background: "var(--grad)" }}
+              <Link
+                href="/conta"
+                title="Minha conta"
+                className="-m-1 flex min-w-0 flex-1 items-center gap-2 rounded-lg p-1 transition-colors hover:bg-accent/60"
               >
-                {(user?.email ?? "?").slice(0, 2).toUpperCase()}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-bold">{user?.email ?? "demo"}</div>
-                <div className="text-xs text-faint">Conta ativa</div>
-              </div>
+                <div
+                  className="flex size-9 flex-none items-center justify-center overflow-hidden rounded-full text-sm font-bold text-white"
+                  style={
+                    user?.avatar_url
+                      ? { backgroundImage: `url("${user.avatar_url}")`, backgroundSize: "cover", backgroundPosition: "center" }
+                      : { background: "var(--grad)" }
+                  }
+                >
+                  {!user?.avatar_url && (user?.email ?? "?").slice(0, 2).toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-bold">{user?.name ?? user?.email ?? "demo"}</div>
+                  <div className="text-xs text-faint">Minha conta</div>
+                </div>
+              </Link>
               <button
                 type="button"
                 aria-label="Sair"
