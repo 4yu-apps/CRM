@@ -96,3 +96,78 @@ subagents NÃO acelera além do teto e arrisca 429. Use assim:
 - Não re-descobrir (geo). Não forçar ReceitaWS. Não estourar Places (guard já existe).
 - Re-score NÃO pode transicionar status (usar update direto, não `score_one`).
 - Token Meta expira 2026-08-24 — fazer antes; depois IG/ad voltam a vir vazios.
+
+---
+
+# Parte 2 — Dados na ficha + o que o Gemini considera (próxima sessão)
+
+Capturamos muito sinal, mas quem LÊ a ficha (humano) quase não vê nada além do
+dono e do breakdown, e o Gemini ignora alguns sinais. A MENSAGEM já está boa — o
+foco aqui é **dado bruto pro humano** + ajuste cirúrgico no Gemini só pra tráfego.
+**Implementar a Parte 2 ANTES da Parte 1** (reprocessar): pra quando os 2034
+encherem, a ficha já saiba ler; e a frequência de postagem (B) exige o probe novo.
+
+## Respostas diretas (as 3 perguntas)
+**1. O que o Gemini CONSIDERA (e sai na msg, que aparece no front):** reputação
+(sem número cru), tem site/qualidade (mobile/perf/stack), IG existe/parado,
+anuncia?+plataformas, temas de review (elogio), categoria (cue por ramo), nome de
+QUEM ENVIA (`sender_name`). **Ajuste novo:** intensidade de anúncio (N anúncios /
+desde quando) **só quando o alvo é tráfego/ambos** (é o gestor de tráfego que liga
+pra isso). NÃO usa nome do dono (não saudar pela pessoa) nem número cru de seguidores.
+
+**2. O que vem BRUTO (sem Gemini), direto no painel da ficha:** nº de seguidores,
+frequência de postagem + última postagem, nota, nº de avaliações, nº de anúncios +
+desde quando + plataformas, negócio novo (data de abertura), situação cadastral,
+horário de funcionamento, dono (anotado), sinais técnicos do site, lat/lng (mapa).
+São FATOS exibidos, sem IA.
+
+**3. Tudo importante já está no front? NÃO.** Hoje a ficha mostra só `owner_name`
++ breakdown + chips do site. Falta o painel de dados brutos (abaixo) e o tipo Lead
+do front nem tem os campos novos (followers/engagement/ads_count/opening_hours...).
+
+## A fazer
+### A. owner_name (dado sensível) — só ANOTAR, não alimentar o Gemini
+Exibir na ficha (já exibe "Dono / responsável"). **NÃO** mandar pro Gemini saudar
+pela pessoa: o CNPJ traz o sócio, mas não garante que é ele falando, e usar dado
+sensível pode incomodar. Confirmar que `build_prompt` NÃO usa owner_name (hoje não
+usa — manter assim).
+
+### B. IG: frequência de postagem (DADO pro humano)
+O probe já puxa `media.limit(5){timestamp,...}`. Subir pra `limit(12)` (mesma 1
+chamada, sem custo extra) e derivar, além do `last_post`:
+- `post_freq` (posts/semana na janela dos últimos posts) e
+- `post_freq_label` legível: "≈3x/semana", "≈1x/mês", "postou recentemente",
+  "parado há ~2 meses". (Não precisa virar pontuação; o LABEL basta pro humano.)
+Emitir junto de `followers`/`engagement`.
+
+### C. Armazenar pra exibir: jsonb `social_signals` (espelha o site_signals)
+1 migration: coluna `social_signals jsonb` (cascade always-update, igual
+site_signals). Conteúdo: {followers, media_count, last_post, post_freq,
+post_freq_label, engagement, ig_status, ads_active, ads_count, ads_since,
+ad_platforms}. Assim o front monta o painel de um campo só.
+Alternativa zero-migration: o front já carrega proveniência → montar o painel
+lendo de lá (mais trabalho no front; o jsonb é mais limpo).
+
+### D. Front: tipo Lead + painel "Sinais do lead" (DADOS, sem IA)
+- Tipo Lead (`types.ts`): adicionar os campos (ou `social_signals`).
+- Painel agrupado na ficha (reusar o padrão de chips de `site-signals.ts` + DataRow):
+  - **Reputação:** nota, nº avaliações.
+  - **Social:** seguidores, frequência + última postagem, IG ativo/parado, canais extras.
+  - **Anúncio:** anuncia?, N anúncios, desde quando, plataformas.
+  - **Negócio:** data de abertura (negócio novo), situação cadastral, categoria/CNAE, horário.
+  - **Contato:** dono (anotado), telefone/WhatsApp, email, site.
+  - **Mapa:** lat/lng (opcional, fase visual depois).
+
+### E. Gemini (msg já boa) — ajuste cirúrgico, baixa prioridade
+- Alimentar `ads_count`/`ads_since` no `build_prompt` SÓ no lens tráfego/ambos.
+- `instagram_status=parado` está no exemplo do prompt mas NÃO é alimentado como
+  sinal → passar (já temos o dado). Manter sem nome do dono e sem número cru.
+
+## Verificação (Parte 2)
+- Ficha de lead com IG mostra seguidores + frequência; lead que anuncia mostra N
+  anúncios + desde quando; negócio novo aparece como fato. Tudo SEM IA.
+- `pytest` verde (probe freq + social_signals). Front `tsc`/`lint`/`build` ok.
+
+## Ordem geral
+Parte 2 (B→C→D, depois E opcional) **primeiro**; só então Parte 1 (reprocessar os
+2034), pra os dados caírem num sistema que já os lê e exibe.
