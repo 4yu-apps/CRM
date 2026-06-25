@@ -10,16 +10,19 @@ import {
   MagnifyingGlass,
   MapTrifold,
   Shuffle,
+  Sparkle,
   Spinner,
   X,
 } from "@phosphor-icons/react";
 import { getRepo } from "@/lib/repo";
 import { useAuth } from "@/lib/auth";
+import { useLeads } from "@/hooks/use-leads";
 import { fetchEstados, fetchMunicipios } from "@/lib/ibge";
 import { geocodeCity, geocodeNeighborhood, stateCenter, type GeoPoint } from "@/lib/geocode";
 import { serviceOptionsForProfile } from "@/lib/professions";
 import { SERVICE_META } from "@/lib/service";
 import { RAMOS_DISPONIVEIS } from "@/lib/ramos";
+import { suggestSearches } from "@/lib/suggest-search";
 import { Dropdown } from "@/components/dropdown";
 import { CityAutocomplete } from "@/components/city-autocomplete";
 import { BairroAutocomplete } from "@/components/bairro-autocomplete";
@@ -147,6 +150,7 @@ function RamoChips({
 export default function BuscarPage() {
   const repo = getRepo();
   const { user } = useAuth();
+  const { leads } = useLeads();
 
   const [profile, setProfile] = useState<SearchProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -186,6 +190,9 @@ export default function BuscarPage() {
   // Opcoes de servico-alvo conforme a profissao configurada no perfil.
   const serviceOpts = useMemo(() => serviceOptionsForProfile(profile), [profile]);
 
+  // F5 — sugestoes derivadas dos leads reais: top 3 combos que mais fecham.
+  const suggestions = useMemo(() => suggestSearches(leads), [leads]);
+
   // Nichos oferecidos: os do perfil primeiro, depois os 20 ramos canonicos (sem repetir).
   const nicheOptions = useMemo(() => {
     return Array.from(new Set([...(profile?.niches ?? []), ...RAMOS_DISPONIVEIS]));
@@ -212,6 +219,21 @@ export default function BuscarPage() {
     const dias = Math.floor((Date.now() - +new Date(lastAt)) / (24 * 60 * 60 * 1000));
     return { maxPct, totalCount, dias };
   }, [city, uf, niches, coverage]);
+
+  // F5 — aplica sugestao no formulario
+  const aplicarSugestao = useCallback(
+    (s: ReturnType<typeof suggestSearches>[number]) => {
+      if (s.niche) setNiches([s.niche]);
+      if (s.city) {
+        setCity(s.city);
+        setUf(s.uf ?? "");
+      }
+      if (s.service) setService(s.service);
+      setNeighborhood("");
+      setBairroPoint(null);
+    },
+    [],
+  );
 
   // #8 — aplicar / salvar / remover preset
   const aplicarPreset = useCallback((p: SearchPreset) => {
@@ -538,6 +560,34 @@ export default function BuscarPage() {
             Escolha onde e o que garimpar e clique em buscar pra disparar na hora. O robô roda no
             servidor e os leads novos vão subindo na sua fila, e você acompanha aqui em tempo real.
           </p>
+
+          {/* F5 — Garimpe o que converte (so aparece quando ha sugestoes com dados suficientes) */}
+          {suggestions.length > 0 && (
+            <div className="mb-5 rounded-[13px] border border-brand/20 bg-brand-50 px-3.5 py-3">
+              <div className="mb-2 flex items-center gap-1.5 text-[11.5px] font-bold uppercase tracking-wider text-brand">
+                <Sparkle size={13} weight="fill" />
+                Garimpe o que converte
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {suggestions.map((s) => (
+                  <button
+                    key={s.label}
+                    type="button"
+                    onClick={() => aplicarSugestao(s)}
+                    title={`${s.fechados} fechado${s.fechados !== 1 ? "s" : ""} em ${s.enviados} enviado${s.enviados !== 1 ? "s" : ""}`}
+                    className="flex items-center gap-1.5 rounded-full border border-brand/30 bg-white px-3 py-1.5 text-[12.5px] font-semibold text-brand transition-colors hover:border-brand hover:bg-brand hover:text-white"
+                  >
+                    {s.label}
+                    <span className="rounded-full bg-brand/10 px-1.5 py-0.5 text-[11px] font-bold tabular-nums text-brand">
+                      {s.fechados > 0
+                        ? `${Math.round((s.fechados / s.enviados) * 100)}% fecham`
+                        : `${s.enviados} env.`}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Ramos (multi-selecao com chips) */}
           <div className="mb-4">
