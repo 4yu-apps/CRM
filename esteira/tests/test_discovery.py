@@ -1,5 +1,5 @@
 from garimpo_esteira.config import FIXTURES_DIR
-from garimpo_esteira.discovery import FixtureMapsSource, discover, result_to_lead
+from garimpo_esteira.discovery import FixtureMapsSource, PlacesMapsSource, discover, result_to_lead
 from garimpo_esteira.sink import JsonFileSink
 
 
@@ -118,3 +118,38 @@ def test_discover_fixture_br_nao_descartada(tmp_path):
     sink = JsonFileSink(tmp_path / "db.json")
     res = discover(sink, _maps(), ["pizzaria"], "owner")
     assert res["inserted"] == 3, "Fixtures BR nao devem ser descartadas pela trava Brasil"
+
+
+# ------------------------------------------------------------------
+# Fase 5: teto de custo no Places Text Search (SKU pago). Por-run: para de
+# buscar quando bate o limite (segue no proximo cron), evita runaway na fatura.
+# ------------------------------------------------------------------
+
+def test_places_text_search_respeita_teto_por_run():
+    src = PlacesMapsSource("key", max_pages=1, request_limit=2)
+    calls = {"n": 0}
+
+    def fake_page(term, token):
+        calls["n"] += 1
+        return ([{"displayName": {"text": f"Biz {calls['n']}"}}], None)
+
+    src._fetch_page = fake_page
+    src.search("a em Maringa")
+    src.search("b em Maringa")
+    src.search("c em Maringa")  # 3a barrada pelo teto de 2
+    assert calls["n"] == 2
+
+
+def test_places_text_search_sem_teto_quando_zero():
+    src = PlacesMapsSource("key", max_pages=1, request_limit=0)
+    calls = {"n": 0}
+
+    def fake_page(term, token):
+        calls["n"] += 1
+        return ([], None)
+
+    src._fetch_page = fake_page
+    src.search("a")
+    src.search("b")
+    src.search("c")
+    assert calls["n"] == 3

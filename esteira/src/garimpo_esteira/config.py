@@ -50,11 +50,15 @@ class Config:
     maps_mode: str = "fixture"        # fixture | places | overpass (OSM, gratis)
     maps_key: str | None = None
     maps_pages: int = 3               # paginas do Places por busca (~20 cada)
+    # teto de custo POR RUN do Places Text Search (SKU pago). 0 = sem teto. Protege
+    # a fatura de runaway; mensal fica coberto pelo cron diario + scan_coverage.
+    places_search_limit: int = 150
     extra_niches: int = 0             # nichos aleatorios extras por run (variedade)
     ig_business_id: str | None = None
     ig_token: str | None = None
     ig_stale_days: int = 60
     reviews_enabled: bool = False
+    reviews_limit: int = 50           # teto por-run da Reviews (SKU pago); 0 = sem teto
     # PageSpeed Insights (Google, gratis): nota de performance do site. Liga
     # sozinho quando ha PAGESPEED_API_KEY (chave gratuita, sem cobranca); pode
     # forcar com GARIMPO_PAGESPEED=1 (modo sem chave, cota baixa).
@@ -94,11 +98,13 @@ class Config:
             maps_mode=os.getenv("GARIMPO_MAPS", "fixture"),
             maps_key=os.getenv("GOOGLE_MAPS_API_KEY"),
             maps_pages=int(os.getenv("GARIMPO_MAPS_PAGES", "3")),
+            places_search_limit=int(os.getenv("GARIMPO_PLACES_SEARCH_LIMIT", "150")),
             extra_niches=int(os.getenv("GARIMPO_EXTRA_NICHES", "0")),
             ig_business_id=os.getenv("INSTAGRAM_BUSINESS_ID"),
             ig_token=os.getenv("INSTAGRAM_TOKEN") or os.getenv("META_AD_LIBRARY_TOKEN"),
             ig_stale_days=int(os.getenv("GARIMPO_IG_STALE_DAYS", "60")),
             reviews_enabled=os.getenv("GARIMPO_REVIEWS", "0") in ("1", "true", "True"),
+            reviews_limit=int(os.getenv("GARIMPO_REVIEWS_LIMIT", "50")),
             pagespeed_key=ps_key,
             pagespeed_enabled=(
                 ps_flag in ("1", "true", "True") if ps_flag is not None else bool(ps_key)
@@ -268,7 +274,10 @@ def build_reviews_source(cfg: Config):
         summarize = make_groq_review_summarizer(
             cfg.groq_key, "https://api.groq.com/openai/v1", cfg.extract_model
         )
-    return ReviewsSource(fetch=place_details_reviews(cfg.maps_key), summarize=summarize)
+    return ReviewsSource(
+        fetch=place_details_reviews(cfg.maps_key), summarize=summarize,
+        request_limit=cfg.reviews_limit,
+    )
 
 
 def build_maps_source(cfg: Config) -> MapsSource:
@@ -277,7 +286,9 @@ def build_maps_source(cfg: Config) -> MapsSource:
             raise SystemExit("GARIMPO_MAPS=places exige GOOGLE_MAPS_API_KEY")
         from .discovery import PlacesMapsSource
 
-        return PlacesMapsSource(cfg.maps_key, max_pages=cfg.maps_pages)
+        return PlacesMapsSource(
+            cfg.maps_key, max_pages=cfg.maps_pages, request_limit=cfg.places_search_limit
+        )
     if cfg.maps_mode == "overpass":
         # descoberta gratis via OpenStreetMap/Overpass (sem chave, sem custo).
         from .sources.overpass import OverpassSource

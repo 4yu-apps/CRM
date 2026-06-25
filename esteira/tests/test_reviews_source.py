@@ -11,6 +11,39 @@ from garimpo_esteira.sources.reviews import (
 )
 
 
+def _lead_pid(pid="p1"):
+    return Lead(id="l", owner_id="o", maps_place_id=pid)
+
+
+def test_reviews_respeita_teto_por_run():
+    # Fase 5: Reviews usa o SKU pago do Places Details. Teto por-run evita estouro
+    # se a fonte for ligada (GARIMPO_REVIEWS=1).
+    calls = {"n": 0}
+
+    def fetch(pid):
+        calls["n"] += 1
+        return [{"rating": 5, "text": "otimo"}]
+
+    src = ReviewsSource(fetch=fetch, request_limit=2)
+    src.enrich(_lead_pid())
+    src.enrich(_lead_pid())
+    src.enrich(_lead_pid())  # 3a barrada pelo teto
+    assert calls["n"] == 2
+
+
+def test_reviews_sem_teto_quando_zero():
+    calls = {"n": 0}
+
+    def fetch(pid):
+        calls["n"] += 1
+        return []
+
+    src = ReviewsSource(fetch=fetch, request_limit=0)
+    src.enrich(_lead_pid())
+    src.enrich(_lead_pid())
+    assert calls["n"] == 2
+
+
 class FakeResp:
     def __init__(self, status=200, payload=None):
         self.status_code = status

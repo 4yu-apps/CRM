@@ -124,13 +124,25 @@ class ReviewsSource:
         self,
         fetch: FetchFn | None = None,
         summarize: Callable[[list[dict]], dict | None] | None = None,
+        request_limit: int = 0,
     ):
         self._fetch = fetch
         self._summarize = summarize
+        # Teto de custo POR RUN: Reviews usa o SKU pago do Places Details. 0 = sem
+        # teto. So morde quando a fonte for ligada (GARIMPO_REVIEWS=1).
+        self._request_limit = request_limit
+        self._requests = 0
+        self._warned = False
 
     def enrich(self, lead) -> list[Finding]:
         if self._fetch is None or not getattr(lead, "maps_place_id", None):
             return []
+        if self._request_limit and self._requests >= self._request_limit:
+            if not self._warned:
+                print(f"reviews: teto de {self._request_limit} chamadas/run batido; pausando.")
+                self._warned = True
+            return []
+        self._requests += 1
         reviews = self._fetch(lead.maps_place_id)
         if not reviews:
             return []

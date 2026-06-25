@@ -188,12 +188,21 @@ class PlacesMapsSource:
     )
 
     def __init__(
-        self, api_key: str, timeout: float = 15.0, max_pages: int = 3, language: str = "pt-BR"
+        self, api_key: str, timeout: float = 15.0, max_pages: int = 3, language: str = "pt-BR",
+        request_limit: int = 0,
     ):
         self._key = api_key
         self._timeout = timeout
         self._max_pages = max_pages
         self._language = language
+        # Teto de custo POR RUN (SKU Enterprise pago). 0 = sem teto. Conta requests
+        # (paginas) feitos nesta instancia; o autopilot cria uma por run, entao o
+        # teto vale pra run inteira (cron 1x/dia => ~teto diario). Bate => para de
+        # buscar e segue no proximo run; zona nao some (scan_coverage so marca o que
+        # foi inserido). Protege contra runaway na fatura.
+        self._request_limit = request_limit
+        self._requests = 0
+        self._warned = False
 
     def _fetch_page(self, term: str, page_token: str | None) -> tuple[list[dict], str | None]:
         """Uma pagina da busca. Retorna (places_brutos, proximo_token).
@@ -248,7 +257,14 @@ class PlacesMapsSource:
         out: list[dict] = []
         token: str | None = None
         for _ in range(self._max_pages):
+            if self._request_limit and self._requests >= self._request_limit:
+                if not self._warned:
+                    print(f"places: teto de {self._request_limit} buscas/run batido; "
+                          "pausando descoberta (segue no proximo run).")
+                    self._warned = True
+                break
             places, token = self._fetch_page(term, token)
+            self._requests += 1
             out.extend(self._to_raw(p) for p in places)
             if not token:
                 break
