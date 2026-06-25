@@ -37,7 +37,15 @@ import { useT } from "@/lib/i18n";
 import { useLeads } from "@/hooks/use-leads";
 import { STATUS_META } from "@/lib/state-machine";
 import { meetingsWithin, meetingModality, fmtMeetingWhen } from "@/lib/meetings";
-import { buildNotifications, groupNotifications, type NotifKind } from "@/lib/notifications";
+import {
+  buildNotifications,
+  groupNotifications,
+  loadSeenNotifs,
+  saveSeenNotifs,
+  notifKey,
+  type NotifKind,
+  type NotifItem,
+} from "@/lib/notifications";
 import type { Lead } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { searchLeads } from "@/lib/lead-search";
@@ -280,33 +288,60 @@ function NotificationBell({ leads }: { leads: Lead[] }) {
   const [open, setOpen] = useState(false);
   const items = useMemo(() => buildNotifications(leads), [leads]);
   const groups = useMemo(() => groupNotifications(items), [items]);
-  const total = items.length;
+  const pending = items.length;
+
+  // "Visto": badge conta so o que voce ainda nao olhou. Abrir o sino marca tudo
+  // como visto (zera o numero); evento novo (ts novo) volta a contar.
+  const [seen, setSeen] = useState<Set<string>>(loadSeenNotifs);
+  const unread = useMemo(
+    () => items.reduce((n, it) => (seen.has(notifKey(it)) ? n : n + 1), 0),
+    [items, seen],
+  );
+
+  const persist = (next: Set<string>) => {
+    saveSeenNotifs(next);
+    setSeen(next);
+  };
+  const markAllSeen = () => persist(new Set(items.map(notifKey)));
+  const markSeen = (it: NotifItem) => {
+    // Poda chaves que nao existem mais e adiciona a clicada.
+    const current = new Set(items.map(notifKey));
+    const next = new Set([...seen].filter((k) => current.has(k)));
+    next.add(notifKey(it));
+    persist(next);
+  };
+
+  const toggle = () =>
+    setOpen((o) => {
+      if (!o) markAllSeen();
+      return !o;
+    });
 
   return (
     <div className="relative">
       <button
         type="button"
         aria-label="Notificações"
-        onClick={() => setOpen((o) => !o)}
+        onClick={toggle}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         className="relative flex size-9 items-center justify-center rounded-full border border-border bg-accent text-ink-2 transition-colors hover:text-brand"
       >
-        <Bell size={17} weight={total ? "fill" : "regular"} />
-        {total > 0 && (
+        <Bell size={17} weight={unread ? "fill" : "regular"} />
+        {unread > 0 && (
           <span
             className="absolute -right-0.5 -top-0.5 flex h-[17px] min-w-[17px] items-center justify-center rounded-full px-1 text-[10px] font-bold text-white"
             style={{ background: "var(--grad)" }}
           >
-            {total}
+            {unread}
           </span>
         )}
       </button>
       {open && (
         <div className="absolute right-0 top-[calc(100%+8px)] z-50 max-h-[70vh] w-[360px] max-w-[80vw] overflow-y-auto rounded-[14px] border border-border bg-card shadow-xl">
           <div className="sticky top-0 border-b border-border bg-card px-4 py-2.5 text-[12px] font-bold uppercase tracking-wider text-faint">
-            {total === 0 ? "Tudo em dia" : `${total} pra você agora`}
+            {pending === 0 ? "Tudo em dia" : `${pending} ${pending === 1 ? "pendência" : "pendências"}`}
           </div>
-          {total === 0 ? (
+          {pending === 0 ? (
             <div className="px-4 py-5 text-[13px] text-muted-foreground">
               Nada exigindo sua atenção agora. Quando alguém responder, uma reunião chegar ou um follow-up vencer, aparece aqui.
             </div>
@@ -322,18 +357,29 @@ function NotificationBell({ leads }: { leads: Lead[] }) {
                   {g.items.slice(0, 6).map((it) => {
                     const lead = it.leadId ? leads.find((l) => l.id === it.leadId) : null;
                     const modality = lead ? meetingModality(lead) : "indefinido";
+                    const isNew = !seen.has(notifKey(it));
                     return (
                       <button
                         key={it.id}
                         type="button"
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => {
+                          markSeen(it);
                           setOpen(false);
                           router.push(it.href);
                         }}
                         className="flex w-full flex-col items-start gap-0.5 border-b border-border px-4 py-2.5 text-left transition-colors last:border-0 hover:bg-accent/60"
                       >
-                        <span className="line-clamp-1 text-[13.5px] font-semibold text-ink">{it.title}</span>
+                        <span className="line-clamp-1 text-[13.5px] font-semibold text-ink">
+                          {isNew && (
+                            <span
+                              aria-label="novo"
+                              className="mr-1.5 inline-block size-1.5 rounded-full align-middle"
+                              style={{ background: "var(--brand)" }}
+                            />
+                          )}
+                          {it.title}
+                        </span>
                         <span className="flex items-center gap-1.5 text-[12px] text-brand-700">
                           {it.detail}
                           {g.kind === "reuniao" && modality === "online" && <VideoCamera size={12} weight="fill" />}

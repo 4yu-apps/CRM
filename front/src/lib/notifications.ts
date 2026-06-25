@@ -151,3 +151,32 @@ export function groupNotifications(items: NotifItem[]): NotifGroup[] {
     items: items.filter((i) => i.kind === kind),
   })).filter((g) => g.items.length > 0);
 }
+
+// ---- Estado "visto" das notificacoes (badge de nao-lidas) ----
+// Chave = id do evento + seu timestamp. Assim, quando o MESMO lead gera um
+// evento novo (ex.: respondeu de novo -> updated_at muda -> ts muda), a chave
+// muda e ele volta a contar como nao-visto. Persistido por usuario no browser.
+const SEEN_KEY = "garimpo:notif-seen";
+
+export function notifKey(it: NotifItem): string {
+  return `${it.id}@${it.ts}`;
+}
+
+export function loadSeenNotifs(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = localStorage.getItem(SEEN_KEY);
+    return new Set(raw ? (JSON.parse(raw) as string[]) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+export function saveSeenNotifs(seen: Set<string>): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(SEEN_KEY, JSON.stringify([...seen]));
+  } catch {
+    /* localStorage indisponivel: badge volta a contar tudo, sem quebrar */
+  }
+}

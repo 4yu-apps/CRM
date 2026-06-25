@@ -1,7 +1,7 @@
 "use client";
 // Componente de mapa de cobertura com Leaflet (react-leaflet).
 // Importado sempre via dynamic(..., { ssr: false }) para evitar quebra no SSR do Next.js.
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { MapContainer, TileLayer, CircleMarker, Tooltip, Circle, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import type { ScanCoverage } from "@/lib/types";
@@ -54,34 +54,45 @@ function MapController({
   lng,
   zoom,
   radiusMeters,
+  focusNeighborhood,
 }: {
   lat: number;
   lng: number;
   zoom: number;
   radiusMeters: number | null;
+  focusNeighborhood: boolean;
 }) {
   const map = useMap();
+  const first = useRef(true);
   useEffect(() => {
-    // Com raio definido, enquadra o circulo inteiro (zoom automatico, tipo
-    // gerenciador de anuncio): 5km mostra de perto, 50km abre bem mais. Assim
-    // o range do raio sempre aparece certo no mapa.
+    // 1a renderizacao = instantanea (mata a "louqueada" de zoom out/in na
+    // montagem); trocas seguintes de cidade/bairro animam suave.
+    const animate = !first.current;
+    first.current = false;
+
+    if (focusNeighborhood) {
+      // Bairro escolhido: foca NO bairro (nivel de rua), nao enquadra os 10km
+      // inteiros da cidade. O circulo do raio continua sendo desenhado a partir
+      // daqui (centrado no bairro).
+      map.setView([lat, lng], Math.max(zoom, 14), { animate });
+      return;
+    }
     if (radiusMeters && radiusMeters > 0) {
+      // Sem bairro: enquadra o raio inteiro a partir da cidade (5km de perto,
+      // 50km abre mais).
       const latDelta = radiusMeters / 111320;
       const lngDelta = radiusMeters / (111320 * Math.cos((lat * Math.PI) / 180));
-      // padding pequeno: o circulo do raio quase preenche o mapa (fica apertado
-      // no bairro, nao mostrando a regiao toda em volta). maxZoom alto pra raios
-      // pequenos (1-2km) poderem chegar perto.
       map.flyToBounds(
         [
           [lat - latDelta, lng - lngDelta],
           [lat + latDelta, lng + lngDelta],
         ],
-        { padding: [16, 16], duration: 0.8, maxZoom: 17 },
+        { padding: [16, 16], maxZoom: 15, animate, duration: animate ? 0.6 : 0 },
       );
-    } else {
-      map.flyTo([lat, lng], zoom, { duration: 0.8 });
+      return;
     }
-  }, [map, lat, lng, zoom, radiusMeters]);
+    map.setView([lat, lng], zoom, { animate });
+  }, [map, lat, lng, zoom, radiusMeters, focusNeighborhood]);
   return null;
 }
 
@@ -130,7 +141,13 @@ export default function CoverageMap({
       />
 
       {/* Reage a mudancas de centro/zoom via flyTo */}
-      <MapController lat={centerLat} lng={centerLng} zoom={zoom} radiusMeters={radiusMeters} />
+      <MapController
+        lat={centerLat}
+        lng={centerLng}
+        zoom={zoom}
+        radiusMeters={radiusMeters}
+        focusNeighborhood={!!neighborhood}
+      />
 
       {/* Circulo de raio de atuacao centrado na cidade */}
       {hasCityCoord && radiusMeters !== null && (

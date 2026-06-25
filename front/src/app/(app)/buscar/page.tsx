@@ -529,8 +529,6 @@ export default function BuscarPage() {
     return BRASIL_CENTER;
   })();
 
-  const mapKey = `${mapCenter.lat.toFixed(3)},${mapCenter.lng.toFixed(3)},${mapCenter.zoom}`;
-
   // Cobertura mostrada: filtrada pela cidade escolhida.
   const covFiltered = useMemo(() => {
     if (!city) return coverage;
@@ -892,7 +890,6 @@ export default function BuscarPage() {
             style={{ height: "290px" }}
           >
             <CoverageMap
-              key={mapKey}
               zones={covFiltered}
               centerLat={mapCenter.lat}
               centerLng={mapCenter.lng}
