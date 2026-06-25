@@ -105,6 +105,11 @@ jobs:
           # PageSpeed Insights (Google, gratis): performance do site no celular.
           # Liga sozinho quando o secret existe (chave gratuita, sem cobranca).
           PAGESPEED_API_KEY: ${{ secrets.PAGESPEED_API_KEY }}
+          # Instagram Business Discovery (seguidores + ativo/parado). App Meta
+          # SEPARADO do Ad Library; token de 60d (renovar ~2026-08-24). Sem os 2
+          # secrets a fonte fica inerte. Precisa instagram_manage_insights no token.
+          INSTAGRAM_BUSINESS_ID: ${{ secrets.INSTAGRAM_BUSINESS_ID }}
+          INSTAGRAM_TOKEN: ${{ secrets.INSTAGRAM_TOKEN }}
           # CNPJ por nome (Fase 5.5): provider Receita local (tabela no Supabase,
           # carregada pelo workflow load-receita.yml). Liga com a var/secret =1.
           # Sem dados carregados a fonte e inerte (RPC vazia, nao inventa CNPJ).
