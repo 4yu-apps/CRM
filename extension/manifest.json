@@ -9,7 +9,7 @@
     "48": "icons/icon-48.png",
     "128": "icons/icon-128.png"
   },
-  "permissions": ["storage", "tabs"],
+  "permissions": ["storage", "tabs", "notifications", "alarms"],
   "host_permissions": [
     "https://web.whatsapp.com/*",
     "https://www.google.com/maps/*",
