@@ -516,6 +516,15 @@
     const m = (node.getAttribute("data-id") || "").match(/(\d{10,15})@c\.us/);
     return m ? normalizePhone(m[1]) : null;
   }
+  function chatTemRespostaRecebida() {
+    try {
+      const main = document.querySelector("#main");
+      if (!main) return false;
+      return main.querySelector('[class*="message-in"]') !== null;
+    } catch {
+      return false;
+    }
+  }
   function readConversation() {
     const header = document.querySelector("#main header") || document.querySelector("header");
     if (!header) return { name: null, phone: null, rawName: "" };
@@ -736,6 +745,16 @@
       }));
       box.append(row);
       card.append(box);
+    }
+    if ((lead.status === "enviado" || lead.status === "sem_resposta") && chatTemRespostaRecebida()) {
+      const nudge = el("div", { className: "gp-nudge" });
+      nudge.append(el("span", { className: "gp-nudge-text", textContent: "Esse respondeu?" }));
+      nudge.append(el("button", {
+        className: "gp-btn gp-nudge-btn",
+        textContent: "Marcar respondeu",
+        onclick: () => doTransition(lead.id, "respondeu", "Respondeu")
+      }));
+      card.append(nudge);
     }
     const btns = contextualButtons(lead.status, lead.opt_out);
     if (btns.length === 0) {

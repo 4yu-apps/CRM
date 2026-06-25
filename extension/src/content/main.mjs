@@ -200,6 +200,21 @@ function readPhoneFromChat() {
   return m ? normalizePhone(m[1]) : null;
 }
 
+// Verifica se a conversa aberta tem pelo menos uma mensagem RECEBIDA (bubble "in").
+// Conservador: qualquer elemento com classe contendo "message-in" ja e suficiente.
+// Nunca lanca excecao, pois o DOM do WhatsApp muda sem aviso. Devolve false em
+// qualquer erro ou quando nao da pra ler o painel.
+function chatTemRespostaRecebida() {
+  try {
+    const main = document.querySelector("#main");
+    if (!main) return false;
+    // WhatsApp usa classes como "message-in" nas bolhas recebidas.
+    return main.querySelector('[class*="message-in"]') !== null;
+  } catch {
+    return false;
+  }
+}
+
 // ---- leitura do DOM (defensiva; selectors do WA mudam) ----
 function readConversation() {
   const header = document.querySelector("#main header") || document.querySelector("header");
@@ -435,6 +450,20 @@ function leadCard(lead, method) {
     }));
     box.append(row);
     card.append(box);
+  }
+
+  // Nudge de resposta: quando o lead esta em "enviado" ou "sem_resposta" e a
+  // conversa aberta ja tem mensagem recebida, sugere marcar como respondeu.
+  // Sem automacao: so mostra o nudge, o clique e do usuario.
+  if ((lead.status === "enviado" || lead.status === "sem_resposta") && chatTemRespostaRecebida()) {
+    const nudge = el("div", { className: "gp-nudge" });
+    nudge.append(el("span", { className: "gp-nudge-text", textContent: "Esse respondeu?" }));
+    nudge.append(el("button", {
+      className: "gp-btn gp-nudge-btn",
+      textContent: "Marcar respondeu",
+      onclick: () => doTransition(lead.id, "respondeu", "Respondeu"),
+    }));
+    card.append(nudge);
   }
 
   const btns = contextualButtons(lead.status, lead.opt_out);
