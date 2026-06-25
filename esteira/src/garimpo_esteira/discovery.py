@@ -89,6 +89,9 @@ def result_to_lead(raw: dict, owner_id: str, source: str = "google_maps") -> tup
         state=raw.get("state") or st,
         maps_place_id=raw.get("place_id"),
         maps_url=raw.get("url"),
+        lat=raw.get("lat"),
+        lng=raw.get("lng"),
+        opening_hours=raw.get("opening_hours"),
     )
     findings: list[Finding] = []
     if name:

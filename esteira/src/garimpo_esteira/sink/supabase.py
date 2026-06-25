@@ -18,6 +18,7 @@ _RETRY_STATUSES = {429, 500, 502, 503, 504}
 _LEAD_COLS = (
     "id", "owner_id", "status", "business_name", "cnpj", "phone", "whatsapp", "email",
     "instagram", "facebook", "website", "maps_place_id", "maps_url", "rating", "reviews_count",
+    "lat", "lng", "opening_hours",
     "category", "address", "neighborhood", "city", "state", "owner_name", "opt_out",
     "opened_on", "company_status",
     "score", "score_reason", "service_target", "ads_active",
@@ -250,6 +251,20 @@ class SupabaseSink:
         r = self._send("GET", f"{self.base}/lead_field_provenance", params={"lead_id": f"eq.{lead_id}"})
         r.raise_for_status()
         return r.json()
+
+    def fetch_provenance_many(self, lead_ids: list[str]) -> dict[str, list[dict]]:
+        """Proveniencia de varios leads numa chamada (corta o N+1 do score)."""
+        out: dict[str, list[dict]] = {lid: [] for lid in lead_ids}
+        if not lead_ids:
+            return out
+        ids = ",".join(lead_ids)
+        r = self._send(
+            "GET", f"{self.base}/lead_field_provenance", params={"lead_id": f"in.({ids})"}
+        )
+        r.raise_for_status()
+        for p in r.json():
+            out.setdefault(p["lead_id"], []).append(p)
+        return out
 
     def set_status(self, lead_id, to_status, actor="system", note=None) -> None:
         # RPC do banco: valida transição + guarda LGPD + grava histórico.

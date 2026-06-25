@@ -54,6 +54,10 @@ class LeadSink(Protocol):
         """Proveniência do lead (inclui sinais que não são coluna, ex.: ads_active)."""
         ...
 
+    def fetch_provenance_many(self, lead_ids: list[str]) -> dict[str, list[dict]]:
+        """Proveniência de vários leads numa chamada (corta o N+1 do score)."""
+        ...
+
     def set_status(
         self, lead_id: str, to_status: LeadStatus, actor: str = "system", note: str | None = None
     ) -> None:

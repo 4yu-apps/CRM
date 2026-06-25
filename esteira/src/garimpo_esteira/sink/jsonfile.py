@@ -184,6 +184,14 @@ class JsonFileSink:
     def fetch_provenance(self, lead_id: str) -> list[dict]:
         return [p for p in self._db["provenance"] if p["lead_id"] == lead_id]
 
+    def fetch_provenance_many(self, lead_ids: list[str]) -> dict[str, list[dict]]:
+        wanted = set(lead_ids)
+        out: dict[str, list[dict]] = {lid: [] for lid in wanted}
+        for p in self._db["provenance"]:
+            if p["lead_id"] in wanted:
+                out[p["lead_id"]].append(p)
+        return out
+
     def set_status(self, lead_id, to_status, actor="system", note=None) -> None:
         raw = self._db["leads"].get(lead_id)
         if not raw:

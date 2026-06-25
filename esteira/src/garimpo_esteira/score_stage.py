@@ -48,9 +48,11 @@ def _as_float(v) -> float | None:
 
 def score_one(
     lead, sink: LeadSink, profession: str | None = None, min_score: int = 0,
-    *, professions: list[str] | None = None,
+    *, professions: list[str] | None = None, prov: list[dict] | None = None,
 ) -> ScoreResult:
-    prov = sink.fetch_provenance(lead.id)
+    # prov injetada pelo score_batch (prefetch em lote, corta N+1); sem ela, busca.
+    if prov is None:
+        prov = sink.fetch_provenance(lead.id)
     ads_active = _ads_signal(prov)
     ig_status = _ig_signal(prov)
     # sinais tecnicos do site (de graca) entram no score; ads_active tambem pode
@@ -102,7 +104,13 @@ def score_batch(
     profession: str | None = None, min_score: int = 0, professions: list[str] | None = None,
 ) -> list[ScoreResult]:
     leads = sink.fetch_by_status(status, batch, owner_id)
-    results = [score_one(lead, sink, profession, min_score, professions=professions) for lead in leads]
+    # prefetch da proveniencia de todos os leads numa chamada (corta o N+1).
+    prov_by = sink.fetch_provenance_many([lead.id for lead in leads])
+    results = [
+        score_one(lead, sink, profession, min_score, professions=professions,
+                  prov=prov_by.get(lead.id, []))
+        for lead in leads
+    ]
     discarded = [r for r in results if r.decision == "descartado"]
     if discarded and leads:
         owner_id = leads[0].owner_id or ""

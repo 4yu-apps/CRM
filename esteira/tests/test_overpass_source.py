@@ -107,6 +107,12 @@ def test_element_to_raw_sem_nome_e_none():
     assert element_to_raw({"type": "node", "id": 1, "tags": {"shop": "hairdresser"}}) is None
 
 
+def test_element_to_raw_captura_opening_hours():
+    el = {"type": "node", "id": 1, "lat": -23.0, "lon": -51.0,
+          "tags": {"name": "X", "shop": "bakery", "opening_hours": "Mo-Sa 08:00-19:00"}}
+    assert element_to_raw(el)["opening_hours"] == "Mo-Sa 08:00-19:00"
+
+
 # ------------------------------------------------------------------
 # OverpassSource (MapsSource): search() com fetch injetado, sem rede
 # ------------------------------------------------------------------

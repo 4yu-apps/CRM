@@ -54,6 +54,12 @@ class Lead:
 
     maps_place_id: str | None = None
     maps_url: str | None = None
+    # coordenada do negocio (Places e OSM ja devolvem). Habilita mapa de leads e
+    # dedup cross-fonte por proximidade (geo_dedup_key no banco).
+    lat: float | None = None
+    lng: float | None = None
+    # horario de funcionamento (gratis do OSM; formato OSM). Base pro "melhor horario".
+    opening_hours: str | None = None
     rating: float | None = None
     reviews_count: int | None = None
     category: str | None = None

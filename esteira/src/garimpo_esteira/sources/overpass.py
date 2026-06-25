@@ -156,6 +156,7 @@ def element_to_raw(el: dict) -> dict | None:
         "city": tags.get("addr:city"),
         "state": tags.get("addr:state"),
         "country": tags.get("addr:country"),
+        "opening_hours": tags.get("opening_hours"),
         "category": _category(tags),
         "lat": lat,
         "lng": lng,

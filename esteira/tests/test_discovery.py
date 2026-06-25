@@ -25,6 +25,17 @@ def test_result_to_lead_maps_fields():
     assert all(f.source == "google_maps" for f in findings)
 
 
+def test_result_to_lead_captura_geo_e_horario():
+    raw = {
+        "name": "Pizzaria Nova", "place_id": "p1",
+        "lat": -23.42, "lng": -51.93, "opening_hours": "Mo-Fr 09:00-18:00",
+    }
+    lead, _ = result_to_lead(raw, "owner")
+    assert lead.lat == -23.42
+    assert lead.lng == -51.93
+    assert lead.opening_hours == "Mo-Fr 09:00-18:00"
+
+
 def test_discover_inserts_bruto_with_provenance(tmp_path):
     sink = JsonFileSink(tmp_path / "db.json")
     res = discover(sink, _maps(), ["pizzaria"], "owner")

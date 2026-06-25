@@ -58,14 +58,19 @@ se o site já deu CNPJ. Só descobre o CNPJ; BrasilAPI/ReceitaWS confirmam o res
   (interações/seguidores): <1% parada (12, oportunidade), 1-3% (6), >3% saudável
   (2). Secrets INSTAGRAM_BUSINESS_ID + INSTAGRAM_TOKEN no esteira.yml. Sem migration.
 
-## Fase 7 — Geo & dedup (grátis, médio esforço)
-- Colunas `lat`/`lng` + gravar no `result_to_lead` (Places e OSM já retornam).
-- Capturar `opening_hours` (grátis do OSM) → alimenta O5 depois.
-- Dedup cross-fonte (Places × OSM) por nome normalizado + raio de coordenada.
+## Fase 7 — Geo & dedup (FEITA, grátis)
+- Colunas `lat`/`lng` gravadas no `result_to_lead` (Places e OSM já retornavam;
+  antes jogados fora). `opening_hours` capturado do OSM (base pro "melhor horário").
+- Dedup cross-fonte: coluna gerada `geo_dedup_key` (nome normalizado + coord ~111m)
+  + índice único → o mesmo negócio achado por Places e OSM deduplica no insert (409).
+- Migration `20260625120600`. Front ainda não exibe mapa/horário (feature futura).
 
-## Fase 8 — Performance (grátis, conforme escala)
-- Batch da proveniência no score (corta N+1); cortar round-trip duplo do backfill;
-  índices `service_target/score/assigned_to/tags`; staleness no scrape.
+## Fase 8 — Performance (FEITA, grátis)
+- Batch da proveniência no score: `fetch_provenance_many` (1 chamada p/ o lote) +
+  `score_one(prov=)`; `score_batch` faz prefetch → corta o N+1.
+- Índices `service_target/score/assigned_to/tags` (migration `20260625120700`;
+  assigned_to/tags já existiam → skip idempotente).
+- Não feito (menor ROI/mais risco): round-trip duplo do backfill, staleness no scrape.
 
 ## (Desbloqueado) IG metrics — feito na B6 acima.
 

@@ -1,10 +1,37 @@
 from garimpo_esteira.models import Lead
-from garimpo_esteira.score_stage import score_batch
+from garimpo_esteira.score_stage import score_batch, score_one
 from garimpo_esteira.sink import JsonFileSink
 
 
 def _sink(tmp_path):
     return JsonFileSink(tmp_path / "db.json")
+
+
+# ------------------------------------------------------------------
+# Fase 8: batch da proveniencia (corta N+1) + score_one aceita prov pronta
+# ------------------------------------------------------------------
+
+def test_fetch_provenance_many_agrupa_por_lead(tmp_path):
+    sink = _sink(tmp_path)
+    a = sink.insert_lead(Lead(id="", owner_id="o", business_name="A"))
+    b = sink.insert_lead(Lead(id="", owner_id="o", business_name="B"))
+    sink.record_provenance(a, "ads_active", "website", "sim", 0.6)
+    sink.record_provenance(b, "instagram_status", "instagram", "parado", 0.7)
+    by = sink.fetch_provenance_many([a, b])
+    assert {p["field_name"] for p in by[a]} == {"ads_active"}
+    assert {p["field_name"] for p in by[b]} == {"instagram_status"}
+    assert sink.fetch_provenance_many([]) == {}
+
+
+def test_score_one_usa_prov_injetada_sem_buscar(tmp_path):
+    sink = _sink(tmp_path)
+    lid = sink.insert_lead(Lead(id="", owner_id="o", status="enriquecido",
+                                phone="44999990001", rating=4.6, reviews_count=200, website=None))
+    lead = sink.get_lead(lid)
+    # prov injetada (sem ir ao sink): ads_active=nao deve refletir no score trafego
+    prov = [{"field_name": "ads_active", "value": "nao"}]
+    r = score_one(lead, sink, prov=prov)
+    assert r.reason["trafego"]["score"] > 0
 
 
 def _enriquecido(sink, **kw):
