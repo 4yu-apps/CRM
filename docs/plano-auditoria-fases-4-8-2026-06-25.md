@@ -35,9 +35,14 @@ se o site já deu CNPJ. Só descobre o CNPJ; BrasilAPI/ReceitaWS confirmam o res
   senão vazio) + `CnpjNameSource` (gated, teto por-run) + enum `cnpj_lookup` +
   wiring. Provider injetável. **Adapter casadosdados bateu em Cloudflare 403** (não
   roda headless) → fonte nasce gated-off; o validador/source são o que vale.
-- **5.5b (próxima, provider real):** Dados Abertos da Receita, subset dos
-  municípios prospectados, tabela no Supabase + índice trigram → `nome+cidade→CNPJ`
-  local, legal, robusto. Mesmo `pick_cnpj`, mesma `CnpjNameSource`.
+- **5.5b (FEITA — máquina; dados = operação do dono):** Dados Abertos da Receita.
+  Tabela `receita_estabelecimento` no Supabase + pg_trgm + RPC `receita_search`
+  (migration aplicada). Provider `receita_lookup_factory` (cron consulta a RPC,
+  grátis/robusto) + seleção `GARIMPO_CNPJ_LOOKUP_PROVIDER=receita` (default).
+  Loader `scripts/load_receita.py` (+ helpers puros testados em `receita_load.py`)
+  filtra os municípios prospectados e faz upsert. **Pendente do dono:** baixar os
+  zips da Receita e rodar o loader local (≈15GB, fora do cron); depois ligar
+  `GARIMPO_CNPJ_LOOKUP=1`. Sem dados carregados, a fonte não acha nada (inerte).
 
 ## Fase 6 — Ad Library: bool → intensidade (grátis, token live)
 - Capturar nº de anúncios ativos + desde quando + plataformas → intensidade no

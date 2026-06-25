@@ -131,6 +131,57 @@ class CnpjNameSource:
 # contrato e seam injetavel; o provider que de fato funciona e o Dados Abertos da
 # Receita local (Fase 5.5b), que usa o MESMO validador (pick_cnpj) e a MESMA
 # CnpjNameSource. Por isso a fonte ja nasce gated-off.
+# Provedor Receita local (Fase 5.5b): consulta a tabela receita_estabelecimento no
+# Supabase via RPC receita_search (trigram). Gratis, legal, robusto, roda no cron.
+# E o provider RECOMENDADO; o casadosdados fica de referencia (Cloudflare-blocked).
+def _map_receita_row(row: dict) -> dict:
+    return {
+        "cnpj": row.get("cnpj"),
+        "nome": row.get("nome_fantasia") or row.get("razao_social"),
+        "phone": row.get("telefone"),
+        "city": row.get("municipio"),
+        "neighborhood": row.get("bairro"),
+        "street": row.get("logradouro"),
+        "uf": row.get("uf"),
+    }
+
+
+def receita_lookup_factory(base_url: str, service_key: str, *, client=None, timeout: float = 15.0):
+    """Devolve um lookup(nome, cidade, uf) que chama a RPC receita_search. O
+    municipio vai normalizado (maiusculo, sem acento) pra casar com a Receita."""
+    url = base_url.rstrip("/") + "/rest/v1/rpc/receita_search"
+
+    def lookup(nome: str, city: str | None, uf: str | None) -> list[dict]:
+        import httpx
+
+        own = client is None
+        c = client or httpx.Client(
+            timeout=timeout,
+            headers={
+                "apikey": service_key,
+                "Authorization": f"Bearer {service_key}",
+                "Content-Type": "application/json",
+            },
+        )
+        try:
+            body = {
+                "p_nome": nome,
+                "p_uf": uf,
+                "p_municipio": _norm(city).upper() or None if city else None,
+            }
+            r = c.post(url, json=body)
+            if r.status_code != 200:
+                return []
+            return [_map_receita_row(x) for x in (r.json() or [])]
+        except (httpx.HTTPError, ValueError):
+            return []
+        finally:
+            if own:
+                c.close()
+
+    return lookup
+
+
 CASADOSDADOS_URL = "https://api.casadosdados.com.br/v2/public/cnpj/search"
 
 

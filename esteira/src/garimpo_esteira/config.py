@@ -53,10 +53,12 @@ class Config:
     # teto de custo POR RUN do Places Text Search (SKU pago). 0 = sem teto. Protege
     # a fatura de runaway; mensal fica coberto pelo cron diario + scan_coverage.
     places_search_limit: int = 150
-    # CNPJ por nome (Fase 5.5): lookup reverso num agregador gray. DESLIGADO por
-    # padrao (ToS-cinza); liga com GARIMPO_CNPJ_LOOKUP=1. Teto por-run separado.
+    # CNPJ por nome (Fase 5.5): lookup reverso. DESLIGADO por padrao; liga com
+    # GARIMPO_CNPJ_LOOKUP=1. Provider: "receita" (Dados Abertos local no Supabase,
+    # recomendado/robusto) ou "casadosdados" (agregador, Cloudflare-blocked).
     cnpj_lookup_enabled: bool = False
     cnpj_lookup_limit: int = 50
+    cnpj_lookup_provider: str = "receita"
     extra_niches: int = 0             # nichos aleatorios extras por run (variedade)
     ig_business_id: str | None = None
     ig_token: str | None = None
@@ -105,6 +107,7 @@ class Config:
             places_search_limit=int(os.getenv("GARIMPO_PLACES_SEARCH_LIMIT", "150")),
             cnpj_lookup_enabled=os.getenv("GARIMPO_CNPJ_LOOKUP", "0") in ("1", "true", "True"),
             cnpj_lookup_limit=int(os.getenv("GARIMPO_CNPJ_LOOKUP_LIMIT", "50")),
+            cnpj_lookup_provider=os.getenv("GARIMPO_CNPJ_LOOKUP_PROVIDER", "receita"),
             extra_niches=int(os.getenv("GARIMPO_EXTRA_NICHES", "0")),
             ig_business_id=os.getenv("INSTAGRAM_BUSINESS_ID"),
             ig_token=os.getenv("INSTAGRAM_TOKEN") or os.getenv("META_AD_LIBRARY_TOKEN"),
@@ -189,12 +192,32 @@ def build_sources(cfg: Config) -> list[Source]:
     # mesmo passo pra trazer dono, data de abertura e situacao cadastral. Entre os
     # dois, opcional, o lookup de CNPJ por nome (so quando o site nao deu CNPJ).
     sources: list[Source] = [WebsiteSource(llm_extract=llm_extract, pagespeed=pagespeed)]
-    if cfg.cnpj_lookup_enabled:
-        from .sources.cnpj_name import CnpjNameSource, casadosdados_lookup
+    lookup = _build_cnpj_lookup(cfg)
+    if lookup is not None:
+        from .sources.cnpj_name import CnpjNameSource
 
-        sources.append(CnpjNameSource(casadosdados_lookup, request_limit=cfg.cnpj_lookup_limit))
+        sources.append(CnpjNameSource(lookup, request_limit=cfg.cnpj_lookup_limit))
     sources += [CnpjSource(), ig, ad]
     return sources
+
+
+def _build_cnpj_lookup(cfg: Config):
+    """Provider de CNPJ-por-nome, ou None (desligado / sem credencial). 'receita'
+    consulta a tabela local no Supabase (precisa de url+service key); 'casadosdados'
+    e referencia (Cloudflare-blocked)."""
+    if not cfg.cnpj_lookup_enabled:
+        return None
+    if cfg.cnpj_lookup_provider == "casadosdados":
+        from .sources.cnpj_name import casadosdados_lookup
+
+        return casadosdados_lookup
+    # default: receita local (so com credencial do Supabase)
+    if not cfg.supabase_url or not cfg.service_key:
+        print("cnpj_lookup=receita exige SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY; desligado.")
+        return None
+    from .sources.cnpj_name import receita_lookup_factory
+
+    return receita_lookup_factory(cfg.supabase_url, cfg.service_key)
 
 
 def gemini_keys(cfg: Config) -> list[str]:

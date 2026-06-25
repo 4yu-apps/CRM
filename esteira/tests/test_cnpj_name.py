@@ -1,5 +1,9 @@
 from garimpo_esteira.models import Lead
-from garimpo_esteira.sources.cnpj_name import CnpjNameSource, pick_cnpj
+from garimpo_esteira.sources.cnpj_name import (
+    CnpjNameSource,
+    pick_cnpj,
+    receita_lookup_factory,
+)
 
 
 def _lead(**kw) -> Lead:
@@ -141,3 +145,69 @@ def test_source_respeita_teto_por_run():
     src.enrich(_lead())
     src.enrich(_lead())  # 3a barrada
     assert calls["n"] == 2
+
+
+# ------------------------------------------------------------------
+# provider Receita local (RPC receita_search via PostgREST)
+# ------------------------------------------------------------------
+
+class _FakeResp:
+    def __init__(self, status, payload):
+        self.status_code = status
+        self._p = payload
+
+    def json(self):
+        return self._p
+
+
+class _FakeClient:
+    def __init__(self, payload, status=200):
+        self.payload = payload
+        self.status = status
+        self.last = None
+
+    def post(self, url, json=None):
+        self.last = {"url": url, "json": json}
+        return _FakeResp(self.status, self.payload)
+
+
+def test_receita_lookup_mapeia_linhas_em_candidatos():
+    rows = [{
+        "cnpj": "11222333000144", "razao_social": "BARBEARIA CORTE FINO LTDA",
+        "nome_fantasia": "Corte Fino", "telefone": "44999990000",
+        "municipio": "MARINGA", "bairro": "ZONA 7", "logradouro": "RUA DAS FLORES",
+        "uf": "PR",
+    }]
+    client = _FakeClient(rows)
+    lookup = receita_lookup_factory("https://x.supabase.co", "svc", client=client)
+    cands = lookup("Barbearia Corte Fino", "Maringá", "PR")
+    assert len(cands) == 1
+    c = cands[0]
+    assert c["cnpj"] == "11222333000144"
+    assert c["nome"] == "Corte Fino"      # fantasia tem prioridade
+    assert c["city"] == "MARINGA"
+    # RPC chamada com nome + uf + municipio normalizado (maiusculo sem acento)
+    assert client.last["url"].endswith("/rest/v1/rpc/receita_search")
+    assert client.last["json"]["p_uf"] == "PR"
+    assert client.last["json"]["p_municipio"] == "MARINGA"
+
+
+def test_receita_lookup_status_ruim_vira_vazio():
+    lookup = receita_lookup_factory("https://x.supabase.co", "svc",
+                                    client=_FakeClient([], status=500))
+    assert lookup("qualquer", "Maringa", "PR") == []
+
+
+def test_receita_lookup_alimenta_pick_cnpj_end_to_end():
+    rows = [{
+        "cnpj": "11222333000144", "razao_social": "BARBEARIA CORTE FINO LTDA",
+        "nome_fantasia": "Barbearia Corte Fino", "telefone": "44999990000",
+        "municipio": "MARINGA", "bairro": "ZONA 7", "logradouro": "RUA DAS FLORES",
+        "uf": "PR",
+    }]
+    lookup = receita_lookup_factory("https://x.supabase.co", "svc", client=_FakeClient(rows))
+    src = CnpjNameSource(lookup=lookup)
+    out = src.enrich(_lead())
+    f = next(x for x in out if x.field_name == "cnpj")
+    assert f.value == "11222333000144"
+    assert f.source == "cnpj_lookup"
