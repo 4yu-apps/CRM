@@ -256,7 +256,9 @@
     });
     if (!r.ok) throw new Error(`sign ${r.status}`);
     const d = await r.json();
-    return storageBase(cfg) + d.signedURL;
+    const su = d.signedURL || d.signedUrl || "";
+    if (!su) throw new Error("sign: sem URL");
+    return su.startsWith("http") ? su : storageBase(cfg) + su;
   }
   async function deleteAnexo(cfg, path) {
     const r = await fetch(`${storageBase(cfg)}/object/${BUCKET}/${encodeURI(path)}`, {

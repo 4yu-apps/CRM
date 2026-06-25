@@ -78,8 +78,11 @@ export async function signAnexo(cfg, path) {
   });
   if (!r.ok) throw new Error(`sign ${r.status}`);
   const d = await r.json();
-  // signedURL vem relativo (/object/sign/...); vira URL completa.
-  return storageBase(cfg) + d.signedURL;
+  // REST devolve `signedURL` (U maiusculo); supabase-js usa `signedUrl`.
+  // Aceita os dois e ja-absoluto, por seguranca.
+  const su = d.signedURL || d.signedUrl || "";
+  if (!su) throw new Error("sign: sem URL");
+  return su.startsWith("http") ? su : storageBase(cfg) + su;
 }
 
 export async function deleteAnexo(cfg, path) {
