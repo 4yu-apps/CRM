@@ -65,7 +65,28 @@ class CnpjSource:
             conf = 0.85 if _first_partner(data) else 0.5
             findings.append(Finding("owner_name", self.name, owner, conf))
 
+        # data de abertura (O1 "negocio novo"): vem em data_inicio_atividade.
+        opened = _normalize_open_date(data.get("data_inicio_atividade"))
+        if opened:
+            findings.append(Finding("opened_on", self.name, opened, 1.0))
+
         return findings
+
+
+def _normalize_open_date(raw: str | None) -> str | None:
+    """Normaliza a data de abertura pra ISO YYYY-MM-DD. Aceita ISO (BrasilAPI)
+    e DD/MM/YYYY. Qualquer coisa fora disso vira None (campo ausente, nao erro)."""
+    if not raw or not isinstance(raw, str):
+        return None
+    s = raw.strip()[:10]
+    try:
+        if "/" in s:
+            d, m, y = s.split("/")
+            return f"{int(y):04d}-{int(m):02d}-{int(d):02d}"
+        y, m, d = s.split("-")
+        return f"{int(y):04d}-{int(m):02d}-{int(d):02d}"
+    except (ValueError, TypeError):
+        return None
 
 
 def _first_partner(data: dict) -> str | None:

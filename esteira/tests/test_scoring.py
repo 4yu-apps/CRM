@@ -1,5 +1,9 @@
+from datetime import date
+
 from garimpo_esteira.models import Lead
 from garimpo_esteira.scoring import THRESHOLD, score_lead
+
+TODAY = date(2026, 6, 25)
 
 
 def _lead(**kw) -> Lead:
@@ -175,3 +179,63 @@ def test_marketing_summary_sem_travessao():
     r = score_lead(_lead(instagram=None), profession="marketing")
     assert "—" not in r.reason["summary"]
     assert "--" not in r.reason["summary"]
+
+
+# ------------------------------------------------------------------
+# O1 "negocio novo": idade da empresa (opened_on) pesa em trafego/design/marketing
+# ------------------------------------------------------------------
+
+def _crit(reason, lens, label):
+    return next((c for c in reason[lens]["criteria"] if c["label"] == label), None)
+
+
+def test_negocio_novo_pontua_forte_em_trafego():
+    # aberto ha ~3.5 meses => faixa forte (18 pts)
+    r = score_lead(_lead(website=None, opened_on="2026-03-01"), {"ads_active": False}, today=TODAY)
+    assert _crit(r.reason, "trafego", "Idade")["points"] == 18
+
+
+def test_negocio_recente_pontua_leve_em_trafego():
+    # aberto ha ~12 meses => faixa leve (8 pts)
+    r = score_lead(_lead(website=None, opened_on="2025-06-01"), {"ads_active": False}, today=TODAY)
+    assert _crit(r.reason, "trafego", "Idade")["points"] == 8
+
+
+def test_negocio_estabelecido_zera_idade():
+    # aberto ha anos => 0 pts, mas aparece no breakdown (transparente)
+    r = score_lead(_lead(website=None, opened_on="2022-01-01"), {"ads_active": False}, today=TODAY)
+    assert _crit(r.reason, "trafego", "Idade")["points"] == 0
+
+
+def test_sem_data_abertura_nao_cria_item_idade():
+    r = score_lead(_lead(website=None), {"ads_active": False}, today=TODAY)
+    assert _crit(r.reason, "trafego", "Idade") is None
+
+
+def test_idade_entra_em_design_e_marketing():
+    r = score_lead(_lead(website=None, opened_on="2026-03-01"), {}, today=TODAY)
+    assert _crit(r.reason, "design", "Idade")["points"] == 18
+    assert _crit(r.reason, "marketing", "Idade")["points"] == 18
+
+
+def test_idade_nao_entra_em_automacao():
+    r = score_lead(
+        _lead(opened_on="2026-03-01", category="Clínica odontológica"), {}, today=TODAY
+    )
+    assert _crit(r.reason, "automacao", "Idade") is None
+
+
+def test_negocio_novo_some_no_score_de_trafego():
+    novo = score_lead(
+        _lead(website=None, opened_on="2026-03-01"), {"ads_active": False}, today=TODAY
+    ).reason["trafego"]["score"]
+    velho = score_lead(
+        _lead(website=None, opened_on="2010-01-01"), {"ads_active": False}, today=TODAY
+    ).reason["trafego"]["score"]
+    assert novo > velho
+
+
+def test_idade_note_sem_travessao():
+    r = score_lead(_lead(website=None, opened_on="2026-03-01"), {"ads_active": False}, today=TODAY)
+    note = _crit(r.reason, "trafego", "Idade")["note"]
+    assert "—" not in note and "--" not in note

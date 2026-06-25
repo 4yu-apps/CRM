@@ -42,3 +42,29 @@ def test_owner_falls_back_to_razao_social_with_lower_confidence():
     owner = next(f for f in findings if f.field_name == "owner_name")
     assert owner.value == "EMPRESA SEM SOCIO LTDA"
     assert owner.confidence == 0.5
+
+
+def test_cnpj_source_captures_opened_on():
+    # BrasilAPI ja devolve data_inicio_atividade em ISO (YYYY-MM-DD); capturamos.
+    data = {"11222333000144": {"ddd_telefone_1": "44 99999-0002", "data_inicio_atividade": "2021-05-10"}}
+    src = CnpjSource(fetch=lambda c: data.get(c))
+    findings = src.enrich(_lead(cnpj="11.222.333/0001-44"))
+    opened = next(f for f in findings if f.field_name == "opened_on")
+    assert opened.value == "2021-05-10"
+    assert opened.source == "cnpj_brasilapi"
+
+
+def test_cnpj_source_opened_on_aceita_barra():
+    # algumas respostas vem em DD/MM/YYYY; normalizamos pra ISO
+    data = {"11222333000144": {"data_inicio_atividade": "10/05/2021"}}
+    src = CnpjSource(fetch=lambda c: data.get(c))
+    findings = src.enrich(_lead(cnpj="11.222.333/0001-44"))
+    opened = next(f for f in findings if f.field_name == "opened_on")
+    assert opened.value == "2021-05-10"
+
+
+def test_cnpj_source_without_open_date_is_silent_on_opened_on():
+    data = {"11222333000144": {"ddd_telefone_1": "44 99999-0002"}}
+    src = CnpjSource(fetch=lambda c: data.get(c))
+    findings = src.enrich(_lead(cnpj="11.222.333/0001-44"))
+    assert all(f.field_name != "opened_on" for f in findings)

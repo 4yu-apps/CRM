@@ -108,6 +108,8 @@ export interface Lead {
   state: string | null;
 
   owner_name: string | null;
+  // Data de abertura da empresa (BrasilAPI). Alimenta o sinal "negocio novo".
+  opened_on?: string | null;
 
   score: number | null;
   score_reason: ScoreReason | null;

@@ -16,6 +16,7 @@ O alvo (service_target) sai da comparacao dos dois. score = o maior dos dois.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 from typing import Any, Literal
 
 from .models import Lead, ServiceTarget
@@ -77,6 +78,54 @@ def _is_agendamento(category: str | None) -> bool:
     return any(k in cat for k in _AGENDAMENTO_KEYWORDS)
 
 
+# O1 "negocio novo": negocio aberto ha pouco quase sempre precisa montar
+# presenca (site/redes/trafego). A data vem da BrasilAPI (data_inicio_atividade).
+# Pesa nas lentes trafego/design/marketing; nao na automacao (essa quer volume
+# de operacao, que negocio novo ainda nao tem).
+def _parse_opened_on(value: str | None) -> date | None:
+    if not value:
+        return None
+    try:
+        y, m, d = value.strip()[:10].split("-")
+        return date(int(y), int(m), int(d))
+    except (ValueError, TypeError):
+        return None
+
+
+def _months_since(start: date, today: date) -> int:
+    months = (today.year - start.year) * 12 + (today.month - start.month)
+    if today.day < start.day:
+        months -= 1
+    return max(months, 0)
+
+
+def _idade_label(months: int) -> str:
+    if months <= 0:
+        return "aberto este mes"
+    if months == 1:
+        return "aberto ha 1 mes"
+    if months < 24:
+        return f"aberto ha {months} meses"
+    anos = months // 12
+    return f"aberto ha {anos} ano" + ("s" if anos > 1 else "")
+
+
+def _company_age_points(opened_on: str | None, today: date | None = None) -> tuple[int, str] | None:
+    """Pontos pela idade do negocio. None quando nao se sabe a data (sem item no
+    breakdown). Com data: <6 meses forte, 6-18 leve, mais que isso neutro (0,
+    mas aparece no breakdown pra ficar transparente)."""
+    d = _parse_opened_on(opened_on)
+    if d is None:
+        return None
+    months = _months_since(d, today or date.today())
+    quando = _idade_label(months)
+    if months < 6:
+        return 18, f"negocio novo ({quando}), precisa montar presenca"
+    if months <= 18:
+        return 8, f"negocio recente ({quando})"
+    return 0, f"negocio estabelecido ({quando})"
+
+
 # Sinais tecnicos do site (extraidos de graca do HTML em sources/website.py).
 # Chegam em signals["site"] como dict. Ausencia = None (desconhecido), nao False.
 def _sig(signals: dict[str, Any] | None, key: str, default: Any = None) -> Any:
@@ -106,7 +155,9 @@ def lens_for(profession: str | None) -> str:
 # ---------------------------------------------------------------------
 # ICP trafego: visibilidade pra quem ja tem cliente
 # ---------------------------------------------------------------------
-def score_trafego(lead: Lead, signals: dict[str, Any]) -> tuple[int, list[dict[str, Any]]]:
+def score_trafego(
+    lead: Lead, signals: dict[str, Any], today: date | None = None
+) -> tuple[int, list[dict[str, Any]]]:
     crit: list[dict[str, Any]] = []
 
     def add(label: str, pts_note: tuple[int, str]) -> None:
@@ -137,6 +188,10 @@ def score_trafego(lead: Lead, signals: dict[str, Any]) -> tuple[int, list[dict[s
         add("Anuncia?", (15, "nao anuncia, oportunidade de trafego"))
     else:
         add("Anuncia?", (8, "anuncio desconhecido"))
+
+    idade = _company_age_points(lead.opened_on, today)
+    if idade is not None:
+        add("Idade", idade)
 
     add("Contato", _contact_points(lead))
     return sum(c["points"] for c in crit), crit
@@ -207,7 +262,9 @@ def score_automacao(lead: Lead, signals: dict[str, Any]) -> tuple[int, list[dict
 # ICP design/web/branding: qualidade do site (tudo de graca do HTML)
 # Site fraco/ausente = oportunidade. Quanto pior o site, melhor o lead.
 # ---------------------------------------------------------------------
-def score_design(lead: Lead, signals: dict[str, Any]) -> tuple[int, list[dict[str, Any]]]:
+def score_design(
+    lead: Lead, signals: dict[str, Any], today: date | None = None
+) -> tuple[int, list[dict[str, Any]]]:
     crit: list[dict[str, Any]] = []
 
     def add(label: str, pts_note: tuple[int, str]) -> None:
@@ -245,6 +302,9 @@ def score_design(lead: Lead, signals: dict[str, Any]) -> tuple[int, list[dict[st
 
     # negocio real que vale o investimento em design
     add("Reputacao", _rating_points(lead.rating))
+    idade = _company_age_points(lead.opened_on, today)
+    if idade is not None:
+        add("Idade", idade)
     add("Contato", _contact_points(lead))
     return sum(c["points"] for c in crit), crit
 
@@ -254,7 +314,9 @@ def score_design(lead: Lead, signals: dict[str, Any]) -> tuple[int, list[dict[st
 # Presenca fraca/abandonada = oportunidade. Frequencia/engajamento de posts
 # NAO da pra medir de graca (IG/FB sao gated); usamos proxies de presenca.
 # ---------------------------------------------------------------------
-def score_marketing(lead: Lead, signals: dict[str, Any]) -> tuple[int, list[dict[str, Any]]]:
+def score_marketing(
+    lead: Lead, signals: dict[str, Any], today: date | None = None
+) -> tuple[int, list[dict[str, Any]]]:
     crit: list[dict[str, Any]] = []
 
     def add(label: str, pts_note: tuple[int, str]) -> None:
@@ -287,6 +349,9 @@ def score_marketing(lead: Lead, signals: dict[str, Any]) -> tuple[int, list[dict
     else:
         add("Reputacao", (4, f"ja tem volume ({n} avaliacoes)"))
 
+    idade = _company_age_points(lead.opened_on, today)
+    if idade is not None:
+        add("Idade", idade)
     add("Contato", _contact_points(lead))
     return sum(c["points"] for c in crit), crit
 
@@ -378,7 +443,7 @@ def _offered_lenses(professions: list[str]) -> set[str]:
 
 def score_lead(
     lead: Lead, signals: dict[str, Any] | None = None, profession: str | None = None,
-    *, professions: list[str] | None = None,
+    *, professions: list[str] | None = None, today: date | None = None,
 ) -> ScoreResult:
     """Pontua o lead pelas LENTES dos servicos que o dono oferta (pode ser mais
     de um). Qualifica pelo MELHOR encaixe entre as lentes ofertadas.
@@ -392,10 +457,10 @@ def score_lead(
     profs = professions if professions is not None else ([profession] if profession else [])
     lenses = _offered_lenses(profs)
 
-    t_score, t_crit = score_trafego(lead, signals)
+    t_score, t_crit = score_trafego(lead, signals, today)
     a_score, a_crit = score_automacao(lead, signals)
-    d_score, d_crit = score_design(lead, signals)
-    m_score, m_crit = score_marketing(lead, signals)
+    d_score, d_crit = score_design(lead, signals, today)
+    m_score, m_crit = score_marketing(lead, signals, today)
     by_lens = {
         "trafego": (t_score, t_crit), "automacao": (a_score, a_crit),
         "design": (d_score, d_crit), "marketing": (m_score, m_crit),

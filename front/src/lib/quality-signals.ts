@@ -2,6 +2,7 @@
 // anuncia, quem tem site mas nao anuncia (oportunidade de trafego), quem nao
 // tem site, quem tem site lento. Compartilhado por fila e contatos pra ficar
 // consistente. Tudo deriva de campos que JA existem no Lead (sem schema).
+import type { SignalChip } from "./site-signals";
 import type { Lead } from "./types";
 
 export type SignalFilter =
@@ -13,10 +14,12 @@ export type SignalFilter =
   | "sem_chatbot"
   | "sem_agendamento"
   | "tem_loja"
-  | "sem_instagram";
+  | "sem_instagram"
+  | "empresa_nova";
 
 export const SIGNAL_FILTER_OPTIONS: { value: SignalFilter; label: string }[] = [
   { value: "", label: "Todos os sinais" },
+  { value: "empresa_nova", label: "Negócio novo (aberto há pouco)" },
   { value: "ja_anuncia", label: "Tráfego: já anuncia" },
   { value: "nao_anuncia", label: "Tráfego: tem site, não anuncia" },
   { value: "sem_site", label: "Design: sem site" },
@@ -70,6 +73,31 @@ export function temLoja(l: Lead): boolean {
   return l.site_signals?.has_ecommerce === true;
 }
 
+// O1 "negocio novo": meses desde a abertura (opened_on, ISO YYYY-MM-DD da
+// BrasilAPI). null quando nao se sabe a data.
+export function mesesDesdeAbertura(l: Lead): number | null {
+  if (!l.opened_on) return null;
+  const d = new Date(`${l.opened_on}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
+  const now = new Date();
+  let m = (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
+  if (now.getDate() < d.getDate()) m -= 1;
+  return Math.max(m, 0);
+}
+
+// Negocio novo/recente: aberto ha no maximo 18 meses (faixa onde o score premia).
+export function negocioNovo(l: Lead): boolean {
+  const m = mesesDesdeAbertura(l);
+  return m !== null && m <= 18;
+}
+
+// Chip pra fila/ficha. null quando nao se aplica (sem data ou ja estabelecido).
+export function negocioNovoChip(l: Lead): SignalChip | null {
+  const m = mesesDesdeAbertura(l);
+  if (m === null || m > 18) return null;
+  return { label: m < 6 ? "Negocio novo" : "Negocio recente", variant: "positive" };
+}
+
 export function matchesSignal(l: Lead, f: SignalFilter): boolean {
   switch (f) {
     case "":
@@ -90,6 +118,8 @@ export function matchesSignal(l: Lead, f: SignalFilter): boolean {
       return temLoja(l);
     case "sem_instagram":
       return !temInstagram(l);
+    case "empresa_nova":
+      return negocioNovo(l);
     default:
       return false;
   }

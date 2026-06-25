@@ -40,7 +40,7 @@ import { openWhatsApp } from "@/lib/whatsapp";
 import { promptFollowupSuggestion } from "@/lib/followup-prompt";
 import { googleSearchUrl, googleMapsUrl, metaAdsUrl } from "@/lib/links";
 import { siteSignalChips, signalChipClass } from "@/lib/site-signals";
-import { matchesSignal, SIGNAL_FILTER_OPTIONS, type SignalFilter } from "@/lib/quality-signals";
+import { matchesSignal, negocioNovoChip, SIGNAL_FILTER_OPTIONS, type SignalFilter } from "@/lib/quality-signals";
 import { Skeleton } from "@/components/skeleton";
 import { recordSend, sentToday, overSoftLimit } from "@/lib/send-guard";
 
@@ -509,6 +509,19 @@ export default function FilaPage() {
                   <span className="text-faint">({cur.reviews_count})</span>
                 </span>
               </div>
+
+              {/* O1 negocio novo: aberto ha pouco quase sempre precisa montar presenca */}
+              {(() => {
+                const chip = negocioNovoChip(cur);
+                if (!chip) return null;
+                return (
+                  <div className="mt-2">
+                    <span className={cn("rounded-full px-2.5 py-1 text-[12px] font-semibold", signalChipClass(chip.variant))}>
+                      {chip.label}
+                    </span>
+                  </div>
+                );
+              })()}
 
               {/* Conferir o negocio por fora (puxar info e checar se anuncia) */}
               <div className="mt-2.5 flex flex-wrap items-center gap-2">

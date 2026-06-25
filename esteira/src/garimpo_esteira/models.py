@@ -23,7 +23,7 @@ ServiceTarget = Literal["trafego", "automacao", "ambos", "design", "marketing", 
 # Campos do lead que as fontes podem preencher (proveniência por campo).
 ENRICHABLE_FIELDS = (
     "phone", "whatsapp", "email", "instagram", "facebook", "website",
-    "owner_name", "cnpj", "places_detailed_at",
+    "owner_name", "cnpj", "places_detailed_at", "opened_on",
 )
 
 
@@ -63,6 +63,9 @@ class Lead:
 
     owner_name: str | None = None
     opt_out: bool = False
+    # data de abertura da empresa (BrasilAPI data_inicio_atividade), ISO YYYY-MM-DD.
+    # Alimenta o criterio "negocio novo" (O1): aberto ha pouco => precisa de marketing.
+    opened_on: str | None = None
     # carimbo do enriquecimento via Google Places Details (contador da cota diaria)
     places_detailed_at: str | None = None
 
