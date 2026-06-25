@@ -265,41 +265,58 @@ function SiteSignalsPanel({ signals, since }: { signals: SiteSignals; since?: st
 
 type SignalFact = {
   label: string;
-  value: string;
+  value: string | null;
   href?: string;
 };
 
-function SignalSection({ title, facts }: { title: string; facts: SignalFact[] }) {
-  if (facts.length === 0) return null;
+type SignalGroup = { title: string; facts: SignalFact[] };
+
+// Um quadradinho de estatística: rótulo em cima, valor embaixo. Valor ausente
+// vira um "—" discreto (cinza), não some — o slot continua visível pro Eduardo
+// saber o que ainda falta enriquecer.
+function StatTile({ fact }: { fact: SignalFact }) {
+  const known = fact.value != null && fact.value !== "";
   return (
-    <div className="border-t border-border first:border-t-0">
-      <div className="bg-surface-2/65 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-faint">
-        {title}
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2">
-        {facts.map((fact) => (
-          <div
-            key={fact.label}
-            className="min-w-0 border-t border-border px-4 py-3 first:border-t-0 sm:[&:nth-child(-n+2)]:border-t-0 sm:[&:nth-child(even)]:border-l"
-          >
-            <div className="text-[11.5px] text-muted-foreground">{fact.label}</div>
-            {fact.href ? (
-              <a
-                href={fact.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-0.5 block truncate text-[13.5px] font-semibold text-brand hover:underline"
-              >
-                {fact.value}
-              </a>
-            ) : (
-              <div className="mt-0.5 break-words text-[13.5px] font-semibold text-ink">
-                {fact.value}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
+    <div className="min-w-0 rounded-[12px] border border-border bg-surface-2/40 px-3.5 py-2.5">
+      <div className="truncate text-[11px] text-muted-foreground">{fact.label}</div>
+      {fact.href && known ? (
+        <a
+          href={fact.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-0.5 block truncate text-[14px] font-semibold text-brand hover:underline"
+        >
+          {fact.value}
+        </a>
+      ) : (
+        <div className={cn("mt-0.5 truncate text-[14px] font-semibold", known ? "text-ink" : "text-faint")}>
+          {known ? fact.value : "—"}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Um grupo de sinais (Reputação, Presença social...). Se TODO o grupo está
+// vazio, mostra uma linha tracejada "ainda não medido" em vez de um mar de
+// traços. Se tem ao menos um valor, mostra todos os slots (inclusive os vazios).
+function SignalGroupBlock({ group }: { group: SignalGroup }) {
+  if (group.facts.length === 0) return null;
+  const known = group.facts.filter((f) => f.value != null && f.value !== "");
+  return (
+    <div>
+      <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-faint">{group.title}</div>
+      {known.length === 0 ? (
+        <div className="rounded-[12px] border border-dashed border-border px-3.5 py-2.5 text-[12.5px] text-faint">
+          ainda não medido
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+          {group.facts.map((f) => (
+            <StatTile key={f.label} fact={f} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -323,89 +340,70 @@ function RawSignalsPanel({ lead }: { lead: Lead }) {
     ? `https://www.google.com/maps?q=${lead.lat},${lead.lng}`
     : undefined;
 
-  const reputation: SignalFact[] = [
-    ...(lead.rating != null
-      ? [{ label: "Nota no Google", value: `${lead.rating.toLocaleString("pt-BR")} / 5` }]
-      : []),
-    ...(lead.reviews_count != null
-      ? [{ label: "Avaliações", value: fmtNumber(lead.reviews_count) }]
-      : []),
+  const groups: SignalGroup[] = [
+    {
+      title: "Reputação",
+      facts: [
+        { label: "Nota no Google", value: lead.rating != null ? `${lead.rating.toLocaleString("pt-BR")} / 5` : null },
+        { label: "Avaliações", value: lead.reviews_count != null ? fmtNumber(lead.reviews_count) : null },
+      ],
+    },
+    {
+      title: "Presença social",
+      facts: [
+        { label: "Seguidores", value: social.followers != null ? fmtNumber(social.followers) : null },
+        { label: "Ritmo de publicação", value: social.post_freq_label ?? null },
+        { label: "Última postagem", value: social.last_post ? fmtDateOnly(social.last_post) : null },
+        { label: "Saúde do perfil", value: social.ig_status ? (social.ig_status === "parado" ? "Parado" : "Ativo") : null },
+        { label: "Interações médias", value: social.engagement != null ? fmtNumber(social.engagement) : null },
+        { label: "Outros canais", value: channels.length ? channels.join(", ") : null },
+      ],
+    },
+    {
+      title: "Anúncios",
+      facts: [
+        { label: "Anuncia?", value: adsActive != null ? (adsActive ? "Sim" : "Ainda não") : null },
+        { label: "Anúncios ativos", value: social.ads_count != null ? fmtNumber(social.ads_count) : null },
+        { label: "Anuncia desde", value: social.ads_since ? fmtDateOnly(social.ads_since) : null },
+        { label: "Plataformas", value: platforms.length ? platforms.map((p) => platformLabels[p] ?? p).join(", ") : null },
+        { label: "Verificação manual", value: adHref ? "Conferir na Biblioteca da Meta" : null, href: adHref },
+      ],
+    },
+    {
+      title: "Empresa",
+      facts: [
+        { label: "Data de abertura", value: lead.opened_on ? fmtDateOnly(lead.opened_on) : null },
+        { label: "Situação cadastral", value: lead.company_status ?? null },
+        { label: "Porte", value: lead.porte ?? null },
+        { label: "Capital social", value: lead.capital_social != null ? fmtBRL(lead.capital_social) : null },
+        { label: "Sócios", value: lead.socios_count != null ? fmtNumber(lead.socios_count) : null },
+        { label: "Funcionamento", value: lead.opening_hours ?? null },
+      ],
+    },
+    {
+      title: "Localização",
+      facts: [
+        {
+          label: "Coordenadas",
+          value: lead.lat != null && lead.lng != null ? `${lead.lat.toFixed(5)}, ${lead.lng.toFixed(5)}` : null,
+          href: mapHref,
+        },
+      ],
+    },
   ];
-  const socialFacts: SignalFact[] = [
-    ...(social.followers != null
-      ? [{ label: "Seguidores", value: fmtNumber(social.followers) }]
-      : []),
-    ...(social.post_freq_label
-      ? [{ label: "Ritmo de publicação", value: social.post_freq_label }]
-      : []),
-    ...(social.last_post
-      ? [{ label: "Última postagem", value: fmtDateOnly(social.last_post) }]
-      : []),
-    ...(social.ig_status
-      ? [{ label: "Saúde do perfil", value: social.ig_status === "parado" ? "Parado" : "Ativo" }]
-      : []),
-    ...(social.engagement != null
-      ? [{ label: "Interações médias", value: fmtNumber(social.engagement) }]
-      : []),
-    ...(channels.length
-      ? [{ label: "Outros canais", value: channels.join(", ") }]
-      : []),
-  ];
-  const adFacts: SignalFact[] = [
-    ...(adsActive != null
-      ? [{ label: "Anuncia?", value: adsActive ? "Sim" : "Ainda não" }]
-      : []),
-    ...(social.ads_count != null
-      ? [{ label: "Anúncios ativos", value: fmtNumber(social.ads_count) }]
-      : []),
-    ...(social.ads_since
-      ? [{ label: "Anuncia desde", value: fmtDateOnly(social.ads_since) }]
-      : []),
-    ...(platforms.length
-      ? [{ label: "Plataformas", value: platforms.map((p) => platformLabels[p] ?? p).join(", ") }]
-      : []),
-    ...(adHref
-      ? [{ label: "Verificação manual", value: "Conferir na Biblioteca da Meta", href: adHref }]
-      : []),
-  ];
-  const businessFacts: SignalFact[] = [
-    ...(lead.opened_on
-      ? [{ label: "Data de abertura", value: fmtDateOnly(lead.opened_on) }]
-      : []),
-    ...(lead.company_status
-      ? [{ label: "Situação cadastral", value: lead.company_status }]
-      : []),
-    ...(lead.porte ? [{ label: "Porte", value: lead.porte }] : []),
-    ...(lead.capital_social != null
-      ? [{ label: "Capital social", value: fmtBRL(lead.capital_social) }]
-      : []),
-    ...(lead.socios_count != null
-      ? [{ label: "Sócios", value: fmtNumber(lead.socios_count) }]
-      : []),
-    ...(lead.opening_hours
-      ? [{ label: "Funcionamento", value: lead.opening_hours }]
-      : []),
-  ];
-  const mapFacts: SignalFact[] = lead.lat != null && lead.lng != null
-    ? [{
-        label: "Localização",
-        value: `${lead.lat.toFixed(5)}, ${lead.lng.toFixed(5)}`,
-        href: mapHref,
-      }]
-    : [];
 
   return (
-    <section className="overflow-hidden rounded-[16px] border border-border bg-card shadow-[var(--shadow-sm)]">
-      <div className="flex items-center gap-2 border-b border-border bg-surface-2 px-4 py-3">
+    <section>
+      <div className="mb-4 flex items-center gap-2">
         <Info size={16} weight="fill" className="text-brand" />
         <h2 className="text-[12px] font-bold uppercase tracking-wider text-ink">Sinais do lead</h2>
         <span className="ml-auto text-[11px] text-faint">dados complementares, sem IA</span>
       </div>
-      <SignalSection title="Reputação" facts={reputation} />
-      <SignalSection title="Presença social" facts={socialFacts} />
-      <SignalSection title="Anúncios" facts={adFacts} />
-      <SignalSection title="Empresa" facts={businessFacts} />
-      <SignalSection title="Mapa" facts={mapFacts} />
+      <div className="flex flex-col gap-5">
+        {groups.map((g) => (
+          <SignalGroupBlock key={g.title} group={g} />
+        ))}
+      </div>
     </section>
   );
 }
@@ -711,7 +709,7 @@ export default function FichaPage() {
         )}
 
         {/* Grid principal: dados + sinais */}
-        <div className="grid grid-cols-1 gap-6 p-6 sm:p-7 lg:grid-cols-2">
+        <div className="grid grid-cols-1 items-start gap-6 p-6 sm:p-7 lg:grid-cols-2">
           {/* Coluna esquerda: dados do negocio */}
           <div>
             <div className="mb-4 flex items-center justify-between">
@@ -827,10 +825,9 @@ export default function FichaPage() {
             )}
           </div>
 
-          {/* Coluna direita: sinais + abordagem */}
+          {/* Coluna direita: leitura + abordagem (os fatos brutos vão num
+              painel de largura cheia abaixo, pra não duplicar nem espremer) */}
           <div className="flex flex-col gap-5">
-            <RawSignalsPanel lead={lead} />
-
             {/* Sinais / score */}
             {lead.score_reason && (
               <div className="rounded-[14px] border border-brand-100 bg-brand-50 p-4">
@@ -851,11 +848,6 @@ export default function FichaPage() {
                   </div>
                 )}
               </div>
-            )}
-
-            {/* Diagnostico do site */}
-            {lead.site_signals && (
-              <SiteSignalsPanel signals={lead.site_signals} since={lead.updated_at} />
             )}
 
             {/* Valor sugerido pela IA (B8) */}
@@ -971,6 +963,18 @@ export default function FichaPage() {
               </div>
             )}
           </div>
+        </div>
+
+        {/* Sinais do lead (largura cheia): diagnóstico do site + dashboard
+            factual. Largura cheia pra os fatos curtos respirarem em grade, em
+            vez de espremidos numa coluna estreita virando tabela de traços. */}
+        <div className="border-t border-border p-6 sm:p-7">
+          {lead.site_signals && (
+            <div className="mb-5">
+              <SiteSignalsPanel signals={lead.site_signals} since={lead.updated_at} />
+            </div>
+          )}
+          <RawSignalsPanel lead={lead} />
         </div>
 
         {/* Anotacoes (B8) */}
