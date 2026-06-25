@@ -757,16 +757,20 @@
     const templates = (state.templates || []).slice(0, 6);
     if (templates.length > 0) {
       const section = el("div", { className: "gp-tpl" });
-      section.append(el("div", { className: "gp-tpl-title", textContent: "Respostas rapidas" }));
+      section.append(el("div", { className: "gp-tpl-title", textContent: "Respostas r\xE1pidas" }));
       const btnsRow = el("div", { className: "gp-tpl-btns" });
       for (const tpl of templates) {
         btnsRow.append(el("button", {
           className: "gp-btn gp-tpl-btn",
           textContent: tpl.name,
           onclick: async () => {
-            const text = fillTemplate(tpl.body, lead);
-            await waPrefill(text);
-            toast("E so revisar e enviar.");
+            const text = fillTemplate(tpl.body || "", lead);
+            const ok = await waPrefill(text);
+            if (ok) {
+              toast("\xC9 s\xF3 revisar e enviar.");
+            } else {
+              toast("N\xE3o consegui preencher o compositor.", true);
+            }
           }
         }));
       }

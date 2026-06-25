@@ -461,16 +461,20 @@ function leadCard(lead, method) {
   const templates = (state.templates || []).slice(0, 6);
   if (templates.length > 0) {
     const section = el("div", { className: "gp-tpl" });
-    section.append(el("div", { className: "gp-tpl-title", textContent: "Respostas rapidas" }));
+    section.append(el("div", { className: "gp-tpl-title", textContent: "Respostas rápidas" }));
     const btnsRow = el("div", { className: "gp-tpl-btns" });
     for (const tpl of templates) {
       btnsRow.append(el("button", {
         className: "gp-btn gp-tpl-btn",
         textContent: tpl.name,
         onclick: async () => {
-          const text = fillTemplate(tpl.body, lead);
-          await waPrefill(text);
-          toast("E so revisar e enviar.");
+          const text = fillTemplate(tpl.body || "", lead);
+          const ok = await waPrefill(text);
+          if (ok) {
+            toast("É só revisar e enviar.");
+          } else {
+            toast("Não consegui preencher o compositor.", true);
+          }
         },
       }));
     }
