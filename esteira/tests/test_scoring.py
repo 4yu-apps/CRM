@@ -268,3 +268,46 @@ def test_empresa_ativa_nao_sofre_corte():
 def test_sem_company_status_nao_corta():
     r = score_lead(_lead(website=None), {"ads_active": False})
     assert r.decision == "qualificado"
+
+
+# ------------------------------------------------------------------
+# Fase 6: intensidade de anuncio no lens trafego (ads_count)
+# ------------------------------------------------------------------
+
+def test_anuncia_forte_pontua_menos_que_leve_no_trafego():
+    forte = _crit(
+        score_lead(_lead(website="x.com"), {"ads_active": True, "ads_count": 8}).reason,
+        "trafego", "Anuncia?",
+    )
+    leve = _crit(
+        score_lead(_lead(website="x.com"), {"ads_active": True, "ads_count": 1}).reason,
+        "trafego", "Anuncia?",
+    )
+    assert forte["points"] < leve["points"]
+    assert "8" in forte["note"]
+
+
+# ------------------------------------------------------------------
+# B6: engajamento do Instagram no lens marketing
+# ------------------------------------------------------------------
+
+def test_marketing_engajamento_baixo_pontua_mais_que_alto():
+    baixo = _crit(
+        score_lead(_lead(instagram="@x"),
+                   {"instagram_followers": 10000, "instagram_engagement": 50.0},
+                   profession="marketing").reason,
+        "marketing", "Engajamento",
+    )
+    alto = _crit(
+        score_lead(_lead(instagram="@x"),
+                   {"instagram_followers": 1000, "instagram_engagement": 80.0},
+                   profession="marketing").reason,
+        "marketing", "Engajamento",
+    )
+    assert baixo is not None and alto is not None
+    assert baixo["points"] > alto["points"]
+
+
+def test_marketing_sem_engajamento_nao_cria_item():
+    r = score_lead(_lead(instagram="@x"), profession="marketing")
+    assert _crit(r.reason, "marketing", "Engajamento") is None

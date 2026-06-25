@@ -44,9 +44,19 @@ se o site já deu CNPJ. Só descobre o CNPJ; BrasilAPI/ReceitaWS confirmam o res
   zips da Receita e rodar o loader local (≈15GB, fora do cron); depois ligar
   `GARIMPO_CNPJ_LOOKUP=1`. Sem dados carregados, a fonte não acha nada (inerte).
 
-## Fase 6 — Ad Library: bool → intensidade (grátis, token live)
-- Capturar nº de anúncios ativos + desde quando + plataformas → intensidade no
-  lens trafego. Token Meta já validado (renovar antes de 2026-08-24).
+## Fase 6 — Ad Library: bool → intensidade (FEITA, grátis)
+- `has_ads_info` captura nº de anúncios ativos + desde quando. Probe devolve dict
+  {active,count,since}; source emite ads_count/ads_since (proveniência); ainda
+  aceita probe bool (legado). Score trafego usa ads_count: anuncia forte (≥5) = 4
+  "foco em otimização"; leve = 6; não anuncia = 15. Sem migration. Token expira
+  2026-08-24.
+
+## B6 — Instagram metrics (FEITA, grátis; IG validado)
+- Probe Business Discovery pega bio, website e engajamento (média like+coment dos
+  últimos posts) na mesma chamada. Source emite `website` (enriquecível) + sinal
+  `instagram_engagement`. Score marketing: critério "Engajamento" por taxa
+  (interações/seguidores): <1% parada (12, oportunidade), 1-3% (6), >3% saudável
+  (2). Secrets INSTAGRAM_BUSINESS_ID + INSTAGRAM_TOKEN no esteira.yml. Sem migration.
 
 ## Fase 7 — Geo & dedup (grátis, médio esforço)
 - Colunas `lat`/`lng` + gravar no `result_to_lead` (Places e OSM já retornam).
@@ -57,9 +67,7 @@ se o site já deu CNPJ. Só descobre o CNPJ; BrasilAPI/ReceitaWS confirmam o res
 - Batch da proveniência no score (corta N+1); cortar round-trip duplo do backfill;
   índices `service_target/score/assigned_to/tags`; staleness no scrape.
 
-## Parado (bloqueado na API do IG)
-- IG metrics: bio + site + verificado + seguidores/engajamento no lens marketing.
-  Liga com `INSTAGRAM_BUSINESS_ID`. Fase curta quando a API for validada.
+## (Desbloqueado) IG metrics — feito na B6 acima.
 
 ## Notas honestas
 - CNPJ do site só pega quem publica CNPJ no rodapé (muitos publicam; nem todos).

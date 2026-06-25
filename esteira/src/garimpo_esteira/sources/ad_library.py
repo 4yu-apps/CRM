@@ -17,8 +17,8 @@ from typing import Callable
 
 from ..models import Finding, Lead
 
-# probe(lead) -> True (anuncia) / False (não) / None (desconhecido)
-ProbeFn = Callable[[Lead], bool | None]
+# probe(lead) -> dict {active,count,since} (rico) | bool (legado) | None (desconhecido)
+ProbeFn = Callable[[Lead], "dict | bool | None"]
 
 GRAPH_URL = "https://graph.facebook.com/v21.0"
 AD_ARCHIVE_URL = f"{GRAPH_URL}/ads_archive"
@@ -64,19 +64,48 @@ def has_active_ads(page_id: str, token: str, get, country: str, timeout: float) 
         return None
 
 
+def has_ads_info(page_id: str, token: str, get, country: str, timeout: float) -> dict | None:
+    """Intensidade do anuncio (Fase 6): {active, count, since}. count e quantos
+    anuncios ativos (ate o limite); since e o inicio do mais antigo. None se a API
+    nao responde. Mesma chamada do has_active_ads, so pedindo mais campos."""
+    try:
+        r = get(
+            AD_ARCHIVE_URL,
+            params={
+                "search_page_ids": f'["{page_id}"]',
+                "ad_reached_countries": f'["{country}"]',
+                "ad_active_status": "ACTIVE",
+                "ad_type": "ALL",
+                "fields": "id,ad_delivery_start_time",
+                "limit": "25",
+                "access_token": token,
+            },
+            timeout=timeout,
+        )
+        if r.status_code != 200:
+            return None
+        data = r.json().get("data", [])
+        if not data:
+            return {"active": False, "count": 0, "since": None}
+        starts = [d.get("ad_delivery_start_time") for d in data if d.get("ad_delivery_start_time")]
+        return {"active": True, "count": len(data), "since": min(starts) if starts else None}
+    except Exception:
+        return None
+
+
 def meta_ads_probe(token: str, *, country: str = "BR", timeout: float = 10.0, get=None) -> ProbeFn:
-    """Probe real da Ad Library API por page_id (confiavel). `get` injetavel pra
-    teste; em producao usa httpx. Sem token, build_sources deixa a fonte inerte.
+    """Probe real da Ad Library API por page_id (confiavel). Devolve dict de
+    intensidade {active,count,since} ou None. `get` injetavel pra teste.
     """
     import httpx
 
     _get = get or httpx.get
 
-    def probe(lead: Lead) -> bool | None:
+    def probe(lead: Lead) -> dict | None:
         page_id = resolve_page_id(lead.facebook, token, _get, timeout)
         if not page_id:
             return None  # sem pagina resolvivel: desconhecido (nada de chute)
-        return has_active_ads(page_id, token, _get, country, timeout)
+        return has_ads_info(page_id, token, _get, country, timeout)
 
     return probe
 
@@ -93,4 +122,16 @@ class AdLibrarySource:
         result = self._probe(lead)
         if result is None:
             return []
-        return [Finding("ads_active", self.name, "sim" if result else "nao", 0.8)]
+        # aceita o probe rico (dict de intensidade) e o legado (bool).
+        if isinstance(result, bool):
+            active, count, since = result, None, None
+        else:
+            active, count, since = result.get("active"), result.get("count"), result.get("since")
+            if active is None:
+                return []
+        findings = [Finding("ads_active", self.name, "sim" if active else "nao", 0.8)]
+        if active and count:
+            findings.append(Finding("ads_count", self.name, str(count), 0.7))
+        if active and since:
+            findings.append(Finding("ads_since", self.name, since, 0.7))
+        return findings

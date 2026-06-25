@@ -12,9 +12,10 @@ from typing import Callable
 
 from ..models import Finding, Lead
 from ..normalize import normalize_instagram
+from ..validation import clean
 
 # probe(handle: str) -> dict | None
-# dict = {"followers": int|None, "media_count": int|None, "last_post": str|None}
+# dict = {"followers", "media_count", "last_post", "website", "engagement"}
 ProbeFn = Callable[[str], dict | None]
 
 GRAPH_URL = "https://graph.facebook.com/v21.0"
@@ -60,7 +61,12 @@ def business_discovery_probe(ig_business_id: str, token: str, *, timeout: float 
     def probe(handle: str) -> dict | None:
         # a API quer o username cru, sem o @ que normalize_instagram devolve
         username = handle.lstrip("@")
-        fields = f"business_discovery.username({username}){{followers_count,media_count,media.limit(1){{timestamp}}}}"
+        # mesma chamada (gratis) ja traz bio, site e engajamento dos ultimos posts.
+        fields = (
+            f"business_discovery.username({username})"
+            "{followers_count,media_count,biography,website,"
+            "media.limit(5){timestamp,like_count,comments_count}}"
+        )
         try:
             r = _get(
                 f"{GRAPH_URL}/{ig_business_id}",
@@ -74,10 +80,18 @@ def business_discovery_probe(ig_business_id: str, token: str, *, timeout: float 
                 return None
             media = (bd.get("media") or {}).get("data") or []
             last = media[0].get("timestamp") if media else None
+            inter = [
+                (m.get("like_count") or 0) + (m.get("comments_count") or 0)
+                for m in media
+                if m.get("like_count") is not None or m.get("comments_count") is not None
+            ]
+            engagement = round(sum(inter) / len(inter), 1) if inter else None
             return {
                 "followers": bd.get("followers_count"),
                 "media_count": bd.get("media_count"),
                 "last_post": last,
+                "website": bd.get("website"),
+                "engagement": engagement,
             }
         except Exception:
             return None
@@ -110,4 +124,12 @@ class InstagramSource:
         status = instagram_status(data.get("last_post"), now=self._now, stale_days=self._stale_days)
         if status:
             findings.append(Finding("instagram_status", self.name, status, 0.7))
+        # site da bio do IG: enriquecimento de contato de graca (preenche a coluna
+        # website quando o lead so tinha o @).
+        site = clean("website", data.get("website"))
+        if site:
+            findings.append(Finding("website", self.name, site, 0.7))
+        # engajamento medio dos ultimos posts: sinal pro lens marketing.
+        if data.get("engagement") is not None:
+            findings.append(Finding("instagram_engagement", self.name, str(data["engagement"]), 0.7))
         return findings

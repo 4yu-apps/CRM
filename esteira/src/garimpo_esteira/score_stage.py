@@ -25,6 +25,27 @@ def _ig_signal(provenance: list[dict]) -> str | None:
     return None
 
 
+def _prov(provenance: list[dict], field: str):
+    for p in provenance:
+        if p.get("field_name") == field:
+            return p.get("value")
+    return None
+
+
+def _as_int(v) -> int | None:
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def _as_float(v) -> float | None:
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
 def score_one(
     lead, sink: LeadSink, profession: str | None = None, min_score: int = 0,
     *, professions: list[str] | None = None,
@@ -33,8 +54,16 @@ def score_one(
     ads_active = _ads_signal(prov)
     ig_status = _ig_signal(prov)
     # sinais tecnicos do site (de graca) entram no score; ads_active tambem pode
-    # vir derivado do Pixel detectado no HTML.
-    signals = {"ads_active": ads_active, "site": getattr(lead, "site_signals", None) or {}, "instagram_status": ig_status}
+    # vir derivado do Pixel detectado no HTML. Intensidade de anuncio (Fase 6) e
+    # engajamento do IG (B6) refinam os lens trafego/marketing.
+    signals = {
+        "ads_active": ads_active,
+        "ads_count": _as_int(_prov(prov, "ads_count")),
+        "site": getattr(lead, "site_signals", None) or {},
+        "instagram_status": ig_status,
+        "instagram_followers": _as_int(_prov(prov, "instagram_followers")),
+        "instagram_engagement": _as_float(_prov(prov, "instagram_engagement")),
+    }
     result = score_lead(lead, signals, profession, professions=professions)
     # #19: piso de score por dono. Alem do THRESHOLD global, o dono pode exigir
     # uma nota minima maior. min_score=0 (default) = sem filtro extra. Ao rebaixar,

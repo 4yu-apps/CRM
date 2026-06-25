@@ -234,3 +234,44 @@ def test_source_com_probe_status_parado_quando_post_antigo():
 
 def test_source_source_name():
     assert InstagramSource.name == "instagram"
+
+
+# ------------------------------------------------------------------
+# B6: probe captura website + engajamento; source emite website (enriquecivel)
+# ------------------------------------------------------------------
+
+def test_probe_captura_website_e_engajamento():
+    payload = {"business_discovery": {
+        "followers_count": 1000, "media_count": 50, "website": "https://sitedonegocio.com",
+        "biography": "Melhor barbearia",
+        "media": {"data": [
+            {"timestamp": "2026-06-10T10:00:00+0000", "like_count": 80, "comments_count": 20},
+            {"timestamp": "2026-06-05T10:00:00+0000", "like_count": 40, "comments_count": 10},
+        ]},
+    }}
+    probe = business_discovery_probe("123", "tok", get=lambda *a, **k: FakeResp(200, payload))
+    r = probe("negocio")
+    assert r["website"] == "https://sitedonegocio.com"
+    assert r["engagement"] == 75.0  # (100 + 50) / 2
+    assert r["last_post"] == "2026-06-10T10:00:00+0000"
+
+
+def test_source_emite_website_e_engajamento():
+    def probe(h):
+        return {"followers": 1000, "media_count": 50, "last_post": None,
+                "website": "https://x.com", "engagement": 30.0}
+
+    src = InstagramSource(probe=probe, now=NOW)
+    by = {f.field_name: f for f in src.enrich(_lead(instagram="@x"))}
+    assert by["website"].value == "https://x.com"
+    assert by["website"].source == "instagram"
+    assert by["instagram_engagement"].value == "30.0"
+
+
+def test_source_sem_website_no_probe_nao_emite_website():
+    def probe(h):
+        return {"followers": 10, "media_count": 2, "last_post": None}
+
+    src = InstagramSource(probe=probe, now=NOW)
+    by = {f.field_name for f in src.enrich(_lead(instagram="@x"))}
+    assert "website" not in by

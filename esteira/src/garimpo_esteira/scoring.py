@@ -110,6 +110,26 @@ def _idade_label(months: int) -> str:
     return f"aberto ha {anos} ano" + ("s" if anos > 1 else "")
 
 
+def _engagement_points(followers: Any, engagement: Any) -> tuple[int, str] | None:
+    """Pontos pelo engajamento do IG (lens marketing). None quando faltam dados.
+    Taxa = interacoes medias / seguidores: <1% audiencia parada (oportunidade),
+    1-3% mediana, >3% saudavel (bem gerido)."""
+    try:
+        f = float(followers)
+        e = float(engagement)
+    except (TypeError, ValueError):
+        return None
+    if f <= 0 or e < 0:
+        return None
+    rate = e / f
+    pct = round(rate * 100, 1)
+    if rate < 0.01:
+        return 12, f"engajamento fraco ({pct}%), audiencia parada, da pra movimentar"
+    if rate < 0.03:
+        return 6, f"engajamento mediano ({pct}%)"
+    return 2, f"engajamento saudavel ({pct}%), marca bem cuidada"
+
+
 def _company_age_points(opened_on: str | None, today: date | None = None) -> tuple[int, str] | None:
     """Pontos pela idade do negocio. None quando nao se sabe a data (sem item no
     breakdown). Com data: <6 meses forte, 6-18 leve, mais que isso neutro (0,
@@ -182,8 +202,15 @@ def score_trafego(
     ads = signals.get("ads_active")
     pixel = bool(_sig(signals, "ad_platforms")) or _sig(signals, "has_fb_pixel") \
         or _sig(signals, "has_google_ads") or _sig(signals, "has_tiktok_pixel")
+    ads_count = signals.get("ads_count")
     if ads is True or pixel:
-        add("Anuncia?", (6, "ja tem rastreamento de anuncio (Pixel/tag), aquecido"))
+        # intensidade (Fase 6): quem anuncia MUITO ja domina aquisicao -> a venda
+        # vira otimizacao (menos pontos de "captar cliente novo"); quem anuncia
+        # pouco ainda tem espaco. Pixel sem contagem cai no caso leve.
+        if isinstance(ads_count, int) and ads_count >= 5:
+            add("Anuncia?", (4, f"ja anuncia forte ({ads_count} anuncios ativos), foco em otimizacao"))
+        else:
+            add("Anuncia?", (6, "ja anuncia (aquecido), da pra otimizar"))
     elif ads is False:
         add("Anuncia?", (15, "nao anuncia, oportunidade de trafego"))
     else:
@@ -331,6 +358,11 @@ def score_marketing(
         add("Instagram", (6, "Instagram ativo, bem cuidado"))
     else:
         add("Instagram", (6, "tem Instagram (da pra avaliar a gestao)"))
+    # engajamento real do IG (B6): taxa = interacoes medias / seguidores. Baixa =
+    # audiencia parada, da pra movimentar (oportunidade); saudavel = bem gerido.
+    eng = _engagement_points(signals.get("instagram_followers"), signals.get("instagram_engagement"))
+    if eng is not None:
+        add("Engajamento", eng)
     if is_present("facebook", lead.facebook):
         add("Facebook", (3, "tem Facebook"))
     else:
