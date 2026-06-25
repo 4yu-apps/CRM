@@ -130,12 +130,13 @@ def _fixture_cnpj_fetch():
 
 def build_sources(cfg: Config) -> list[Source]:
     if cfg.sources_mode == "fixture":
-        # offline/determinístico: CNPJ por fixture, site "alcançável", sem ad probe
+        # offline/determinístico: site "alcançável", sem ad probe. Website antes do
+        # CNPJ (mesma ordem do real): o CNPJ raspado do site destrava o CnpjSource
+        # no mesmo passo.
         return [
+            WebsiteSource(reachable=lambda _url: True, fetch_html=lambda _url: None),
             CnpjSource(fetch=_fixture_cnpj_fetch()),
             InstagramSource(),
-            # offline: confirma site sem rede e sem raspar (deterministico)
-            WebsiteSource(reachable=lambda _url: True, fetch_html=lambda _url: None),
             AdLibrarySource(),
         ]
     # real: CNPJ via BrasilAPI (grátis), site via HTTP, Ad Library se houver token
@@ -171,10 +172,13 @@ def build_sources(cfg: Config) -> list[Source]:
 
         pagespeed = pagespeed_probe(cfg.pagespeed_key)
 
+    # Ordem importa: WebsiteSource primeiro raspa o CNPJ do site (rodape) e o
+    # facebook (que o AdLibrary precisa); o CnpjSource em seguida usa esse CNPJ no
+    # mesmo passo pra trazer dono, data de abertura e situacao cadastral.
     return [
+        WebsiteSource(llm_extract=llm_extract, pagespeed=pagespeed),
         CnpjSource(),
         ig,
-        WebsiteSource(llm_extract=llm_extract, pagespeed=pagespeed),
         ad,
     ]
 

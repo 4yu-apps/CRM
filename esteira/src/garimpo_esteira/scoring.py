@@ -488,9 +488,19 @@ def score_lead(
     else:
         target = best_lens
 
+    # corte duro: empresa nao-ATIVA na Receita (baixada/inapta/suspensa/nula) =
+    # negocio morto, nao vale prospectar. Vence ate score alto. So corta quando se
+    # SABE a situacao (status vazio = desconhecido, segue o fluxo normal).
+    status = (lead.company_status or "").strip().upper()
+    inactive = bool(status) and status != "ATIVA"
     contactable = is_present("phone", lead.phone)
-    if not contactable:
+    if inactive:
         decision: Decision = "descartado"
+        target = "indefinido"
+        verdict = f"empresa {status.lower()} na Receita, nao vale prospectar"
+        winning_crit = [*winning_crit, {"label": "Situacao", "points": 0, "note": verdict}]
+    elif not contactable:
+        decision = "descartado"
         target = "indefinido"
         verdict = "sem telefone, nao da pra contatar no WhatsApp"
     elif best < THRESHOLD:

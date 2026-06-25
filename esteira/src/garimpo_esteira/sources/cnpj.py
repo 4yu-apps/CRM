@@ -103,6 +103,14 @@ def _parse_brasilapi(data: dict, source: str) -> list[Finding]:
     if opened:
         findings.append(Finding("opened_on", source, opened, 1.0))
 
+    status = _clean_status(data.get("descricao_situacao_cadastral"))
+    if status:
+        findings.append(Finding("company_status", source, status, 1.0))
+
+    cnae = clean("category", data.get("cnae_fiscal_descricao"))
+    if cnae:
+        findings.append(Finding("category", source, cnae, 0.6))
+
     return findings
 
 
@@ -130,7 +138,24 @@ def _parse_receitaws(data: dict, source: str) -> list[Finding]:
     if opened:
         findings.append(Finding("opened_on", source, opened, 1.0))
 
+    status = _clean_status(data.get("situacao"))
+    if status:
+        findings.append(Finding("company_status", source, status, 1.0))
+
+    atividade = data.get("atividade_principal") or []
+    cnae = clean("category", atividade[0].get("text")) if isinstance(atividade, list) and atividade else None
+    if cnae:
+        findings.append(Finding("category", source, cnae, 0.6))
+
     return findings
+
+
+def _clean_status(raw: str | None) -> str | None:
+    """Situacao cadastral em MAIUSCULA (ATIVA/BAIXADA/INAPTA/SUSPENSA/NULA)."""
+    if not raw or not isinstance(raw, str):
+        return None
+    s = raw.strip().upper()
+    return s or None
 
 
 _PARSERS: dict[str, Callable[[dict, str], list[Finding]]] = {

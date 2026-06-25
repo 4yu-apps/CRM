@@ -2,12 +2,39 @@
 from garimpo_esteira.models import Lead
 from garimpo_esteira.sources.website import (
     WebsiteSource,
+    extract_cnpj,
     extract_email,
     extract_facebook,
     extract_instagram,
     extract_phone,
     extract_whatsapp,
 )
+
+
+# ------------------------------------------------------------------
+# O3/Fase 4: CNPJ do rodape do site destrava a cadeia CNPJ (dono, opened_on)
+# ------------------------------------------------------------------
+
+def test_extract_cnpj_formatado():
+    html = '<footer>CNPJ: 11.222.333/0001-44 - todos os direitos</footer>'
+    assert extract_cnpj(html) == "11222333000144"
+
+
+def test_extract_cnpj_ausente():
+    assert extract_cnpj("<p>sem documento aqui</p>") is None
+
+
+def test_extract_cnpj_ignora_14_digitos_soltos():
+    # precisao: 14 digitos sem formatacao nao contam (poderia ser qualquer numero)
+    assert extract_cnpj("<p>pedido 12345678000199 enviado</p>") is None
+
+
+def test_website_enrich_emite_cnpj():
+    src = WebsiteSource(reachable=lambda _u: True, fetch_html=lambda _u: "CNPJ 11.222.333/0001-44")
+    findings = src.enrich(Lead(id="l", owner_id="o", website="https://x.com"))
+    cnpj = next(f for f in findings if f.field_name == "cnpj")
+    assert cnpj.value == "11222333000144"
+    assert cnpj.source == "website"
 
 _HTML = """
 <html><footer>

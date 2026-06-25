@@ -146,3 +146,36 @@ def test_cnpj_waterfall_provider_que_explode_nao_derruba():
     ])
     by = {f.field_name: f for f in src.enrich(_lead(cnpj="11.222.333/0001-44"))}
     assert by["phone"].source == "cnpj_brasilapi"
+
+
+# ------------------------------------------------------------------
+# Fase 4: situacao cadastral (empresa morta) + CNAE (ramo real)
+# ------------------------------------------------------------------
+
+def test_brasilapi_captura_situacao_e_cnae():
+    data = {"11222333000144": {
+        "descricao_situacao_cadastral": "BAIXADA",
+        "cnae_fiscal_descricao": "Cabeleireiros, manicure e pedicure",
+    }}
+    src = CnpjSource(fetch=lambda c: data.get(c))
+    by = {f.field_name: f for f in src.enrich(_lead(cnpj="11.222.333/0001-44"))}
+    assert by["company_status"].value == "BAIXADA"
+    assert by["category"].value == "Cabeleireiros, manicure e pedicure"
+
+
+def test_receitaws_captura_situacao_e_cnae():
+    rw = {"11222333000144": {
+        "status": "OK", "situacao": "ativa",
+        "atividade_principal": [{"text": "Restaurantes e similares"}],
+    }}
+    src = CnpjSource(providers=[("cnpj_ws", lambda c: rw.get(c))])
+    by = {f.field_name: f for f in src.enrich(_lead(cnpj="11.222.333/0001-44"))}
+    assert by["company_status"].value == "ATIVA"  # normaliza pra maiuscula
+    assert by["category"].value == "Restaurantes e similares"
+
+
+def test_sem_situacao_nao_emite_company_status():
+    data = {"11222333000144": {"ddd_telefone_1": "44 99999-0002"}}
+    src = CnpjSource(fetch=lambda c: data.get(c))
+    findings = src.enrich(_lead(cnpj="11.222.333/0001-44"))
+    assert all(f.field_name != "company_status" for f in findings)

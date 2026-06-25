@@ -19,7 +19,7 @@ _LEAD_COLS = (
     "id", "owner_id", "status", "business_name", "cnpj", "phone", "whatsapp", "email",
     "instagram", "facebook", "website", "maps_place_id", "maps_url", "rating", "reviews_count",
     "category", "address", "neighborhood", "city", "state", "owner_name", "opt_out",
-    "opened_on",
+    "opened_on", "company_status",
     "score", "score_reason", "service_target", "ads_active",
     "site_signals", "match_rate",
     "suggested_value", "suggested_value_reason",

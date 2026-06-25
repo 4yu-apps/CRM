@@ -24,6 +24,7 @@ ServiceTarget = Literal["trafego", "automacao", "ambos", "design", "marketing", 
 ENRICHABLE_FIELDS = (
     "phone", "whatsapp", "email", "instagram", "facebook", "website",
     "owner_name", "cnpj", "places_detailed_at", "opened_on",
+    "company_status", "category",
 )
 
 
@@ -66,6 +67,9 @@ class Lead:
     # data de abertura da empresa (BrasilAPI data_inicio_atividade), ISO YYYY-MM-DD.
     # Alimenta o criterio "negocio novo" (O1): aberto ha pouco => precisa de marketing.
     opened_on: str | None = None
+    # situacao cadastral na Receita (ATIVA/BAIXADA/INAPTA/SUSPENSA/NULA). Empresa
+    # nao-ATIVA = corte duro no score (nao prospectar negocio morto).
+    company_status: str | None = None
     # carimbo do enriquecimento via Google Places Details (contador da cota diaria)
     places_detailed_at: str | None = None
 

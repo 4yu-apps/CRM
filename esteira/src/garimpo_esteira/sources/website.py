@@ -151,6 +151,21 @@ def extract_phone(html: str) -> str | None:
     return None
 
 
+# CNPJ no rodape do site (quase todo site BR formal mostra). So o padrao
+# FORMATADO XX.XXX.XXX/XXXX-XX: 14 digitos soltos dariam falso positivo (qualquer
+# numero), e normalize_cnpj nao valida digito verificador. Destrava a cadeia CNPJ
+# (dono, opened_on, situacao) pros leads de Maps/OSM que nunca trazem CNPJ.
+_CNPJ_RE = re.compile(r"\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}")
+
+
+def extract_cnpj(html: str) -> str | None:
+    for raw in _CNPJ_RE.findall(html or ""):
+        cnpj = clean("cnpj", raw)
+        if cnpj:
+            return cnpj
+    return None
+
+
 # --- sinais tecnicos do site (de graca, do HTML que ja baixamos) -----------
 # Respondem as perguntas que tarfego/automacao/UX precisam, sem API paga e sem
 # a Biblioteca de Anuncios da Meta. Cada um e um regex barato no HTML.
@@ -322,6 +337,12 @@ class WebsiteSource:
                 # so vira coluna se o lead ainda nao tem telefone (cascade decide);
                 # aqui a gente registra o achado pra proveniencia.
                 findings.append(Finding("phone", self.name, tel, 0.5))
+            doc = extract_cnpj(html)
+            if doc:
+                # destrava o CnpjSource no mesmo passo (website roda antes do cnpj
+                # no build_sources): com o CNPJ achado aqui, a cascata busca dono,
+                # data de abertura e situacao de graca.
+                findings.append(Finding("cnpj", self.name, doc, 0.7))
 
             # Sinais tecnicos do site (de graca). Viram a coluna site_signals
             # (cascade trata o JSON). Performance real do PageSpeed (Google,

@@ -239,3 +239,32 @@ def test_idade_note_sem_travessao():
     r = score_lead(_lead(website=None, opened_on="2026-03-01"), {"ads_active": False}, today=TODAY)
     note = _crit(r.reason, "trafego", "Idade")["note"]
     assert "—" not in note and "--" not in note
+
+
+# ------------------------------------------------------------------
+# Fase 4: empresa baixada/inapta na Receita = corte duro (nao prospectar morto)
+# ------------------------------------------------------------------
+
+def test_empresa_baixada_e_descartada():
+    r = score_lead(
+        _lead(company_status="BAIXADA", rating=4.8, reviews_count=300, website=None),
+        {"ads_active": False},
+    )
+    assert r.decision == "descartado"
+    assert r.service_target == "indefinido"
+    assert "baixada" in r.reason["verdict"].lower()
+
+
+def test_empresa_inapta_e_descartada():
+    r = score_lead(_lead(company_status="INAPTA", website=None), {"ads_active": False})
+    assert r.decision == "descartado"
+
+
+def test_empresa_ativa_nao_sofre_corte():
+    r = score_lead(_lead(company_status="ATIVA", website=None), {"ads_active": False})
+    assert r.decision == "qualificado"
+
+
+def test_sem_company_status_nao_corta():
+    r = score_lead(_lead(website=None), {"ads_active": False})
+    assert r.decision == "qualificado"
