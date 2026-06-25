@@ -24,6 +24,7 @@ const state = {
   cfg: null,
   repo: null,
   leads: [],
+  templates: [],
   loggedIn: false,
   lastKey: "",
   lastName: "", // nome da conversa aberta (chave do casamento lembrado)
@@ -141,6 +142,11 @@ async function init() {
   observe();
   if (state.loggedIn) {
     await refreshLeads();
+    try {
+      state.templates = await state.repo.listTemplates();
+    } catch {
+      state.templates = [];
+    }
     void runSweep();
   }
   updateBadge();
@@ -192,6 +198,21 @@ function readPhoneFromChat() {
   if (!node) return null;
   const m = (node.getAttribute("data-id") || "").match(/(\d{10,15})@c\.us/);
   return m ? normalizePhone(m[1]) : null;
+}
+
+// Verifica se a conversa aberta tem pelo menos uma mensagem RECEBIDA (bubble "in").
+// Conservador: qualquer elemento com classe contendo "message-in" ja e suficiente.
+// Nunca lanca excecao, pois o DOM do WhatsApp muda sem aviso. Devolve false em
+// qualquer erro ou quando nao da pra ler o painel.
+function chatTemRespostaRecebida() {
+  try {
+    const main = document.querySelector("#main");
+    if (!main) return false;
+    // WhatsApp usa classes como "message-in" nas bolhas recebidas.
+    return main.querySelector('[class*="message-in"]') !== null;
+  } catch {
+    return false;
+  }
 }
 
 // ---- leitura do DOM (defensiva; selectors do WA mudam) ----
@@ -382,6 +403,31 @@ function renderBody(parsed, result) {
   body.append(manualBox());
 }
 
+function fillTemplate(body, lead) {
+  const nome = (lead.owner_name || "").split(" ")[0] || lead.business_name || "";
+  return body
+    .replace(/\{nome\}/g, nome)
+    .replace(/\{ramo\}/g, lead.category || "")
+    .replace(/\{bairro\}/g, lead.neighborhood || "")
+    .replace(/\{cidade\}/g, lead.city || "");
+}
+
+function waPrefill(text) {
+  return new Promise((resolve) => {
+    const reqId = `pf-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const onMsg = (e) => {
+      if (e.source !== window) return;
+      const d = e.data;
+      if (!d || d.source !== "garimpo-page" || d.type !== "prefill_result" || d.reqId !== reqId) return;
+      window.removeEventListener("message", onMsg);
+      resolve(d.ok);
+    };
+    window.addEventListener("message", onMsg);
+    window.postMessage({ source: "garimpo-sw", type: "prefill", text, reqId }, "*");
+    setTimeout(() => { window.removeEventListener("message", onMsg); resolve(false); }, 5000);
+  });
+}
+
 function leadCard(lead, method) {
   const card = el("div", { className: "gp-card" });
   card.append(el("div", { className: "gp-name", textContent: lead.business_name || "Sem nome" }));
@@ -416,6 +462,20 @@ function leadCard(lead, method) {
     card.append(box);
   }
 
+  // Nudge de resposta: quando o lead esta em "enviado" ou "sem_resposta" e a
+  // conversa aberta ja tem mensagem recebida, sugere marcar como respondeu.
+  // Sem automacao: so mostra o nudge, o clique e do usuario.
+  if ((lead.status === "enviado" || lead.status === "sem_resposta") && chatTemRespostaRecebida()) {
+    const nudge = el("div", { className: "gp-nudge" });
+    nudge.append(el("span", { className: "gp-nudge-text", textContent: "Esse respondeu?" }));
+    nudge.append(el("button", {
+      className: "gp-btn gp-nudge-btn",
+      textContent: "Marcar respondeu",
+      onclick: () => doTransition(lead.id, "respondeu", "Respondeu"),
+    }));
+    card.append(nudge);
+  }
+
   const btns = contextualButtons(lead.status, lead.opt_out);
   if (btns.length === 0) {
     card.append(el("p", { className: "gp-muted", textContent: "Status final." }));
@@ -436,6 +496,31 @@ function leadCard(lead, method) {
   // Edicao sempre aberta: dono, contato, orcamento, reuniao e anotacoes ja
   // visiveis. Escreve so no nosso banco.
   card.append(editForm(lead));
+
+  const templates = (state.templates || []).slice(0, 6);
+  if (templates.length > 0) {
+    const section = el("div", { className: "gp-tpl" });
+    section.append(el("div", { className: "gp-tpl-title", textContent: "Respostas rápidas" }));
+    const btnsRow = el("div", { className: "gp-tpl-btns" });
+    for (const tpl of templates) {
+      btnsRow.append(el("button", {
+        className: "gp-btn gp-tpl-btn",
+        textContent: tpl.name,
+        onclick: async () => {
+          const text = fillTemplate(tpl.body || "", lead);
+          const ok = await waPrefill(text);
+          if (ok) {
+            toast("É só revisar e enviar.");
+          } else {
+            toast("Não consegui preencher o compositor.", true);
+          }
+        },
+      }));
+    }
+    section.append(btnsRow);
+    card.append(section);
+  }
+
   return card;
 }
 

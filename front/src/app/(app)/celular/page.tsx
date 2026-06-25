@@ -30,6 +30,7 @@ import { fmtPhone } from "@/lib/format";
 import type { Lead } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { promptFollowupSuggestion } from "@/lib/followup-prompt";
+import { recordSend, sentToday, overSoftLimit } from "@/lib/send-guard";
 
 // ---- helpers ----
 
@@ -226,6 +227,9 @@ function LeadCard({ lead, onSent, repo, refresh, defaultExpanded = false }: Card
 export default function CelularPage() {
   const { leads, loading, error, repo, refresh } = useLeads();
   const [sentCount, setSentCount] = useState(0);
+  const [guardCount, setGuardCount] = useState(() => {
+    try { return sentToday(); } catch { return 0; }
+  });
   // #7 — modo lote (fila continua): mostra um card por vez e avanca sozinho.
   const [mode, setMode] = useState<"lista" | "lote">("lista");
   const [deferred, setDeferred] = useState<string[]>([]);
@@ -247,6 +251,11 @@ export default function CelularPage() {
 
   const onSent = useCallback(() => {
     setSentCount((n) => n + 1);
+    const total = recordSend();
+    setGuardCount(total);
+    if (overSoftLimit(total)) {
+      toast.warning(`Você já mandou ${total} hoje. Vai com calma pra não arriscar o número.`);
+    }
   }, []);
 
   const skipLote = useCallback((id: string) => {
@@ -304,6 +313,11 @@ export default function CelularPage() {
           <span className="rounded-full bg-brand-50 px-2.5 py-0.5 text-[11.5px] font-bold text-brand">
             {queue.length}
           </span>
+          {guardCount > 0 && (
+            <span className="text-[11.5px] text-faint">
+              {guardCount} enviado{guardCount !== 1 ? "s" : ""} hoje
+            </span>
+          )}
           {/* #7 — alterna lista x lote */}
           <div className="ml-auto flex gap-1 rounded-full bg-[var(--inset)] p-1">
             <button

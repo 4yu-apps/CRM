@@ -42,6 +42,7 @@ import { googleSearchUrl, googleMapsUrl, metaAdsUrl } from "@/lib/links";
 import { siteSignalChips, signalChipClass } from "@/lib/site-signals";
 import { matchesSignal, SIGNAL_FILTER_OPTIONS, type SignalFilter } from "@/lib/quality-signals";
 import { Skeleton } from "@/components/skeleton";
+import { recordSend, sentToday, overSoftLimit } from "@/lib/send-guard";
 
 function LeadIcon({ category, size }: { category: string | null; size: number }) {
   const c = (category ?? "").toLowerCase();
@@ -183,6 +184,10 @@ export default function FilaPage() {
     return [...front, ...back];
   }, [baseQueue, ramo, sinal, sortBy, skipped]);
 
+  const [sendCount, setSendCount] = useState(() => {
+    try { return sentToday(); } catch { return 0; }
+  });
+
   const [edits, setEdits] = useState<Record<string, { m1: string; m2: string }>>({});
   const [sendLead, setSendLead] = useState<Lead | null>(null);
   const sendingRef = useRef(false); // trava re-entrada (2 Enter rapidos / clique duplo)
@@ -245,6 +250,11 @@ export default function FilaPage() {
       setSendLead(null);
       await refresh();
       toast.success("Pronto. Marquei como enviado.");
+      const total = recordSend();
+      setSendCount(total);
+      if (overSoftLimit(total)) {
+        toast.warning(`Você já mandou ${total} hoje. Vai com calma pra não arriscar o número.`);
+      }
       // #1 — oferece agendar o follow-up em 1 toque
       promptFollowupSuggestion({ lead: justSent, repo, onSaved: refresh });
     } catch (e) {
@@ -409,6 +419,11 @@ export default function FilaPage() {
           <div className="h-1.5 w-[160px] overflow-hidden rounded-full bg-[var(--inset)]">
             <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: "var(--grad)" }} />
           </div>
+          {sendCount > 0 && (
+            <span className="text-[11.5px] text-faint">
+              {sendCount} enviado{sendCount !== 1 ? "s" : ""} hoje
+            </span>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[12.5px] font-semibold text-faint">Ordenar por</span>

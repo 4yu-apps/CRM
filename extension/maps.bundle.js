@@ -105,6 +105,9 @@
         Object.assign(lead, fields);
         return { ...lead };
       },
+      async listTemplates() {
+        return [];
+      },
       // Mock: simula insercao, detecta duplicata por maps_place_id.
       async insertLead(lead) {
         const dup = lead.maps_place_id && leads.find((l) => l.maps_place_id === lead.maps_place_id);
@@ -159,6 +162,15 @@
       },
       async undoNoWhatsapp(lead) {
         return this.updateLead(lead.id, undoFields(lead));
+      },
+      async listTemplates() {
+        try {
+          const r = await fetch(`${base}/message_templates?select=*&order=created_at.desc`, { headers });
+          if (!r.ok) return [];
+          return r.json();
+        } catch {
+          return [];
+        }
       },
       // Insere um lead bruto vindo do Google Maps. owner_id cai no default
       // do banco (auth.uid() via RLS). Retorna o id do registro criado,
