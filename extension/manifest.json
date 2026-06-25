@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "4YU CRM — WhatsApp + Maps",
+  "name": "4YU CRM (WhatsApp e Maps)",
   "version": "0.1.0",
   "description": "Card lateral read-only no WhatsApp Web e captacao de leads direto do Google Maps. Nunca envia.",
   "icons": {
@@ -53,6 +53,12 @@
       ],
       "js": ["crm-bridge.bundle.js"],
       "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["icons/*.png"],
+      "matches": ["https://web.whatsapp.com/*"]
     }
   ],
   "options_page": "src/options/options.html",

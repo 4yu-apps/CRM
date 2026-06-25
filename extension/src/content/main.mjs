@@ -27,17 +27,17 @@ const state = {
   loggedIn: false,
   lastKey: "",
   lastName: "", // nome da conversa aberta (chave do casamento lembrado)
-  manual: {}, // { nomeDaConversa: telefone } — casamento por numero, lembrado
+  manual: {}, // { nomeDaConversa: telefone }: casamento por numero, lembrado
 };
 
 const EDIT_FIELDS = [
-  { key: "owner_name", label: "Dono / responsavel", type: "text" },
+  { key: "owner_name", label: "Dono / responsável", type: "text" },
   { key: "phone", label: "Telefone", type: "text" },
   { key: "whatsapp", label: "WhatsApp", type: "text" },
   { key: "email", label: "E-mail", type: "text" },
   { key: "instagram", label: "Instagram", type: "text" },
-  { key: "deal_value", label: "Orcamento (R$)", type: "number" },
-  { key: "meeting_link", label: "Link da reuniao (online)", type: "text" },
+  { key: "deal_value", label: "Orçamento (R$)", type: "number" },
+  { key: "meeting_link", label: "Link da reunião (online)", type: "text" },
   { key: "meeting_location", label: "Local (presencial)", type: "text" },
 ];
 
@@ -256,7 +256,7 @@ function mountPanel() {
   const panel = el("div", { id: PANEL_ID });
   panel.innerHTML = `
     <div class="gp-head">
-      <span class="gp-mark">4Y</span>
+      <span class="gp-mark"></span>
       <span class="gp-logo">4YU CRM</span>
       <span class="gp-src"></span>
       <span class="gp-sweep" id="gp-sweep"></span>
@@ -265,8 +265,18 @@ function mountPanel() {
       <button class="gp-close" title="Fechar painel" aria-label="Fechar painel">×</button>
     </div>
     <div class="gp-body"></div>
-    <div class="gp-foot">So le seu WhatsApp. Status e edicoes vao pro 4YU CRM.</div>`;
+    <div class="gp-foot">Só lê seu WhatsApp. Status e edições vão pro 4YU CRM.</div>`;
   document.body.append(panel);
+  // Injeta o icone real da extensao no .gp-mark (evita texto tecnico "4Y")
+  const markEl = panel.querySelector(".gp-mark");
+  if (markEl && typeof chrome !== "undefined" && chrome.runtime) {
+    const iconImg = document.createElement("img");
+    iconImg.src = chrome.runtime.getURL("icons/icon-32.png");
+    iconImg.alt = "4YU CRM";
+    iconImg.width = 20;
+    iconImg.height = 20;
+    markEl.append(iconImg);
+  }
   panel.querySelector(".gp-min").addEventListener("click", () => panel.classList.toggle("gp-collapsed"));
 
   // Launcher pra reabrir quando o painel e fechado de vez.
@@ -299,7 +309,7 @@ function mountPanel() {
 
 function updateBadge() {
   const src = document.querySelector(`#${PANEL_ID} .gp-src`);
-  if (src) src.textContent = state.loggedIn ? "SUPABASE" : "LOGIN";
+  if (src) src.textContent = state.loggedIn ? "" : "entrar";
   const out = document.querySelector(`#${PANEL_ID} .gp-logout`);
   if (out) out.style.display = state.loggedIn ? "" : "none";
 }
@@ -349,7 +359,7 @@ function renderBody(parsed, result) {
     return;
   }
   if (result.method === "ambiguous") {
-    body.append(el("p", { className: "gp-muted", textContent: "Varios leads possiveis:" }));
+    body.append(el("p", { className: "gp-muted", textContent: "Vários leads possíveis:" }));
     for (const c of result.candidates) {
       body.append(el("button", {
         className: "gp-cand",
@@ -367,8 +377,8 @@ function renderBody(parsed, result) {
   }
   // nenhum match -> mostra o que leu + colar numero (que fica lembrado)
   const who = parsed.phone ? fmtPhone(parsed.phone) : parsed.name || "conversa";
-  body.append(el("p", { className: "gp-muted", textContent: `Nao achei lead pra: ${who}` }));
-  body.append(el("p", { className: "gp-hint", textContent: "Cole o numero do contato uma vez — eu lembro dele nas proximas." }));
+  body.append(el("p", { className: "gp-muted", textContent: `Não achei lead pra: ${who}` }));
+  body.append(el("p", { className: "gp-hint", textContent: "Cole o número do contato uma vez, eu lembro dele nas próximas." }));
   body.append(manualBox());
 }
 
@@ -380,7 +390,7 @@ function leadCard(lead, method) {
   if (lead.phone) meta.append(el("span", { className: "gp-muted", textContent: fmtPhone(lead.phone) }));
   if (lead.score != null) meta.append(el("span", { className: "gp-muted", textContent: `score ${lead.score}` }));
   card.append(meta);
-  card.append(el("div", { className: "gp-method", textContent: `casou por ${method === "phone" ? "numero" : "nome"}` }));
+  card.append(el("div", { className: "gp-method", textContent: `casou por ${method === "phone" ? "número" : "nome"}` }));
 
   if (Array.isArray(lead.tags) && lead.tags.includes("sem-whatsapp")) {
     const box = el("div", { className: "gp-nowa" });
@@ -458,12 +468,12 @@ function editForm(lead) {
 
   const mAt = el("input", { className: "gp-input", type: "datetime-local", value: toLocalInput(lead.meeting_at) });
   inputs.meeting_at = mAt;
-  form.append(field("Reuniao (data/hora)", mAt));
+  form.append(field("Reunião (data/hora)", mAt));
 
   const notes = el("textarea", { className: "gp-input gp-textarea", rows: 3 });
   notes.value = lead.notes || "";
   inputs.notes = notes;
-  form.append(field("Anotacoes", notes));
+  form.append(field("Anotações", notes));
 
   const save = el("button", { className: "gp-save", textContent: "Salvar no lead" });
   save.addEventListener("click", async () => {
@@ -510,11 +520,11 @@ function toLocalInput(iso) {
 
 function manualBox() {
   const box = el("div", { className: "gp-manual" });
-  const input = el("input", { className: "gp-input", type: "text", placeholder: "Colar numero do contato" });
+  const input = el("input", { className: "gp-input", type: "text", placeholder: "Colar número do contato" });
   const go = el("button", { className: "gp-btn", textContent: "Buscar" });
   const apply = () => {
     const p = parsePhone(input.value);
-    if (!p) return toast("numero invalido", true);
+    if (!p) return toast("número inválido", true);
     if (state.lastName) {
       state.manual[state.lastName] = p; // lembra pra sempre nesse contato
       saveManual();

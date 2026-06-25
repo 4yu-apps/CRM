@@ -39,6 +39,12 @@
   font-weight: 800;
   letter-spacing: .02em;
 }
+#garimpo-panel .gp-mark img {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  display: block;
+}
 #garimpo-panel .gp-logo { font-weight: 700; }
 #garimpo-panel .gp-src {
   margin-left: auto;
@@ -48,6 +54,16 @@
   background: rgba(255, 255, 255, .15);
   padding: 1px 6px;
   border-radius: 999px;
+}
+/* Indicador de conexao: pontinho verde quando logado (texto vazio), "entrar" quando nao */
+#garimpo-panel .gp-src:empty::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #4ade80;
+  vertical-align: middle;
 }
 #garimpo-panel .gp-min {
   background: transparent;
