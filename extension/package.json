@@ -6,7 +6,8 @@
   "description": "Extensao Chrome MV3 read-only sobre o WhatsApp Web (Garimpo).",
   "scripts": {
     "test": "node --test",
-    "build": "esbuild src/content/main.mjs --bundle --format=iife --outfile=content.bundle.js --target=chrome110 && esbuild src/content/maps.mjs --bundle --format=iife --outfile=maps.bundle.js --target=chrome110 && esbuild src/content/crm-bridge.mjs --bundle --format=iife --outfile=crm-bridge.bundle.js --target=chrome110 && esbuild src/background.mjs --bundle --format=iife --outfile=background.bundle.js --target=chrome110 && esbuild src/content/wa-relay.mjs --bundle --format=iife --outfile=wa-relay.bundle.js --target=chrome111 && esbuild src/content/wa-glue.mjs --bundle --format=iife --outfile=wa-glue.bundle.js --target=chrome111 && cp node_modules/@wppconnect/wa-js/dist/wppconnect-wa.js wa-js.bundle.js"
+    "build": "esbuild src/content/main.mjs --bundle --format=iife --outfile=content.bundle.js --target=chrome110 && esbuild src/content/maps.mjs --bundle --format=iife --outfile=maps.bundle.js --target=chrome110 && esbuild src/content/crm-bridge.mjs --bundle --format=iife --outfile=crm-bridge.bundle.js --target=chrome110 && esbuild src/background.mjs --bundle --format=iife --outfile=background.bundle.js --target=chrome110 && esbuild src/content/wa-relay.mjs --bundle --format=iife --outfile=wa-relay.bundle.js --target=chrome111 && esbuild src/content/wa-glue.mjs --bundle --format=iife --outfile=wa-glue.bundle.js --target=chrome111 && cp node_modules/@wppconnect/wa-js/dist/wppconnect-wa.js wa-js.bundle.js",
+    "zip": "npm run build && python3 scripts/make-zip.py"
   },
   "devDependencies": {
     "esbuild": "^0.28.1"

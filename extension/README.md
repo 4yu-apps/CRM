@@ -26,6 +26,10 @@ O script roda como um **bundle clássico** (`content.bundle.js`) injetado direto
 pelo manifest — evita o CSP do WhatsApp Web que bloqueia `import()` dinâmico.
 Se editar algo em `src/`, rode `npm run build` pra regerar o bundle.
 
+Pra atualizar o pacote que o CRM oferece pra download, rode `npm run zip` — ele
+builda e escreve o zip em `front/public/4yu-crm-extension.zip` (assim o download
+do CRM nunca fica defasado vs o codigo). Precisa de `python3` (stdlib `zipfile`).
+
 ## Ligar no Supabase
 
 Página de opções da extensão (`chrome://extensions` → Detalhes → Opções):

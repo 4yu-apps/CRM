@@ -1,7 +1,15 @@
 (() => {
   // src/content/crm-bridge.mjs
+  var extVersion = (() => {
+    try {
+      return chrome.runtime.getManifest().version;
+    } catch {
+      return "";
+    }
+  })();
   document.documentElement.setAttribute("data-garimpo-ext", "1");
-  window.postMessage({ source: "garimpo-ext", type: "ready" }, "*");
+  if (extVersion) document.documentElement.setAttribute("data-garimpo-ext-version", extVersion);
+  window.postMessage({ source: "garimpo-ext", type: "ready", version: extVersion }, "*");
   window.addEventListener("message", (e) => {
     if (e.source !== window) return;
     const d = e.data;

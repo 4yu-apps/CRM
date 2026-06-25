@@ -4,8 +4,18 @@
 // 2) repassa o pedido da pagina pro service worker.
 // So a extensao enxerga chrome.* aqui; a pagina fala via window.postMessage.
 
+// Versao do manifest: deixa o CRM saber presenca E versao (pra futuros nudges
+// de "atualize a extensao"). Falha silenciosa se o contexto da extensao sumiu.
+const extVersion = (() => {
+  try {
+    return chrome.runtime.getManifest().version;
+  } catch {
+    return "";
+  }
+})();
 document.documentElement.setAttribute("data-garimpo-ext", "1");
-window.postMessage({ source: "garimpo-ext", type: "ready" }, "*");
+if (extVersion) document.documentElement.setAttribute("data-garimpo-ext-version", extVersion);
+window.postMessage({ source: "garimpo-ext", type: "ready", version: extVersion }, "*");
 
 window.addEventListener("message", (e) => {
   if (e.source !== window) return;

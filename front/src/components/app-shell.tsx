@@ -42,6 +42,7 @@ import type { Lead } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { searchLeads } from "@/lib/lead-search";
 import { CommandPalette } from "@/components/command-palette";
+import { ExtensionBadge } from "@/components/extension-badge";
 import {
   Sheet,
   SheetContent,
@@ -633,6 +634,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <HeaderSearch leads={leads} t={t} />
             <MobileSearch leads={leads} t={t} />
             <NotificationBell leads={leads} />
+            <ExtensionBadge />
             <Link
               href="/fila"
               className={cn(
