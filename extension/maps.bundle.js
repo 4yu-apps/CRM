@@ -77,6 +77,15 @@
   ];
 
   // src/lib/repo.mjs
+  function noWhatsappFields(lead, nowIso) {
+    const tags = Array.isArray(lead?.tags) ? lead.tags : [];
+    const next = tags.includes("sem-whatsapp") ? tags : [...tags, "sem-whatsapp"];
+    return { archived: true, tags: next, whatsapp_checked_at: nowIso };
+  }
+  function undoFields(lead) {
+    const tags = (Array.isArray(lead?.tags) ? lead.tags : []).filter((t) => t !== "sem-whatsapp");
+    return { archived: false, tags, whatsapp_checked_at: null };
+  }
   function mockRepo() {
     const leads = MOCK_LEADS.map((l) => ({ ...l }));
     return {
@@ -95,6 +104,9 @@
         if (!lead) throw new Error("lead nao encontrado");
         Object.assign(lead, fields);
         return { ...lead };
+      },
+      async listTemplates() {
+        return [];
       },
       // Mock: simula insercao, detecta duplicata por maps_place_id.
       async insertLead(lead) {
@@ -141,6 +153,24 @@
         if (!r.ok) throw new Error(`updateLead: ${r.status} ${await r.text()}`);
         const data = await r.json();
         return Array.isArray(data) ? data[0] : data;
+      },
+      async markNoWhatsapp(lead) {
+        return this.updateLead(lead.id, noWhatsappFields(lead, (/* @__PURE__ */ new Date()).toISOString()));
+      },
+      async markChecked(id) {
+        return this.updateLead(id, { whatsapp_checked_at: (/* @__PURE__ */ new Date()).toISOString() });
+      },
+      async undoNoWhatsapp(lead) {
+        return this.updateLead(lead.id, undoFields(lead));
+      },
+      async listTemplates() {
+        try {
+          const r = await fetch(`${base}/message_templates?select=*&order=created_at.desc`, { headers });
+          if (!r.ok) return [];
+          return r.json();
+        } catch {
+          return [];
+        }
       },
       // Insere um lead bruto vindo do Google Maps. owner_id cai no default
       // do banco (auth.uid() via RLS). Retorna o id do registro criado,

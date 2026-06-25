@@ -105,6 +105,9 @@
         Object.assign(lead, fields);
         return { ...lead };
       },
+      async listTemplates() {
+        return [];
+      },
       // Mock: simula insercao, detecta duplicata por maps_place_id.
       async insertLead(lead) {
         const dup = lead.maps_place_id && leads.find((l) => l.maps_place_id === lead.maps_place_id);
@@ -159,6 +162,15 @@
       },
       async undoNoWhatsapp(lead) {
         return this.updateLead(lead.id, undoFields(lead));
+      },
+      async listTemplates() {
+        try {
+          const r = await fetch(`${base}/message_templates?select=*&order=created_at.desc`, { headers });
+          if (!r.ok) return [];
+          return r.json();
+        } catch {
+          return [];
+        }
       },
       // Insere um lead bruto vindo do Google Maps. owner_id cai no default
       // do banco (auth.uid() via RLS). Retorna o id do registro criado,
@@ -350,6 +362,7 @@
     cfg: null,
     repo: null,
     leads: [],
+    templates: [],
     loggedIn: false,
     lastKey: "",
     lastName: "",
@@ -456,6 +469,11 @@
     observe();
     if (state.loggedIn) {
       await refreshLeads();
+      try {
+        state.templates = await state.repo.listTemplates();
+      } catch {
+        state.templates = [];
+      }
       void runSweep();
     }
     updateBadge();
@@ -661,6 +679,28 @@
     body.append(el("p", { className: "gp-hint", textContent: "Cole o numero do contato uma vez \u2014 eu lembro dele nas proximas." }));
     body.append(manualBox());
   }
+  function fillTemplate(body, lead) {
+    const nome = (lead.owner_name || "").split(" ")[0] || lead.business_name || "";
+    return body.replace(/\{nome\}/g, nome).replace(/\{ramo\}/g, lead.category || "").replace(/\{bairro\}/g, lead.neighborhood || "").replace(/\{cidade\}/g, lead.city || "");
+  }
+  function waPrefill(text) {
+    return new Promise((resolve) => {
+      const reqId = `pf-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const onMsg = (e) => {
+        if (e.source !== window) return;
+        const d = e.data;
+        if (!d || d.source !== "garimpo-page" || d.type !== "prefill_result" || d.reqId !== reqId) return;
+        window.removeEventListener("message", onMsg);
+        resolve(d.ok);
+      };
+      window.addEventListener("message", onMsg);
+      window.postMessage({ source: "garimpo-sw", type: "prefill", text, reqId }, "*");
+      setTimeout(() => {
+        window.removeEventListener("message", onMsg);
+        resolve(false);
+      }, 5e3);
+    });
+  }
   function leadCard(lead, method) {
     const card = el("div", { className: "gp-card" });
     card.append(el("div", { className: "gp-name", textContent: lead.business_name || "Sem nome" }));
@@ -714,6 +754,25 @@
       card.append(row);
     }
     card.append(editForm(lead));
+    const templates = (state.templates || []).slice(0, 6);
+    if (templates.length > 0) {
+      const section = el("div", { className: "gp-tpl" });
+      section.append(el("div", { className: "gp-tpl-title", textContent: "Respostas rapidas" }));
+      const btnsRow = el("div", { className: "gp-tpl-btns" });
+      for (const tpl of templates) {
+        btnsRow.append(el("button", {
+          className: "gp-btn gp-tpl-btn",
+          textContent: tpl.name,
+          onclick: async () => {
+            const text = fillTemplate(tpl.body, lead);
+            await waPrefill(text);
+            toast("E so revisar e enviar.");
+          }
+        }));
+      }
+      section.append(btnsRow);
+      card.append(section);
+    }
     return card;
   }
   async function openCorrigirNumero(lead) {

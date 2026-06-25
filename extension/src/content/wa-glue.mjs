@@ -203,5 +203,16 @@
       window.postMessage({ source: "garimpo-page", type: "open_result", ok, reqId: d.reqId }, "*");
       return;
     }
+
+    if (d.type === "prefill") {
+      let ok = false;
+      try {
+        ok = await prefill(String(d.text || ""));
+      } catch {
+        ok = false;
+      }
+      window.postMessage({ source: "garimpo-page", type: "prefill_result", ok, reqId: d.reqId }, "*");
+      return;
+    }
   });
 })();
