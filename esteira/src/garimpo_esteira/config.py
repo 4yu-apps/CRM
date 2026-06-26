@@ -95,7 +95,12 @@ class Config:
             ad_token=os.getenv("META_AD_LIBRARY_TOKEN"),
             llm=os.getenv("GARIMPO_LLM", "mock"),
             gemini_key=os.getenv("GEMINI_API_KEY") or os.getenv("gemini_API"),
-            gemini_keys=os.getenv("GEMINI_API_KEYS"),
+            # junta TODAS as chaves Gemini: GEMINI_API_KEYS (csv) + as numeradas no
+            # .env (GEMINI_API2, GEMINI_API3, ...). Cada chave = um projeto free
+            # (somam cota). gemini_keys() depois dedup com a singular.
+            gemini_keys=",".join(
+                k for k in [os.getenv("GEMINI_API_KEYS"), *(os.getenv(f"GEMINI_API{i}") for i in range(2, 11))] if k
+            ) or None,
             gemini_model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
             groq_key=os.getenv("GROQ_API_KEY"),
             groq_model=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
