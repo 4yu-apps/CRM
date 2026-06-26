@@ -301,8 +301,8 @@ export default function BuscarPage() {
       setPresets(pre);
       if (p) {
         setProfile(p);
-        // Inicia com o primeiro nicho do perfil (retrocompat: uma selecao)
-        setNiches(p.niches.length > 0 ? [p.niches[0]] : []);
+        // Default e "Qualquer ramo" (vazio). Quem quiser, filtra.
+        setNiches([]);
         setUf(p.state ?? "");
         setCity(p.city ?? "");
         setNeighborhood(p.neighborhood ?? "");
