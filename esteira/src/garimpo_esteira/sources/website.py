@@ -191,6 +191,15 @@ _GOOGLE_TAG_RE = re.compile(
 _TIKTOK_CH_RE = re.compile(r"tiktok\.com/@", re.I)
 _YOUTUBE_CH_RE = re.compile(r"youtube\.com/(?:@|c/|channel/|user/)|youtu\.be/", re.I)
 _LINKEDIN_CH_RE = re.compile(r"linkedin\.com/(?:company|in)/", re.I)
+# URL completa do canal (pra abrir e ver a marca: qualidade de posts/videos).
+_TIKTOK_URL_RE = re.compile(r"https?://(?:www\.)?tiktok\.com/@[\w.\-]+", re.I)
+_YOUTUBE_URL_RE = re.compile(r"https?://(?:www\.)?(?:youtube\.com/(?:@|c/|channel/|user/)[\w.\-]+|youtu\.be/[\w\-]+)", re.I)
+_LINKEDIN_URL_RE = re.compile(r"https?://(?:www\.)?linkedin\.com/(?:company|in)/[\w.\-]+", re.I)
+
+
+def _first_url(rx: "re.Pattern[str]", h: str) -> str | None:
+    m = rx.search(h)
+    return m.group(0) if m else None
 # Agendamento online (ouro pra automacao: ja tenta agendar, da pra integrar).
 _BOOKING_RE = re.compile(
     r"calendly\.com|booksy|simplybook|setmore|appointlet|trinks\.com|agendor\.com|"
@@ -295,6 +304,10 @@ def extract_site_signals(html: str, *, url: str = "") -> dict:
         "has_tiktok": bool(_TIKTOK_CH_RE.search(h)),
         "has_youtube": bool(_YOUTUBE_CH_RE.search(h)),
         "has_linkedin": bool(_LINKEDIN_CH_RE.search(h)),
+        # URL do canal (clicável na ficha): ver a marca, posts e vídeos.
+        "tiktok_url": _first_url(_TIKTOK_URL_RE, h),
+        "youtube_url": _first_url(_YOUTUBE_URL_RE, h),
+        "linkedin_url": _first_url(_LINKEDIN_URL_RE, h),
         "has_linktree": bool(_LINKTREE_RE.search(h)),
         "has_marketplace": bool(_MARKETPLACE_RE.search(h)),
         "mobile_ready": bool(_VIEWPORT_RE.search(h)),

@@ -60,6 +60,10 @@ export interface SiteSignals {
   has_tiktok?: boolean;
   has_youtube?: boolean;
   has_linkedin?: boolean;
+  // URL do canal (clicável: abrir e ver a marca, posts e vídeos).
+  tiktok_url?: string | null;
+  youtube_url?: string | null;
+  linkedin_url?: string | null;
   mobile_ready?: boolean;
   page_kb?: number;
   slow?: boolean;

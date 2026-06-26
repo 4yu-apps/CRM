@@ -29,7 +29,9 @@ SYSTEM = (
     "ativas + anuncia. Para hours: normalize o texto de horario em "
     '{"tz":"America/Sao_Paulo","days":{"mon":[["0900","1800"]],...}} usando as '
     "chaves mon,tue,wed,thu,fri,sat,sun e horas HHMM 24h; se nao houver horario "
-    "claro nos fatos, use null. Responda em portugues, sem emojis."
+    "claro nos fatos, use null. Se houver varios socios (socios>1), a decisao de "
+    "compra tende a ser mais lenta/dificil — leve isso em conta no pain. Responda "
+    "em portugues, sem emojis."
 )
 
 
@@ -43,7 +45,7 @@ def _facts(lead: Lead) -> str:
         f"categoria/CNAE: {lead.category or '-'}",
         f"cidade/UF: {(lead.city or '-')}/{(lead.state or '-')}",
         f"nota google: {lead.rating if lead.rating is not None else '-'} ({lead.reviews_count or 0} avaliacoes)",
-        f"abertura: {lead.opened_on or '-'} | porte: {lead.porte or '-'} | capital: {lead.capital_social or '-'}",
+        f"abertura: {lead.opened_on or '-'} | porte: {lead.porte or '-'} | capital: {lead.capital_social or '-'} | socios: {lead.socios_count if lead.socios_count is not None else '-'}",
         f"tem site: {yn(bool(lead.website))} | site lento: {yn(sig.get('slow'))} | mobile ok: {yn(sig.get('mobile_ready'))}",
         f"agendamento online: {yn(sig.get('has_online_booking'))} | e-commerce: {yn(sig.get('has_ecommerce'))}",
         f"instagram: {lead.instagram or '-'} | seguidores: {soc.get('followers') or '-'} | status: {soc.get('ig_status') or '-'} | engajamento: {soc.get('engagement') or '-'}",

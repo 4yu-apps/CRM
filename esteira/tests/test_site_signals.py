@@ -102,11 +102,26 @@ def test_extract_site_signals_returns_dict_with_all_keys():
         "has_google_tag", "has_chat_widget", "chat_vendor",
         "has_form", "has_online_booking", "has_ecommerce",
         "has_tiktok", "has_youtube", "has_linkedin",
+        "tiktok_url", "youtube_url", "linkedin_url",
         "has_linktree", "has_marketplace",
         "mobile_ready", "page_kb", "slow", "stack",
         "https", "has_h1", "has_title", "has_description", "og_image"
     }
     assert set(signals.keys()) == expected_keys
+
+
+def test_extract_site_signals_captura_urls_dos_canais():
+    html = (
+        '<a href="https://www.tiktok.com/@barbearia.lobo">tt</a>'
+        '<a href="https://youtube.com/@LoboTV">yt</a>'
+        '<a href="https://www.linkedin.com/company/lobo">in</a>'
+    )
+    s = extract_site_signals(html, url="https://x.com")
+    assert s["tiktok_url"] == "https://www.tiktok.com/@barbearia.lobo"
+    assert s["youtube_url"] == "https://youtube.com/@LoboTV"
+    assert s["linkedin_url"] == "https://www.linkedin.com/company/lobo"
+    # sem canal -> None
+    assert extract_site_signals("<p>nada</p>")["tiktok_url"] is None
 
 
 # --- anuncio pago vs analytics (precisao do "ja anuncia?") ------------------

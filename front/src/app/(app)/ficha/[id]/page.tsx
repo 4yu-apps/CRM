@@ -330,11 +330,16 @@ function RawSignalsPanel({ lead }: { lead: Lead }) {
     google: "Google Ads",
     tiktok: "TikTok",
   };
-  const channels = [
-    ...(lead.site_signals?.has_tiktok ? ["TikTok"] : []),
-    ...(lead.site_signals?.has_youtube ? ["YouTube"] : []),
-    ...(lead.site_signals?.has_linkedin ? ["LinkedIn"] : []),
-  ];
+  // canais extras como tiles CLICÁVEIS (abrir e ver a marca/posts/vídeos).
+  const sg = lead.site_signals ?? {};
+  const canalFacts: SignalFact[] = [];
+  const addCanal = (label: string, has: boolean | undefined, url: string | null | undefined) => {
+    if (url) canalFacts.push({ label, value: "Abrir canal", href: url });
+    else if (has) canalFacts.push({ label, value: "Presente" });
+  };
+  addCanal("TikTok", sg.has_tiktok, sg.tiktok_url);
+  addCanal("YouTube", sg.has_youtube, sg.youtube_url);
+  addCanal("LinkedIn", sg.has_linkedin, sg.linkedin_url);
   const adsActive = social.ads_active ?? lead.ads_active;
   const adHref = adLibraryUrl(lead);
   const mapHref = lead.lat != null && lead.lng != null
@@ -357,7 +362,7 @@ function RawSignalsPanel({ lead }: { lead: Lead }) {
         { label: "Última postagem", value: social.last_post ? fmtDateOnly(social.last_post) : null },
         { label: "Saúde do perfil", value: social.ig_status ? (social.ig_status === "parado" ? "Parado" : "Ativo") : null },
         { label: "Interações médias", value: social.engagement != null ? fmtNumber(social.engagement) : null },
-        { label: "Outros canais", value: channels.length ? channels.join(", ") : null },
+        ...canalFacts,
       ],
     },
     {
