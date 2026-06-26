@@ -13,9 +13,10 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .ai_stage import apply_ai
 from .autopilot import region_key, run_autopilot, run_drain, search_term
 from .cascade import enrich_batch, enrich_lead
-from .config import FIXTURES_DIR, Config, build_maps_source, build_places_source, build_provider, build_reviews_source, build_sink, build_sources
+from .config import FIXTURES_DIR, Config, build_ai_reader, build_maps_source, build_places_source, build_provider, build_reviews_source, build_sink, build_sources
 from .discovery import discover
 from .draft_stage import draft_batch, redraft_batch
 from .models import Lead
@@ -167,7 +168,7 @@ def cmd_autopilot(cfg: Config) -> int:
     summary = run_autopilot(
         sink, maps, provider, sources,
         batch=cfg.batch, delay=cfg.delay, extra_niches=cfg.extra_niches,
-        reviews_source=reviews_source, workers=workers,
+        reviews_source=reviews_source, workers=workers, ai_reader=build_ai_reader(cfg),
     )
     if not summary:
         print("  nenhum perfil com autopilot ligado (nada a fazer)")
@@ -233,7 +234,7 @@ def cmd_search(
         profession=profession, professions=professions,
         min_score=min_score, reviews_source=reviews_source,
         sender_name=sender_name,
-        workers=workers,
+        workers=workers, ai_reader=build_ai_reader(cfg),
     )
 
     # memoria de cobertura + feed de atividade do dono
@@ -280,7 +281,7 @@ def cmd_drain(cfg: Config) -> int:
     print(f"drain · sink={cfg.sink} llm={cfg.llm} workers={workers}")
     summary = run_drain(
         sink, sources, provider, batch=cfg.batch, delay=cfg.delay,
-        workers=workers, reviews_source=reviews_source,
+        workers=workers, reviews_source=reviews_source, ai_reader=build_ai_reader(cfg),
     )
     if not summary:
         print("  nada pendente (nenhum lead bruto/enriquecido/qualificado).")
@@ -342,6 +343,7 @@ def cmd_reprocess(cfg: Config) -> int:
     Places Details (pago) — esse so e montado a parte, no fluxo de descoberta."""
     sink = build_sink(cfg)
     sources = build_sources(cfg)
+    ai_reader = build_ai_reader(cfg)  # Leitura da IA (Gemini->Groq); None se sem chave
     # GARIMPO_OWNER escopa a um dono (pra dividir a carga em paralelo sem corrida:
     # um processo por dono). Vazio = todos os donos.
     owner = os.getenv("GARIMPO_OWNER") or None
@@ -377,6 +379,9 @@ def cmd_reprocess(cfg: Config) -> int:
             )
             if res.decision == "qualificado":
                 qualif += 1
+            # Leitura da IA: lê os dados já guardados (não re-baixa) e grava
+            # ai_signals + hours_struct (horário normalizado pro "aberto agora?").
+            apply_ai(ai_reader, lead, sink)
             print(f"  {lead.id}: score={res.score} {res.decision} alvo={res.service_target}")
         except Exception as e:
             # carimba mesmo no erro pra a onda avancar; como a ordem e

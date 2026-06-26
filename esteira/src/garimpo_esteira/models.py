@@ -25,6 +25,7 @@ ENRICHABLE_FIELDS = (
     "phone", "whatsapp", "email", "instagram", "facebook", "website",
     "owner_name", "cnpj", "places_detailed_at", "opened_on",
     "company_status", "category", "porte", "capital_social", "socios_count",
+    "fb_page_id", "opening_hours",
 )
 
 
@@ -88,6 +89,13 @@ class Lead:
     score_reason: dict[str, Any] | None = None
     service_target: ServiceTarget = "indefinido"
     ads_active: bool | None = None      # "ja anuncia?" (null = desconhecido)
+    # page_id do Facebook resolvido (Ad Library): guardado pra a proxima checagem
+    # ser direta/precisa, sem re-resolver o slug toda vez.
+    fb_page_id: str | None = None
+    # leitura da IA (Gemini): {segment, maturity, maturity_note, pain}.
+    ai_signals: dict[str, Any] | None = None
+    # horario normalizado pra calcular "aberto agora?" no front.
+    hours_struct: dict[str, Any] | None = None
 
     # sinais tecnicos do site, extraidos de graca do HTML (pixel, widget de chat,
     # form, mobile, peso, stack, og...). Alimentam o score por profissao e a ficha.

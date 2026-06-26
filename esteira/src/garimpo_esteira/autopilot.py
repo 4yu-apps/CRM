@@ -89,6 +89,7 @@ def run_autopilot(
     rng: random.Random | None = None,
     reviews_source=None,
     workers: int = 1,
+    ai_reader=None,
 ) -> list[dict]:
     """Itera os perfis com autopilot ligado. Por dono: descobre (pulando o ja
     varrido) e roda o pipeline so nos leads dele. Retorna um resumo por dono.
@@ -185,7 +186,7 @@ def run_autopilot(
                 sink, sources, provider, batch=batch, delay=delay, owner_id=owner,
                 profession=profession, professions=professions,
                 min_score=min_score, reviews_source=reviews_source, workers=workers,
-                sender_name=sender_name,
+                sender_name=sender_name, ai_reader=ai_reader,
             )
             score_batch(sink, batch=batch, owner_id=owner, profession=profession,
                         professions=professions, min_score=min_score)
@@ -210,6 +211,7 @@ def run_drain(
     delay: float = 0.0,
     workers: int = 1,
     reviews_source=None,
+    ai_reader=None,
 ) -> list[dict]:
     """Processa leads pendentes (bruto/enriquecido/qualificado) de TODO dono que
     tenha pendencia, com a profissao dele. E o que faz a captura da extensao (e
@@ -232,7 +234,7 @@ def run_drain(
                 sink, sources, provider, batch=batch, delay=delay, owner_id=owner,
                 profession=profession, professions=professions, min_score=min_score,
                 reviews_source=reviews_source, workers=workers,
-                sender_name=sender_name,
+                sender_name=sender_name, ai_reader=ai_reader,
             )
             # mop-up: termina quem ficou em enriquecido/qualificado de runs anteriores
             score_batch(sink, batch=batch, owner_id=owner, profession=profession,

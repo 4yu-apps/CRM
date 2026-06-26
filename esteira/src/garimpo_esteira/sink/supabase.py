@@ -22,6 +22,7 @@ _LEAD_COLS = (
     "category", "address", "neighborhood", "city", "state", "owner_name", "opt_out",
     "opened_on", "company_status", "porte", "capital_social", "socios_count",
     "score", "score_reason", "service_target", "ads_active",
+    "fb_page_id", "ai_signals", "hours_struct",
     "site_signals", "social_signals", "match_rate",
     "suggested_value", "suggested_value_reason",
     "draft_msg1", "draft_msg2", "draft_model", "draft_generated_at",

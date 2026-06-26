@@ -100,6 +100,21 @@ export interface SocialSignals {
   ad_platforms?: string[];
 }
 
+// Leitura da IA (Gemini): fatos digeridos pro humano. Não é a copy (essa fica boa
+// no rascunho); é o "raio-x" do lead.
+export interface AISignals {
+  segment?: string;        // micro-segmento ("barbearia masculina premium")
+  maturity?: number;       // maturidade digital 1-5
+  maturity_note?: string;  // 1 frase explicando a nota
+  pain?: string;           // dor/gancho principal pra abordagem
+}
+
+// horario normalizado: dias da semana -> faixas [abre,fecha] em HHMM (24h).
+export interface BusinessHours {
+  tz?: string;
+  days: Record<string, [string, string][]>;
+}
+
 // score_reason (jsonb): score explicavel. summary = o "porque" em PT (motivo);
 // criteria = os sinais lidos (cada um com nota curta).
 export interface ScoreReason {
@@ -150,6 +165,12 @@ export interface Lead {
   score_reason: ScoreReason | null;
   service_target: ServiceTarget;
   ads_active?: boolean | null;
+  // page_id do Facebook resolvido (Ad Library), guardado pra checagem direta.
+  fb_page_id?: string | null;
+  // Leitura da IA (Gemini): micro-segmento, maturidade 1-5, dor.
+  ai_signals?: AISignals | null;
+  // horario normalizado pra calcular "aberto agora?" (tag fora-do-horario).
+  hours_struct?: BusinessHours | null;
 
   opt_out: boolean;
   opt_out_at: string | null;

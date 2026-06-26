@@ -157,7 +157,13 @@ def build_sources(cfg: Config) -> list[Source]:
     # real: CNPJ via BrasilAPI (grátis), site via HTTP, Ad Library se houver token
     from .sources.ad_library import meta_ads_probe
 
-    ad = AdLibrarySource(probe=meta_ads_probe(cfg.ad_token)) if cfg.ad_token else AdLibrarySource()
+    # busca de anúncio por nome (search_terms) é ruidosa e gasta 1 chamada/lead
+    # (risco de 429). Off por padrão; liga com GARIMPO_AD_NAME_SEARCH=1.
+    _ad_name_search = os.getenv("GARIMPO_AD_NAME_SEARCH", "0") in ("1", "true", "True")
+    ad = (
+        AdLibrarySource(probe=meta_ads_probe(cfg.ad_token, name_search=_ad_name_search))
+        if cfg.ad_token else AdLibrarySource()
+    )
 
     # reforço de extracao por LLM (Groq, gratis) quando ha chave; senao so regex.
     llm_extract = None
@@ -274,6 +280,19 @@ def build_provider(cfg: Config) -> DraftProvider:
         prov = OpenAICompatDraftProvider(cfg.groq_key, "https://api.groq.com/openai/v1", cfg.groq_model)
         return _chain_fallback([prov, mock])
     return mock
+
+
+def build_ai_reader(cfg: Config):
+    """Leitor da IA (Leitura da IA na ficha): Gemini primário (3 chaves) -> Groq.
+    None se não há chave nenhuma (stage desligado, sem quebrar)."""
+    from .ai_stage import make_ai_reader
+
+    return make_ai_reader(
+        gemini_keys=gemini_keys(cfg),
+        gemini_model=cfg.gemini_model,
+        groq_key=cfg.groq_key,
+        groq_model=cfg.groq_model,
+    )
 
 
 def build_places_source(cfg: Config, sink):

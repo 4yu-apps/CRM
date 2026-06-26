@@ -14,6 +14,7 @@ from __future__ import annotations
 import time
 from collections.abc import Sequence
 
+from .ai_stage import apply_ai
 from .cascade import enrich_lead
 from .draft.base import DraftProvider
 from .draft_stage import draft_one
@@ -27,11 +28,13 @@ def process_one_lead(
     lead, sources: Sequence[Source], provider: DraftProvider, sink: LeadSink, *,
     profession: str | None = None, min_score: int = 0, reviews_source=None,
     professions: list[str] | None = None, sender_name: str | None = None,
+    ai_reader=None,
 ) -> dict:
     """Roda enrich -> score -> draft para UM lead. Retorna o que aconteceu:
     {"enriched": bool, "discarded": bool, "drafted": bool}."""
     enrich_lead(lead, sources, sink)  # bruto -> enriquecido
     result = score_one(lead, sink, profession, min_score, professions=professions)  # -> qualificado | descartado
+    apply_ai(ai_reader, lead, sink)  # Leitura da IA (Gemini->Groq), se houver chave
     drafted = False
     if result.decision == "qualificado":
         if draft_one(
@@ -51,7 +54,7 @@ def run_pipeline_streaming(
     batch: int = 20, delay: float = 0.0, owner_id: str | None = None,
     profession: str | None = None, min_score: int = 0, reviews_source=None,
     status: LeadStatus = "bruto", workers: int = 1, professions: list[str] | None = None,
-    sender_name: str | None = None,
+    sender_name: str | None = None, ai_reader=None,
 ) -> dict:
     """Busca leads 'bruto' (ordem de descoberta: created_at.asc) e processa cada
     um por inteiro, com try/except POR LEAD. Acumula as contagens e emite no fim
@@ -71,7 +74,7 @@ def run_pipeline_streaming(
         return process_one_lead(
             lead, sources, provider, sink,
             profession=profession, min_score=min_score, reviews_source=reviews_source,
-            professions=professions, sender_name=sender_name,
+            professions=professions, sender_name=sender_name, ai_reader=ai_reader,
         )
 
     def _tally(r) -> None:

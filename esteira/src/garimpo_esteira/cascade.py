@@ -105,6 +105,16 @@ def enrich_lead(
                 if value is not None:
                     social[key] = value
                     social_changed = True
+            elif f.field_name == "ad_platforms" and f.value:
+                # plataformas reais da Ad Library (facebook/instagram...); une com
+                # o que já houver (ex.: pixel do site).
+                try:
+                    plats = json.loads(f.value)
+                    if plats:
+                        social["ad_platforms"] = list(dict.fromkeys([*(social.get("ad_platforms") or []), *plats]))
+                        social_changed = True
+                except (ValueError, TypeError):
+                    pass
             # preenche coluna real só se estiver vazia (não sobrescreve edição humana)
             if f.field_name in ENRICHABLE_FIELDS and f.value and not lead.get(f.field_name):
                 column_updates[f.field_name] = f.value

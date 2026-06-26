@@ -238,6 +238,27 @@ _STACKS = {
 _LINKTREE_RE = re.compile(r"linktr\.ee|lit\.link|beacons\.ai|bio\.link|linkr\.bio|campsite\.bio", re.I)
 _MARKETPLACE_RE = re.compile(r"mercadolivre\.com|mercadolibre\.com|shopee\.com|elo7\.com|magazinevoce|/loja/", re.I)
 
+# horario de atendimento no texto (rodape/sessao "horario"): casa um dia/rotulo
+# perto de um horario (9h, 09:00, 9h30). So uma DICA em texto; a IA normaliza.
+_HOURS_RE = re.compile(
+    r"(?:hor[áa]rio|funcionamento|atendiment|aberto|seg(?:unda)?|ter[çc]a|quart|quint|sext|s[áa]bado|domingo)"
+    r"[^<]{0,140}?\d{1,2}\s*(?:h|:|hs|horas)\s*\d{0,2}",
+    re.I,
+)
+
+
+def extract_hours_hint(html: str) -> str | None:
+    """Acha uma DICA de horario de atendimento no texto do site (rodape costuma
+    ter). Devolve um trecho curto legivel, ou None. A IA normaliza depois."""
+    txt = re.sub(r"<(script|style)[\s\S]*?</\1>", " ", html or "", flags=re.I)
+    txt = re.sub(r"<[^>]+>", " ", txt)
+    txt = re.sub(r"\s+", " ", txt).strip()
+    m = _HOURS_RE.search(txt)
+    if not m:
+        return None
+    start = max(0, m.start() - 35)
+    return txt[start:m.end() + 70].strip()[:170]
+
 
 def extract_site_signals(html: str, *, url: str = "") -> dict:
     """Diagnostico tecnico do site a partir do HTML. Tudo de graca.
@@ -364,6 +385,11 @@ class WebsiteSource:
                 if perf:
                     sig.update(perf)
             findings.append(Finding("site_signals", self.name, json.dumps(sig), 0.9))
+            # horario de atendimento: muito site lista no rodape. Pega uma dica
+            # em texto (a IA normaliza depois pra calcular "aberto agora?").
+            hint = extract_hours_hint(html)
+            if hint:
+                findings.append(Finding("opening_hours", self.name, hint, 0.5))
             # "Ja anuncia?": so PIXEL DE ANUNCIO de verdade (Meta/Google Ads/
             # TikTok) deriva ads_active=sim. Analytics (GA/GTM) NAO conta: quase
             # todo site tem medicao e isso geraria falso "ja anuncia".

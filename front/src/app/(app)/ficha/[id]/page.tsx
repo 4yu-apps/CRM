@@ -42,6 +42,7 @@ import { waSend, openWhatsApp } from "@/lib/whatsapp";
 import { Skeleton } from "@/components/skeleton";
 import { googleSearchUrl, googleMapsUrl } from "@/lib/links";
 import { siteSignalChips, signalChipClass } from "@/lib/site-signals";
+import { openState } from "@/lib/business-hours";
 import { useCancelMeeting } from "@/hooks/use-cancel-meeting";
 import { SERVICE_META } from "@/lib/service";
 import { STATUS_META, TONE_CLASSES } from "@/lib/state-machine";
@@ -623,6 +624,7 @@ export default function FichaPage() {
   const service = SERVICE_META[lead.service_target] ?? SERVICE_META.indefinido;
   const statusMeta = STATUS_META[lead.status];
   const toneClass = TONE_CLASSES[statusMeta.tone];
+  const hoursState = openState(lead.hours_struct);
 
 
   const statusAgeDays = daysInStatus(history);
@@ -666,6 +668,14 @@ export default function FichaPage() {
                   title="Achei poucos canais de contato deste lead"
                 >
                   Poucos contatos
+                </span>
+              )}
+              {hoursState && !hoursState.open && (
+                <span
+                  className="rounded-full bg-amber-500/15 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-amber-700"
+                  title="Fora do horário de atendimento — pode não responder agora"
+                >
+                  Fora do horário
                 </span>
               )}
             </div>
@@ -828,6 +838,44 @@ export default function FichaPage() {
           {/* Coluna direita: leitura + abordagem (os fatos brutos vão num
               painel de largura cheia abaixo, pra não duplicar nem espremer) */}
           <div className="flex flex-col gap-5">
+            {/* Leitura da IA: raio-x do lead (segmento, maturidade, dor). */}
+            {lead.ai_signals && (lead.ai_signals.segment || lead.ai_signals.maturity != null || lead.ai_signals.pain) && (
+              <div className="rounded-[14px] border border-brand-100 bg-brand-50/60 p-4">
+                <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-brand-700">
+                  <Sparkle size={15} weight="fill" /> Leitura da IA
+                </div>
+                {lead.ai_signals.segment && (
+                  <div className="text-[14px] font-semibold text-ink">{lead.ai_signals.segment}</div>
+                )}
+                {lead.ai_signals.maturity != null && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-faint">Maturidade digital</span>
+                    <span className="flex gap-1">
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <span
+                          key={n}
+                          className={cn(
+                            "h-2 w-4 rounded-full",
+                            n <= (lead.ai_signals?.maturity ?? 0) ? "bg-brand" : "bg-border",
+                          )}
+                        />
+                      ))}
+                    </span>
+                    <span className="text-[12px] text-faint">{lead.ai_signals.maturity}/5</span>
+                  </div>
+                )}
+                {lead.ai_signals.maturity_note && (
+                  <p className="mt-1.5 text-[13px] text-ink-2">{lead.ai_signals.maturity_note}</p>
+                )}
+                {lead.ai_signals.pain && (
+                  <p className="mt-2 text-[13.5px] text-ink-2">
+                    <span className="font-semibold text-ink">Gancho: </span>
+                    {lead.ai_signals.pain}
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Sinais / score */}
             {lead.score_reason && (
               <div className="rounded-[14px] border border-brand-100 bg-brand-50 p-4">

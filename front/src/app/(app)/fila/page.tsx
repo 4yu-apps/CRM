@@ -41,6 +41,7 @@ import { openWhatsApp } from "@/lib/whatsapp";
 import { promptFollowupSuggestion } from "@/lib/followup-prompt";
 import { googleSearchUrl, googleMapsUrl, metaAdsUrl } from "@/lib/links";
 import { siteSignalChips, signalChipClass } from "@/lib/site-signals";
+import { openState } from "@/lib/business-hours";
 import { matchesSignal, negocioNovoChip, SIGNAL_FILTER_OPTIONS, type SignalFilter } from "@/lib/quality-signals";
 import { Skeleton } from "@/components/skeleton";
 import { recordSend, sentToday, overSoftLimit } from "@/lib/send-guard";
@@ -525,6 +526,17 @@ export default function FilaPage() {
                 <span className={cn("rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider", service.badge)}>
                   {service.short}
                 </span>
+                {(() => {
+                  const h = openState(cur.hours_struct);
+                  return h && !h.open ? (
+                    <span
+                      className="rounded-full bg-amber-500/15 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-amber-700"
+                      title="Fora do horário de atendimento — pode não responder agora"
+                    >
+                      Fora do horário
+                    </span>
+                  ) : null;
+                })()}
               </div>
               <div className="mt-1.5 flex flex-wrap items-center gap-3.5 text-[13.5px] text-muted-foreground">
                 <span className="flex items-center gap-1.5">
