@@ -30,6 +30,9 @@ import {
   GoogleLogo,
   MapTrifold,
   Megaphone,
+  Phone,
+  InstagramLogo,
+  IdentificationCard,
 } from "@phosphor-icons/react";
 import { useLeads } from "@/hooks/use-leads";
 import { SERVICE_META } from "@/lib/service";
@@ -66,17 +69,38 @@ function siteHref(site?: string | null): string | undefined {
   return /^https?:\/\//i.test(s) ? s : `https://${s}`;
 }
 
+// Instagram -> link do perfil (tira @). Telefone -> tel: (DDI BR quando local).
+// CNPJ -> consulta no cnpj.biz (so com 14 digitos validos; senao nao linka).
+function igHref(handle?: string | null): string | undefined {
+  const h = (handle ?? "").trim().replace(/^@/, "");
+  return h ? `https://instagram.com/${h}` : undefined;
+}
+function telHref(phone?: string | null): string | undefined {
+  const d = (phone ?? "").replace(/\D/g, "");
+  if (!d) return undefined;
+  return `tel:${d.length <= 11 ? `+55${d}` : `+${d}`}`;
+}
+function cnpjHref(cnpj?: string | null): string | undefined {
+  const d = (cnpj ?? "").replace(/\D/g, "");
+  return d.length === 14 ? `https://cnpj.biz/${d}` : undefined;
+}
+function igLabel(handle?: string | null): string {
+  const h = (handle ?? "").trim();
+  if (!h) return "-";
+  return h.startsWith("@") ? h : `@${h}`;
+}
+
 // Ordem pensada pra decisao de gestor de trafego: o que define o match vem
 // primeiro (ja anuncia = angulo; site = destino; contato = consigo falar;
 // instagram = canal atual). Dono e CNPJ ficam por ultimo (pouco decisivos).
-function fichaRows(l: Lead): { k: string; v: string; href?: string }[] {
+function fichaRows(l: Lead): { k: string; v: string; href?: string; icon?: React.ReactNode }[] {
   return [
     { k: "Já anuncia?", v: l.ads_active == null ? "Não sei (confira ao lado)" : l.ads_active ? "Sim, já anuncia" : "Ainda não" },
-    { k: "Site", v: l.website ? "Abrir site" : "Não tem", href: siteHref(l.website) },
-    { k: "Telefone", v: fmtPhone(l.phone) },
-    { k: "Instagram", v: l.instagram ?? "-" },
+    { k: "Site", v: l.website ? "Abrir site" : "Não tem", href: siteHref(l.website), icon: <Globe size={15} weight="bold" /> },
+    { k: "Telefone", v: fmtPhone(l.phone), href: telHref(l.phone), icon: <Phone size={15} weight="bold" /> },
+    { k: "Instagram", v: igLabel(l.instagram), href: igHref(l.instagram), icon: <InstagramLogo size={15} /> },
     { k: "Dono / responsável", v: l.owner_name ?? "-" },
-    { k: "CNPJ", v: l.cnpj ? fmtCnpj(l.cnpj) : "-" },
+    { k: "CNPJ", v: l.cnpj ? fmtCnpj(l.cnpj) : "-", href: cnpjHref(l.cnpj), icon: <IdentificationCard size={15} weight="bold" /> },
   ];
 }
 
@@ -595,11 +619,11 @@ export default function FilaPage() {
                   {r.href ? (
                     <a
                       href={r.href}
-                      target="_blank"
+                      target={r.href.startsWith("tel:") ? undefined : "_blank"}
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand hover:underline"
                     >
-                      <Globe size={15} weight="bold" />
+                      {r.icon}
                       {r.v}
                     </a>
                   ) : (
