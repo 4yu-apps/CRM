@@ -25,10 +25,27 @@ def test_sem_score_reason_nao_quebra():
 
 
 def test_angulo_1_ads_sem_site():
-    # ads_active=True mas sem site => menciona "escapar" ou "reter"
-    lead = _lead(ads_active=True, website=None)
+    # ads_active=True mas sem site => menciona "escapar" ou "reter".
+    # So vale pra quem VENDE site (design); trafego/automacao nao falam de site.
+    lead = _lead(ads_active=True, website=None, service_target="design")
     p = build_prompt(lead)
     assert "escapar" in p or "reter" in p
+
+
+def test_trafego_nao_sugere_site():
+    # Regra do dono: trafego/automacao NUNCA comentam falta de site nem citam
+    # WordPress/Wix nos sinais (so design/web vendem site). Checa as frases que
+    # SO aparecem quando um sinal de site entra (o texto fixo da instrucao cita
+    # "site" como exemplo de fato, por isso checamos frases especificas).
+    lead = _lead(service_target="trafego", website=None, ads_active=True,
+                 site_signals={"perf_score": 20, "stack": "wordpress"})
+    p = build_prompt(lead)
+    assert "oportunidade de criar a presenca" not in p
+    assert "da pra modernizar" not in p
+    assert "site lento no celular" not in p
+    assert "nao tem site pra reter" not in p
+    assert "wordpress" not in p
+    assert "PROIBIDO falar de site" in p
 
 
 def test_angulo_2_base_fiel():
@@ -154,7 +171,9 @@ def test_sinal_ja_anuncia_plataforma_aparece():
 
 
 def test_sinal_site_lento_pagespeed():
-    lead = _lead(website="https://x.com", site_signals={"perf_score": 22})
+    # Sinal de site so entra pra quem vende site (design/web).
+    lead = _lead(website="https://x.com", site_signals={"perf_score": 22},
+                 service_target="design")
     p = build_prompt(lead)
     assert "site lento no celular" in p
 

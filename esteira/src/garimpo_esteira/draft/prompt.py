@@ -109,18 +109,26 @@ _SERVICE_BRIEF = {
         "hamburgueria, etc.), pergunte de leve sobre o canal de vendas deles, por "
         "exemplo: 'voces ja trabalham com iFood ou tem canal proprio?' ou "
         "'voces estao no iFood ou e mais no salao/proprio?'. Isso e uma PERGUNTA "
-        "genuina (nao sabemos a resposta), nunca afirme que eles dependem do iFood."
+        "genuina (nao sabemos a resposta), nunca afirme que eles dependem do iFood. "
+        "PROIBIDO falar de site: NUNCA sugira criar, refazer ou modernizar site, "
+        "nem cite WordPress/Wix/landing. Site nao e o seu servico (no maximo e o "
+        "destino do anuncio, nunca a oferta). Nao comente que falta site."
     ),
     "automacao": (
         "Servico: AUTOMACAO (chatbot/atendimento no WhatsApp). Gancho em volume e "
         "operacao (muito cliente, atende e agenda na mao). Valor: atendimento que "
         "responde e agenda sozinho, sem perder cliente quando esta cheio. Se a "
         "categoria for de agendamento (clinica, salao, barbearia, pet, academia), "
-        "pergunte como lidam com a agenda hoje (na mao pelo WhatsApp?)."
+        "pergunte como lidam com a agenda hoje (na mao pelo WhatsApp?). "
+        "PROIBIDO falar de site: NUNCA sugira criar, refazer ou modernizar site, "
+        "nem cite WordPress/Wix. Seu servico e atendimento/WhatsApp, nao site. "
+        "Nao comente que falta site."
     ),
     "ambos": (
         "Servico: TRAFEGO + AUTOMACAO. Lidera com trafego e cita a automacao de "
-        "leve no fim como upsell ('e ainda da pra automatizar o atendimento depois')."
+        "leve no fim como upsell ('e ainda da pra automatizar o atendimento depois'). "
+        "PROIBIDO falar de site: NUNCA sugira criar, refazer ou modernizar site, "
+        "nem cite WordPress/Wix. Site nao e o seu servico. Nao comente que falta site."
     ),
     "design": (
         "Servico: DESIGN / SITE. Gancho na presenca digital (site fraco, antigo, "
@@ -137,7 +145,8 @@ _SERVICE_BRIEF = {
         "'clientes que ja conhecem voltam, mas indicam? como chega gente nova?'"
     ),
     "indefinido": (
-        "Servico: a definir; lidere com trafego (anuncio local) como padrao."
+        "Servico: a definir; lidere com trafego (anuncio local) como padrao. "
+        "Nao sugira criar site nem cite WordPress/Wix."
     ),
 }
 
@@ -220,6 +229,10 @@ def _brief_key(lead: Lead) -> str:
 def build_prompt(lead: Lead) -> str:
     b = lead_brief(lead)
     key = _brief_key(lead)
+    # So profissoes que VENDEM site (design/web/branding -> key "design") podem
+    # usar site como gancho. Pra trafego/automacao/ambos/marketing, site nao e o
+    # servico: nao entra como sinal nem vira sugestao na abertura.
+    sells_site = key == "design"
     sig = getattr(lead, "site_signals", None) or {}
     # contexto pra VOCE, modelo. NAO repita numeros na mensagem (ver regra critica).
     sinais: list[str] = []
@@ -227,15 +240,18 @@ def build_prompt(lead: Lead) -> str:
         sinais.append("boa reputacao no Google (bem avaliado)")
     elif b["nota"] is not None:
         sinais.append("reputacao mediana")
-    if not b["tem_site"]:
-        sinais.append("nao tem site (oportunidade de criar a presenca)")
-    elif sig.get("mobile_ready") is False:
-        sinais.append("tem site, mas nao e adaptado pra celular")
-    elif sig.get("stack") in ("wix", "wordpress", "squarespace"):
-        sinais.append(f"site feito em {sig.get('stack')} (da pra modernizar)")
-    ps = sig.get("perf_score")
-    if isinstance(ps, (int, float)) and ps < 50 and b["tem_site"]:
-        sinais.append("site lento no celular (PageSpeed baixo)")
+    # Sinais de site so entram pra quem vende site. Pra trafego/automacao eles
+    # nao aparecem (senao a IA usa "nao tem site" como gancho e sugere criar um).
+    if sells_site:
+        if not b["tem_site"]:
+            sinais.append("nao tem site (oportunidade de criar a presenca)")
+        elif sig.get("mobile_ready") is False:
+            sinais.append("tem site, mas nao e adaptado pra celular")
+        elif sig.get("stack") in ("wix", "wordpress", "squarespace"):
+            sinais.append(f"site feito em {sig.get('stack')} (da pra modernizar)")
+        ps = sig.get("perf_score")
+        if isinstance(ps, (int, float)) and ps < 50 and b["tem_site"]:
+            sinais.append("site lento no celular (PageSpeed baixo)")
     if not b["tem_instagram"]:
         sinais.append("sem presenca no Instagram")
     social = getattr(lead, "social_signals", None) or {}
@@ -261,7 +277,7 @@ def build_prompt(lead: Lead) -> str:
     plats = social.get("ad_platforms") or sig.get("ad_platforms") or []
     onde = f" ({', '.join(plats)})" if plats else ""
     ja_anuncia = ads is True or bool(plats)
-    if ja_anuncia and not b["tem_site"]:
+    if ja_anuncia and not b["tem_site"] and sells_site:
         sinais.append(
             "ja investe em anuncio mas nao tem site pra reter "
             "(paga pra trazer cliente e deixa escapar)"

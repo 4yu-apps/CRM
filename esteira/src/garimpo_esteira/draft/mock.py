@@ -44,20 +44,23 @@ def _greeting(nome: str) -> str:
     return _GREETINGS[len(nome) % len(_GREETINGS)]
 
 
-def _gancho(b: dict, lead: Lead) -> str:
+def _gancho(b: dict, lead: Lead, service: str) -> str:
     """Clausula curta sobre UM sinal real (a ancora da abertura). Comeca em
     minuscula, pra emendar em 'Encontrei a X no Google e {gancho}.'. Sem repetir
     'vi que voces' e enxuto, pra a abertura nao ficar viciosa nem grande."""
     seg = (b["segmento"] or "").lower()
     com_seg = f" com {seg}" if seg else ""
     boa = b["nota"] is not None and b["nota"] >= 4.5
+    # So quem vende site (design/web/branding -> "design") usa falta de site como
+    # gancho. Trafego/automacao NUNCA comentam site na abertura.
+    sells_site = service == "design"
     if _advertises(lead) and boa:
         return "vi que já anunciam e ainda têm uma ótima reputação"
     if _advertises(lead):
         return "reparei que já estão anunciando"
-    if boa and not b["tem_site"]:
+    if sells_site and boa and not b["tem_site"]:
         return "a reputação de vocês está ótima, mas não achei um site"
-    if not b["tem_site"]:
+    if sells_site and not b["tem_site"]:
         return f"gostei do trabalho{com_seg}, mas não encontrei um site"
     if not b["tem_instagram"]:
         return "procurei no Instagram e não achei nada"
@@ -94,7 +97,7 @@ def _abertura(b: dict, lead: Lead, service: str) -> str:
     sender = (getattr(lead, "sender_name", None) or "").strip()
     intro = f"Me chamo {sender}, {self_desc(lead)}. " if sender else ""
     return (
-        f"{_greeting(nome)} {intro}Encontrei a {nome} no Google e {_gancho(b, lead)}. "
+        f"{_greeting(nome)} {intro}Encontrei a {nome} no Google e {_gancho(b, lead, service)}. "
         f"{_pergunta(b, lead, service)}"
     )
 
