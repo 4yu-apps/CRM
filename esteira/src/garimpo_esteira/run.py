@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -341,8 +342,12 @@ def cmd_reprocess(cfg: Config) -> int:
     Places Details (pago) — esse so e montado a parte, no fluxo de descoberta."""
     sink = build_sink(cfg)
     sources = build_sources(cfg)
-    leads = sink.fetch_reprocess(cfg.batch)
-    print(f"reprocess · sink={cfg.sink} sources={cfg.sources_mode} batch={cfg.batch} alvo={len(leads)}")
+    # GARIMPO_OWNER escopa a um dono (pra dividir a carga em paralelo sem corrida:
+    # um processo por dono). Vazio = todos os donos.
+    owner = os.getenv("GARIMPO_OWNER") or None
+    leads = sink.fetch_reprocess(cfg.batch, owner)
+    scope = owner[:8] if owner else "todos"
+    print(f"reprocess · sink={cfg.sink} sources={cfg.sources_mode} owner={scope} batch={cfg.batch} alvo={len(leads)}")
     if not leads:
         print("  nada pra reprocessar")
         return 0

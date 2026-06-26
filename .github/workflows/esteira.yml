@@ -135,6 +135,13 @@ jobs:
             # cairia no mock). A rotacao (mais antigo primeiro) deixa re-rodar o
             # que sobrar caso a cota diaria de tokens corte no meio.
             GARIMPO_DELAY="2.5" python -m garimpo_esteira.run redraft
+          elif [ "$CMD" = "reprocess" ]; then
+            # Parte 2: re-enrich + re-score dos leads antigos, SEM mudar status.
+            # Escopado a um dono (input owner) pra dividir a carga em paralelo sem
+            # corrida. Delay gentil pro Meta. build_sources NAO inclui o Places
+            # Details (pago) — reprocessamento e 100% free. Batch pelo input.
+            GARIMPO_OWNER="${{ github.event.inputs.owner }}" GARIMPO_DELAY="1.0" \
+              python -m garimpo_esteira.run reprocess
           else
             python -m garimpo_esteira.run "$CMD"
             if [ "$CMD" = "autopilot" ]; then
