@@ -30,7 +30,6 @@ import {
   GoogleLogo,
   MapTrifold,
   Megaphone,
-  Phone,
   InstagramLogo,
   IdentificationCard,
 } from "@phosphor-icons/react";
@@ -75,10 +74,20 @@ function igHref(handle?: string | null): string | undefined {
   const h = (handle ?? "").trim().replace(/^@/, "");
   return h ? `https://instagram.com/${h}` : undefined;
 }
-function telHref(phone?: string | null): string | undefined {
-  const d = (phone ?? "").replace(/\D/g, "");
-  if (!d) return undefined;
-  return `tel:${d.length <= 11 ? `+55${d}` : `+${d}`}`;
+// Telefone abre WhatsApp (o padrao no Brasil). Mas nem todo numero e celular:
+// celular tem 9 na frente do assinante (11 digitos com DDD). Fixo tem 8 digitos
+// (10 com DDD). Quando o enricher ja classificou (phone_type) usa ele; senao,
+// cai na heuristica dos digitos. So rotula quando confia; formato estranho fica
+// sem badge pra nao mentir.
+function looksFixo(l: Lead): boolean {
+  const t = l.site_signals?.phone_type;
+  if (t === "fixo") return true;
+  if (t === "celular") return false;
+  let d = (l.phone ?? "").replace(/\D/g, "");
+  if (d.startsWith("55") && d.length >= 12) d = d.slice(2); // tira DDI
+  if (d.length === 11) return d[2] !== "9"; // 3o digito (1o do assinante) = 9 -> celular
+  if (d.length === 10) return true; // 8 digitos sem o 9 -> fixo
+  return false;
 }
 function cnpjHref(cnpj?: string | null): string | undefined {
   const d = (cnpj ?? "").replace(/\D/g, "");
@@ -93,11 +102,19 @@ function igLabel(handle?: string | null): string {
 // Ordem pensada pra decisao de gestor de trafego: o que define o match vem
 // primeiro (ja anuncia = angulo; site = destino; contato = consigo falar;
 // instagram = canal atual). Dono e CNPJ ficam por ultimo (pouco decisivos).
-function fichaRows(l: Lead): { k: string; v: string; href?: string; icon?: React.ReactNode }[] {
+function fichaRows(
+  l: Lead,
+): { k: string; v: string; href?: string; onClick?: () => void; icon?: React.ReactNode; badge?: string }[] {
   return [
     { k: "Já anuncia?", v: l.ads_active == null ? "Não sei (confira ao lado)" : l.ads_active ? "Sim, já anuncia" : "Ainda não" },
     { k: "Site", v: l.website ? "Abrir site" : "Não tem", href: siteHref(l.website), icon: <Globe size={15} weight="bold" /> },
-    { k: "Telefone", v: fmtPhone(l.phone), href: telHref(l.phone), icon: <Phone size={15} weight="bold" /> },
+    {
+      k: "Telefone",
+      v: fmtPhone(l.phone),
+      onClick: l.phone ? () => openWhatsApp(l.phone) : undefined,
+      icon: <WhatsappLogo size={15} weight="fill" />,
+      badge: l.phone && looksFixo(l) ? "possível fixo" : undefined,
+    },
     { k: "Instagram", v: igLabel(l.instagram), href: igHref(l.instagram), icon: <InstagramLogo size={15} /> },
     { k: "Dono / responsável", v: l.owner_name ?? "-" },
     { k: "CNPJ", v: l.cnpj ? fmtCnpj(l.cnpj) : "-", href: cnpjHref(l.cnpj), icon: <IdentificationCard size={15} weight="bold" /> },
@@ -616,19 +633,35 @@ export default function FilaPage() {
               {fichaRows(cur).map((r) => (
                 <div key={r.k} className="bg-card p-3.5">
                   <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-faint">{r.k}</div>
-                  {r.href ? (
-                    <a
-                      href={r.href}
-                      target={r.href.startsWith("tel:") ? undefined : "_blank"}
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand hover:underline"
-                    >
-                      {r.icon}
-                      {r.v}
-                    </a>
-                  ) : (
-                    <div className="text-sm font-semibold">{r.v}</div>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {r.href ? (
+                      <a
+                        href={r.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand hover:underline"
+                      >
+                        {r.icon}
+                        {r.v}
+                      </a>
+                    ) : r.onClick ? (
+                      <button
+                        type="button"
+                        onClick={r.onClick}
+                        className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand hover:underline"
+                      >
+                        {r.icon}
+                        {r.v}
+                      </button>
+                    ) : (
+                      <div className="text-sm font-semibold">{r.v}</div>
+                    )}
+                    {r.badge && (
+                      <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10.5px] font-semibold text-amber-700 dark:text-amber-300">
+                        {r.badge}
+                      </span>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
