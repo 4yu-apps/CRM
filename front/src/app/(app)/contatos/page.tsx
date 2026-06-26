@@ -112,6 +112,60 @@ function siteUrl(site?: string | null): string | undefined {
   return /^https?:\/\//i.test(s) ? s : `https://${s}`;
 }
 
+// Coluna extra dependente da profissao do dono. Cada perfil quer saber um sinal
+// diferente do lead, vindo do enriquecimento da busca:
+//  - trafego/automacao/ambos -> "Ja anuncia?" (ads_active: sim/nao/nao sei)
+//  - design (UX) / web        -> "Tem site?"   (website)
+//  - marketing / branding     -> "Tem Instagram?" (instagram)
+type SignalVal = "sim" | "nao" | "naosei";
+interface SignalColumn {
+  header: string;
+  get: (l: Lead) => SignalVal;
+}
+
+const COL_ANUNCIA: SignalColumn = {
+  header: "Já anuncia?",
+  get: (l) => {
+    const a = l.ads_active ?? l.social_signals?.ads_active ?? null;
+    return a === true ? "sim" : a === false ? "nao" : "naosei";
+  },
+};
+const COL_SITE: SignalColumn = {
+  header: "Tem site?",
+  get: (l) => (l.website?.trim() ? "sim" : "nao"),
+};
+const COL_INSTA: SignalColumn = {
+  header: "Tem Instagram?",
+  get: (l) => (l.instagram?.trim() ? "sim" : "nao"),
+};
+
+// Profissao primaria do dono -> coluna. Default (sem perfil) = "Ja anuncia?".
+function signalColumnFor(profession: string | null): SignalColumn {
+  switch (profession) {
+    case "design":
+    case "web":
+      return COL_SITE;
+    case "marketing":
+    case "branding":
+      return COL_INSTA;
+    default:
+      return COL_ANUNCIA; // trafego, automacao, ambos, indefinido
+  }
+}
+
+function SignalCell({ v }: { v: SignalVal }) {
+  const meta = {
+    sim: { label: "Sim", cls: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300" },
+    nao: { label: "Não", cls: "bg-muted text-muted-foreground" },
+    naosei: { label: "Não sei", cls: "border border-dashed border-border-2 text-faint" },
+  }[v];
+  return (
+    <span className={cn("inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold", meta.cls)}>
+      {meta.label}
+    </span>
+  );
+}
+
 function StatusBadge({ status }: { status: LeadStatus }) {
   const meta = STATUS_META[status];
   return (
@@ -165,6 +219,9 @@ export default function ContatosPage() {
   const router = useRouter();
   const { leads, loading, error, refresh, repo } = useLeads();
 
+  // Profissao primaria do dono: define a coluna-sinal da tabela.
+  const [profession, setProfession] = useState<string | null>(null);
+
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<LeadStatus | "">("");
   const [ramoFilter, setRamoFilter] = useState<string>("");
@@ -201,6 +258,23 @@ export default function ContatosPage() {
     });
     return out;
   }, [leads, q, statusFilter, ramoFilter, sinalFilter, tagFilter, showArchived, sort]);
+
+  // Carrega o perfil uma vez pra saber a profissao (coluna-sinal da tabela).
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      try {
+        const p = await repo.getProfile();
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        if (alive) setProfession(p?.professions?.[0] ?? p?.profession ?? null);
+      } catch {
+        /* perfil ausente nao quebra a tela; cai no default "Ja anuncia?" */
+      }
+    })();
+    return () => { alive = false; };
+  }, [repo]);
+
+  const signalCol = useMemo(() => signalColumnFor(profession), [profession]);
 
   // tags distintas pro filtro (#20)
   const tagOptions: DropdownOption[] = useMemo(() => {
@@ -425,7 +499,7 @@ export default function ContatosPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-[1180px]">
+      <div className="mx-auto max-w-[1280px]">
         <ListSkeleton rows={10} />
       </div>
     );
@@ -434,7 +508,7 @@ export default function ContatosPage() {
   // Erro de carregamento: distinto do estado "vazio" (que enganava o usuario).
   if (error) {
     return (
-      <div className="mx-auto max-w-[1180px]">
+      <div className="mx-auto max-w-[1280px]">
         <div className="rounded-[16px] border border-danger/30 bg-danger-bg px-5 py-4 text-[14px] text-danger">
           Não consegui carregar seus contatos: {error}
           <button type="button" onClick={() => void refresh()} className="ml-3 font-semibold underline">
@@ -446,20 +520,20 @@ export default function ContatosPage() {
   }
 
   return (
-    <div className="mx-auto max-w-[1180px]">
+    <div className="mx-auto max-w-[1280px]">
       {/* Barra de ferramentas */}
       <div className="mb-4 flex flex-col gap-3">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-          <div className="relative flex-1">
-            <MagnifyingGlass size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-faint" />
+        <div className="flex flex-col gap-3">
+          <div className="relative w-full">
+            <MagnifyingGlass size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-faint" />
             <input
               value={q}
               onChange={(e) => { setQ(e.target.value); setPage(1); }}
               placeholder="Buscar por nome, cidade, telefone..."
-              className="w-full rounded-xl border border-border-2 bg-surface-2 py-3 pl-10 pr-4 text-[14px] text-ink outline-none focus:border-brand"
+              className="w-full rounded-xl border border-border-2 bg-surface-2 py-3 pl-11 pr-4 text-[14px] text-ink outline-none focus:border-brand"
             />
           </div>
-          <div className="flex flex-wrap gap-2.5">
+          <div className="flex flex-wrap items-center gap-2.5">
             <Dropdown
               value={statusFilter}
               onChange={(v) => { setStatusFilter((v as LeadStatus) || ""); setPage(1); }}
@@ -590,7 +664,7 @@ export default function ContatosPage() {
       {/* Lista / tabela */}
       <div className="overflow-hidden rounded-[16px] border border-border bg-card shadow-[var(--shadow)]">
         {/* Cabecalho (desktop) */}
-        <div className="hidden grid-cols-[auto_2.4fr_1fr_1.1fr_1fr_0.6fr_0.9fr_auto] gap-3 border-b border-border bg-surface-2 px-5 py-3 text-[11.5px] font-bold uppercase tracking-wider text-faint lg:grid lg:items-center">
+        <div className="hidden grid-cols-[auto_2.2fr_1fr_1fr_0.9fr_0.9fr_0.6fr_0.85fr_auto] gap-3 border-b border-border bg-surface-2 px-5 py-3 text-[11.5px] font-bold uppercase tracking-wider text-faint lg:grid lg:items-center">
           <input
             type="checkbox"
             checked={selected.size > 0 && selected.size === filtered.length}
@@ -601,6 +675,7 @@ export default function ContatosPage() {
           <span>Status</span>
           <span>Local</span>
           <span>Contato</span>
+          <span>{signalCol.header}</span>
           <span>Score</span>
           <span>Atualizado</span>
           <span className="text-right">Ações</span>
@@ -637,7 +712,7 @@ export default function ContatosPage() {
             {paged.map((lead) => (
               <div
                 key={lead.id}
-                className="group grid cursor-pointer grid-cols-[auto_1fr] items-start gap-x-3 gap-y-2 px-5 py-3.5 transition-colors hover:bg-accent/40 lg:grid-cols-[auto_2.4fr_1fr_1.1fr_1fr_0.6fr_0.9fr_auto] lg:items-center lg:gap-3"
+                className="group grid cursor-pointer grid-cols-[auto_1fr] items-start gap-x-3 gap-y-2 px-5 py-3.5 transition-colors hover:bg-accent/40 lg:grid-cols-[auto_2.2fr_1fr_1fr_0.9fr_0.9fr_0.6fr_0.85fr_auto] lg:items-center lg:gap-3"
               >
                 {/* Selecao: visivel no mobile (ocupa a 1a coluna) e no desktop */}
                 <label
@@ -698,6 +773,14 @@ export default function ContatosPage() {
                   {!lead.whatsapp && !lead.phone && !lead.instagram && !lead.website && (
                     <span className="text-[12px] text-faint">-</span>
                   )}
+                </div>
+
+                {/* Sinal por profissao (Ja anuncia? / Tem site? / Tem Instagram?) */}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-faint lg:hidden">
+                    {signalCol.header}
+                  </span>
+                  <SignalCell v={signalCol.get(lead)} />
                 </div>
 
                 {/* Score */}
