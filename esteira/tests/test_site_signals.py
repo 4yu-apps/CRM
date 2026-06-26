@@ -102,6 +102,7 @@ def test_extract_site_signals_returns_dict_with_all_keys():
         "has_google_tag", "has_chat_widget", "chat_vendor",
         "has_form", "has_online_booking", "has_ecommerce",
         "has_tiktok", "has_youtube", "has_linkedin",
+        "has_linktree", "has_marketplace",
         "mobile_ready", "page_kb", "slow", "stack",
         "https", "has_h1", "has_title", "has_description", "og_image"
     }

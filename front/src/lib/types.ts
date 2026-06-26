@@ -79,6 +79,11 @@ export interface SiteSignals {
   domain_created?: string;
   domain_age_days?: number;
   phone_type?: string; // celular | fixo
+  // regime tributario (BrasilAPI) e maturidade digital extra (scrape)
+  simples?: boolean;
+  mei?: boolean;
+  has_linktree?: boolean;
+  has_marketplace?: boolean;
 }
 
 export interface SocialSignals {

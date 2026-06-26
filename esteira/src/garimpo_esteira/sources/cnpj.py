@@ -9,6 +9,7 @@ leva o nome de quem o achou (cnpj_brasilapi | cnpj_ws).
 """
 from __future__ import annotations
 
+import json
 from typing import Callable
 
 import httpx
@@ -122,6 +123,16 @@ def _parse_brasilapi(data: dict, source: str) -> list[Finding]:
     qsa = data.get("qsa") or data.get("socios") or []
     if isinstance(qsa, list) and qsa:
         findings.append(Finding("socios_count", source, str(len(qsa)), 1.0))
+
+    # Optante Simples / MEI: regime tributario, ja vem na resposta. Vai no
+    # site_signals (jsonb, sem migration); o cascade faz merge entre fontes.
+    flags: dict[str, bool] = {}
+    if data.get("opcao_pelo_simples") is not None:
+        flags["simples"] = bool(data.get("opcao_pelo_simples"))
+    if data.get("opcao_pelo_mei") is not None:
+        flags["mei"] = bool(data.get("opcao_pelo_mei"))
+    if flags:
+        findings.append(Finding("site_signals", source, json.dumps(flags), 1.0))
 
     return findings
 

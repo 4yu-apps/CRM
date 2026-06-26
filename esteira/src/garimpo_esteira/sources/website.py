@@ -233,6 +233,12 @@ _STACKS = {
 }
 
 
+# Link-na-bio (Linktree e similares) e presenca em marketplace: sinais GRATIS de
+# maturidade digital extraidos do HTML que ja baixamos (zero chamada nova).
+_LINKTREE_RE = re.compile(r"linktr\.ee|lit\.link|beacons\.ai|bio\.link|linkr\.bio|campsite\.bio", re.I)
+_MARKETPLACE_RE = re.compile(r"mercadolivre\.com|mercadolibre\.com|shopee\.com|elo7\.com|magazinevoce|/loja/", re.I)
+
+
 def extract_site_signals(html: str, *, url: str = "") -> dict:
     """Diagnostico tecnico do site a partir do HTML. Tudo de graca.
 
@@ -268,6 +274,8 @@ def extract_site_signals(html: str, *, url: str = "") -> dict:
         "has_tiktok": bool(_TIKTOK_CH_RE.search(h)),
         "has_youtube": bool(_YOUTUBE_CH_RE.search(h)),
         "has_linkedin": bool(_LINKEDIN_CH_RE.search(h)),
+        "has_linktree": bool(_LINKTREE_RE.search(h)),
+        "has_marketplace": bool(_MARKETPLACE_RE.search(h)),
         "mobile_ready": bool(_VIEWPORT_RE.search(h)),
         "page_kb": page_kb,
         "slow": page_kb > 1500,

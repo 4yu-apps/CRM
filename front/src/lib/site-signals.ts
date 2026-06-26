@@ -73,6 +73,14 @@ export function siteSignalChips(signals: SiteSignals | null | undefined): Signal
     chips.push({ label: "Telefone fixo, provável sem WhatsApp", variant: "warn" });
   }
 
+  // Regime tributário (Receita): porte do negócio em uma palavra.
+  if (signals.mei === true) chips.push({ label: "MEI", variant: "neutral" });
+  else if (signals.simples === true) chips.push({ label: "Optante Simples", variant: "neutral" });
+
+  // Maturidade digital extra (do scrape): link-na-bio e marketplace.
+  if (signals.has_linktree === true) chips.push({ label: "Usa link na bio", variant: "neutral" });
+  if (signals.has_marketplace === true) chips.push({ label: "Vende em marketplace", variant: "neutral" });
+
   return chips;
 }
 
