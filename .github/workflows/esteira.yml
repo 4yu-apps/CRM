@@ -19,7 +19,7 @@ on:
         description: "Comando da esteira"
         default: "autopilot"
         type: choice
-        options: ["autopilot", "drain", "backfill", "search", "redraft"]
+        options: ["autopilot", "drain", "backfill", "reprocess", "search", "redraft"]
       batch:
         description: "Tamanho do lote"
         default: "60"

@@ -19,7 +19,7 @@ from .discovery import discover
 from .draft_stage import draft_batch, redraft_batch
 from .models import Lead
 from .pipeline_stream import run_pipeline_streaming
-from .score_stage import score_batch
+from .score_stage import rescore_no_status, score_batch
 from .validation import is_present
 
 DEMO_OWNER = "00000000-0000-0000-0000-0000000000aa"
@@ -333,6 +333,62 @@ def cmd_backfill(cfg: Config) -> int:
     return 0
 
 
+def cmd_reprocess(cfg: Config) -> int:
+    """Parte 2: re-enriquece + re-scora os leads antigos pra aplicar os sinais
+    novos (firmografia, biz_signals, IG, anuncio) e a logica de score atual — SEM
+    mudar o status. Idempotente e resumivel: cada onda pega os de reprocessed_at
+    mais antigo (NULL primeiro). Fontes 100% free: build_sources NAO inclui o
+    Places Details (pago) — esse so e montado a parte, no fluxo de descoberta."""
+    sink = build_sink(cfg)
+    sources = build_sources(cfg)
+    leads = sink.fetch_reprocess(cfg.batch)
+    print(f"reprocess · sink={cfg.sink} sources={cfg.sources_mode} batch={cfg.batch} alvo={len(leads)}")
+    if not leads:
+        print("  nada pra reprocessar")
+        return 0
+
+    profiles: dict[str, dict] = {}
+
+    def _profile(owner: str) -> dict:
+        if owner not in profiles:
+            profiles[owner] = (sink.fetch_profile(owner) or {}) if hasattr(sink, "fetch_profile") else {}
+        return profiles[owner]
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    qualif = 0
+    for i, lead in enumerate(leads):
+        try:
+            # re-enriquece sem mexer no status (so preenche campo vazio, idempotente)
+            enrich_lead(lead, sources, sink, advance_status=False)
+            prov = sink.fetch_provenance(lead.id)
+            prof = _profile(lead.owner_id or "")
+            profession = prof.get("profession")
+            professions = list(prof.get("professions") or ([profession] if profession else []))
+            min_score = int(prof.get("min_score") or 0)
+            res = rescore_no_status(
+                lead, sink, profession=profession, min_score=min_score,
+                professions=professions, prov=prov,
+                extra_fields={"reprocessed_at": now_iso},
+            )
+            if res.decision == "qualificado":
+                qualif += 1
+            print(f"  {lead.id}: score={res.score} {res.decision} alvo={res.service_target}")
+        except Exception as e:
+            # carimba mesmo no erro pra a onda avancar; como a ordem e
+            # reprocessed_at asc, o lead so cai pro fim e e re-tentado depois.
+            try:
+                sink.update_lead_fields(lead.id, {"reprocessed_at": now_iso})
+            except Exception:
+                pass
+            print(f"  {lead.id}: erro {e}")
+        if cfg.delay and i < len(leads) - 1:
+            time.sleep(cfg.delay)
+
+    print(f"resumo: {len(leads)} reprocessados · {qualif} qualificados")
+    _print_counts(sink)
+    return 0
+
+
 def cmd_counts(cfg: Config) -> int:
     _print_counts(build_sink(cfg))
     return 0
@@ -346,7 +402,7 @@ def _print_counts(sink) -> None:
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="garimpo-esteira")
     sub = p.add_subparsers(dest="cmd", required=True)
-    for name in ("seed-demo", "discover", "enrich", "score", "draft", "redraft", "pipeline", "autopilot", "drain", "backfill", "counts", "search"):
+    for name in ("seed-demo", "discover", "enrich", "score", "draft", "redraft", "pipeline", "autopilot", "drain", "backfill", "reprocess", "counts", "search"):
         sp = sub.add_parser(name)
         sp.add_argument("--sink", choices=["jsonfile", "supabase"])
         sp.add_argument("--json")
@@ -384,6 +440,7 @@ def main(argv: list[str] | None = None) -> int:
         "autopilot": cmd_autopilot,
         "drain": cmd_drain,
         "backfill": cmd_backfill,
+        "reprocess": cmd_reprocess,
         "counts": cmd_counts,
     }
     return dispatch[args.cmd](cfg)

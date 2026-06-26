@@ -106,6 +106,63 @@ def score_one(
     return result
 
 
+def rescore_no_status(
+    lead, sink: LeadSink, *, profession: str | None = None, min_score: int = 0,
+    professions: list[str] | None = None, prov: list[dict] | None = None,
+    extra_fields: dict[str, object] | None = None,
+) -> ScoreResult:
+    """Re-pontua um lead SEM tocar no status (Parte 2, reprocessamento).
+
+    Espelha score_one MENOS o set_status — não pode regredir um lead já avançado
+    (ex.: rascunho_pronto voltaria pra descartado). Grava score/score_reason/
+    service_target/ads_active (+ suggested_value se qualificado) e quaisquer
+    extra_fields (ex.: reprocessed_at). Idempotente.
+    """
+    if prov is None:
+        prov = sink.fetch_provenance(lead.id)
+    ads_active = _ads_signal(prov)
+    ig_status = _ig_signal(prov)
+    signals = {
+        "ads_active": ads_active,
+        "ads_count": _as_int(_prov(prov, "ads_count")),
+        "site": getattr(lead, "site_signals", None) or {},
+        "instagram_status": ig_status,
+        "instagram_followers": _as_int(_prov(prov, "instagram_followers")),
+        "instagram_engagement": _as_float(_prov(prov, "instagram_engagement")),
+    }
+    result = score_lead(lead, signals, profession, professions=professions)
+    lead.ads_active = ads_active
+    # #19: piso de score por dono, sincronizando o reason (igual score_one).
+    if min_score and result.score < min_score and result.decision != "descartado":
+        result.decision = "descartado"
+        result.service_target = "indefinido"
+        if isinstance(result.reason, dict):
+            result.reason["decision"] = "descartado"
+            result.reason["service_target"] = "indefinido"
+            result.reason["verdict"] = f"abaixo do seu score minimo ({min_score})"
+    lead.score = result.score
+    lead.score_reason = result.reason
+    lead.service_target = result.service_target
+    fields: dict[str, object] = {
+        "score": result.score,
+        "score_reason": result.reason,
+        "service_target": result.service_target,
+        "ads_active": ads_active,
+    }
+    if result.decision == "qualificado":
+        stack = (getattr(lead, "site_signals", None) or {}).get("stack")
+        value, reason = suggest_value(
+            result.service_target, lead.reviews_count, lead.rating,
+            category=lead.category, stack=stack,
+        )
+        fields["suggested_value"] = value
+        fields["suggested_value_reason"] = reason
+    if extra_fields:
+        fields.update(extra_fields)
+    sink.update_lead_fields(lead.id, fields)
+    return result  # NÃO chama set_status: status fica intacto.
+
+
 def score_batch(
     sink: LeadSink, *, batch: int = 20, status="enriquecido", owner_id: str | None = None,
     profession: str | None = None, min_score: int = 0, professions: list[str] | None = None,

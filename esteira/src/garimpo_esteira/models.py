@@ -111,6 +111,9 @@ class Lead:
     # quando o backfill re-enriqueceu por ultimo (rotacao: processa os mais
     # antigos primeiro, pra varrer todos os leads ao longo do tempo sem travar).
     backfilled_at: str | None = None
+    # Parte 2: quando o reprocessamento (re-enrich + re-score sem mudar status)
+    # passou por ultimo. Ondas resumiveis: NULL/mais antigo primeiro.
+    reprocessed_at: str | None = None
 
     extra: dict[str, Any] = field(default_factory=dict)
 

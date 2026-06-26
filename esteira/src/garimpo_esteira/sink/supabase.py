@@ -25,7 +25,7 @@ _LEAD_COLS = (
     "site_signals", "social_signals", "match_rate",
     "suggested_value", "suggested_value_reason",
     "draft_msg1", "draft_msg2", "draft_model", "draft_generated_at",
-    "backfilled_at", "places_detailed_at",
+    "backfilled_at", "reprocessed_at", "places_detailed_at",
 )
 
 
@@ -93,6 +93,22 @@ class SupabaseSink:
         # ignora RLS). So escopa se o caller pedir explicitamente um owner_id —
         # senao ficaria preso ao OWNER_USER_ID do secret, que pode ser um dono
         # pequeno (foi o caso: o bulk dos leads e de outro dono).
+        if owner_id:
+            params["owner_id"] = f"eq.{owner_id}"
+        r = self._send("GET", f"{self.base}/leads", params=params)
+        r.raise_for_status()
+        return [self._to_lead(row) for row in r.json()]
+
+    def fetch_reprocess(self, limit: int, owner_id: str | None = None) -> list[Lead]:
+        """Leads pra reprocessar (Parte 2): re-enrich + re-score sem mudar status.
+        Ordena por reprocessed_at ASC NULLS FIRST — nunca reprocessado primeiro,
+        depois o mais antigo. Cada onda pega a próxima fatia; idempotente. Varre
+        TODOS os donos por padrão (service_role ignora RLS); escopa só se pedirem."""
+        params = {
+            "select": "*",
+            "order": "reprocessed_at.asc.nullsfirst",
+            "limit": str(limit),
+        }
         if owner_id:
             params["owner_id"] = f"eq.{owner_id}"
         r = self._send("GET", f"{self.base}/leads", params=params)

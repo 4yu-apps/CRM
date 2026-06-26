@@ -26,6 +26,11 @@ class LeadSink(Protocol):
         ads_active), em qualquer status — alvo do backfill de re-enriquecimento."""
         ...
 
+    def fetch_reprocess(self, limit: int, owner_id: str | None = None) -> list[Lead]:
+        """Leads pra reprocessar (re-enrich + re-score sem mudar status), ordenados
+        por reprocessed_at (NULL/mais antigo primeiro) — alvo das ondas da Parte 2."""
+        ...
+
     def fetch_autopilot_profiles(self) -> list[dict]:
         """Perfis de busca com autopilot ligado (owner_id, niches, city, state...)."""
         ...

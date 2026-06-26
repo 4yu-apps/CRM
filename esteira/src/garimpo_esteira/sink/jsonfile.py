@@ -76,6 +76,16 @@ class JsonFileSink:
         rows.sort(key=lambda r: r.get("backfilled_at") or "")
         return [self._to_lead(r) for r in rows[:limit]]
 
+    def fetch_reprocess(self, limit: int, owner_id: str | None = None) -> list[Lead]:
+        """Leads pra reprocessar (Parte 2), reprocessed_at mais antigo primeiro
+        (nulos = "" antes). Sem outro filtro: percorre toda a base, em ondas."""
+        rows = [
+            r for r in self._db["leads"].values()
+            if owner_id is None or r.get("owner_id") == owner_id
+        ]
+        rows.sort(key=lambda r: r.get("reprocessed_at") or "")
+        return [self._to_lead(r) for r in rows[:limit]]
+
     def fetch_autopilot_profiles(self) -> list[dict]:
         return [p for p in self._db.get("profiles", []) if p.get("autopilot")]
 
