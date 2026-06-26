@@ -15,6 +15,9 @@ import {
   X,
   Download,
   UploadSimple,
+  CaretUp,
+  CaretDown,
+  ArrowsDownUp,
 } from "@phosphor-icons/react";
 import { useLeads } from "@/hooks/use-leads";
 import { STATUS_META, STATUS_ORDER, TONE_CLASSES } from "@/lib/state-machine";
@@ -28,13 +31,20 @@ import { cn } from "@/lib/utils";
 import { openWhatsApp } from "@/lib/whatsapp";
 import { ListSkeleton } from "@/components/skeleton";
 
-type SortKey = "recent" | "name" | "score";
+// Ordenacao: coluna + direcao. Os headers (desktop) clicam pra ordenar; o
+// dropdown (mobile/atalho) reflete e seta o mesmo estado.
+type SortCol = "name" | "status" | "city" | "signal" | "score" | "recent";
+type SortDir = "asc" | "desc";
 
-const SORTS: { value: SortKey; label: string }[] = [
-  { value: "recent", label: "Mais recentes" },
-  { value: "name", label: "Nome (A-Z)" },
-  { value: "score", label: "Maior score" },
-];
+// Direcao "natural" ao clicar numa coluna pela 1a vez (score/recente = maior 1o).
+const DEFAULT_DIR: Record<SortCol, SortDir> = {
+  name: "asc",
+  status: "asc",
+  city: "asc",
+  signal: "asc",
+  score: "desc",
+  recent: "desc",
+};
 
 // Lista paginada: renderiza um lote por vez (filtro/scroll mais rapidos).
 const PAGE_SIZE = 50;
@@ -153,6 +163,46 @@ function signalColumnFor(profession: string | null): SignalColumn {
   }
 }
 
+// Ordem ao ordenar pela coluna-sinal: agrupa Sim, depois Nao, depois Nao sei.
+function signalRank(v: SignalVal): number {
+  return v === "sim" ? 0 : v === "nao" ? 1 : 2;
+}
+
+// Cabecalho clicavel (desktop): ordena pela coluna; mostra a seta asc/desc.
+function SortTh({
+  col,
+  label,
+  sortCol,
+  sortDir,
+  onSort,
+  align = "left",
+}: {
+  col: SortCol;
+  label: string;
+  sortCol: SortCol;
+  sortDir: SortDir;
+  onSort: (col: SortCol) => void;
+  align?: "left" | "right";
+}) {
+  const active = sortCol === col;
+  const Icon = !active ? ArrowsDownUp : sortDir === "asc" ? CaretUp : CaretDown;
+  return (
+    <button
+      type="button"
+      onClick={() => onSort(col)}
+      aria-label={`Ordenar por ${label}`}
+      className={cn(
+        "flex items-center gap-1 uppercase tracking-wider transition-colors hover:text-ink-2",
+        align === "right" && "justify-end",
+        active ? "text-brand" : "text-faint",
+      )}
+    >
+      <span>{label}</span>
+      <Icon size={11} weight="bold" className={cn("flex-none", !active && "opacity-40")} />
+    </button>
+  );
+}
+
 function SignalCell({ v }: { v: SignalVal }) {
   const meta = {
     sim: { label: "Sim", cls: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300" },
@@ -230,7 +280,8 @@ export default function ContatosPage() {
   const [importing, setImporting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const [showArchived, setShowArchived] = useState(false);
-  const [sort, setSort] = useState<SortKey>("recent");
+  const [sortCol, setSortCol] = useState<SortCol>("recent");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [page, setPage] = useState(1);
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -251,13 +302,35 @@ export default function ContatosPage() {
       .filter((l) => (sinalFilter ? matchesSignal(l, sinalFilter) : true))
       .filter((l) => (tagFilter ? (l.tags ?? []).includes(tagFilter) : true))
       .filter((l) => matchesQuery(l, q));
+    const signalGet = signalColumnFor(profession).get;
+    const dir = sortDir === "asc" ? 1 : -1;
     out.sort((a, b) => {
-      if (sort === "name") return (a.business_name ?? "").localeCompare(b.business_name ?? "");
-      if (sort === "score") return (b.score ?? -1) - (a.score ?? -1);
-      return +new Date(b.updated_at) - +new Date(a.updated_at);
+      let base: number;
+      switch (sortCol) {
+        case "name":
+          base = (a.business_name ?? "").localeCompare(b.business_name ?? "");
+          break;
+        case "status":
+          base = STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status);
+          break;
+        case "city":
+          base = (a.city ?? "").localeCompare(b.city ?? "");
+          break;
+        case "signal":
+          base = signalRank(signalGet(a)) - signalRank(signalGet(b));
+          break;
+        case "score":
+          base = (a.score ?? -1) - (b.score ?? -1);
+          break;
+        default: // recent
+          base = +new Date(a.updated_at) - +new Date(b.updated_at);
+      }
+      // Desempate estavel por nome pra a lista nao "tremer" entre renders.
+      if (base === 0) base = (a.business_name ?? "").localeCompare(b.business_name ?? "");
+      return base * dir;
     });
     return out;
-  }, [leads, q, statusFilter, ramoFilter, sinalFilter, tagFilter, showArchived, sort]);
+  }, [leads, q, statusFilter, ramoFilter, sinalFilter, tagFilter, showArchived, sortCol, sortDir, profession]);
 
   // Carrega o perfil uma vez pra saber a profissao (coluna-sinal da tabela).
   useEffect(() => {
@@ -322,7 +395,21 @@ export default function ContatosPage() {
     () => [{ value: "", label: "Todos os ramos" }, ...RAMOS_DISPONIVEIS.map((r) => ({ value: r, label: r }))],
     [],
   );
-  const sortOptions: DropdownOption[] = SORTS.map((s) => ({ value: s.value, label: s.label }));
+  // Presets de ordenacao (mobile/atalho). Valor = "coluna:direcao". O label da
+  // coluna-sinal e dinamico (Ja anuncia? / Tem site? / Tem Instagram?).
+  const sortValue = `${sortCol}:${sortDir}`;
+  const sortOptions: DropdownOption[] = useMemo(
+    () => [
+      { value: "recent:desc", label: "Mais recentes" },
+      { value: "recent:asc", label: "Mais antigos" },
+      { value: "name:asc", label: "Nome (A-Z)" },
+      { value: "score:desc", label: "Maior score" },
+      { value: "score:asc", label: "Menor score" },
+      { value: "status:asc", label: "Status" },
+      { value: "signal:asc", label: signalCol.header },
+    ],
+    [signalCol.header],
+  );
 
   const toggleSelect = useCallback((leadId: string) => {
     setSelected((prev) => {
@@ -343,6 +430,20 @@ export default function ContatosPage() {
       setSelected(new Set(filtered.map((l) => l.id)));
     }
   }, [filtered, selected.size]);
+
+  // Clique no header: mesma coluna -> inverte direcao; nova coluna -> direcao padrao.
+  const onSort = useCallback(
+    (col: SortCol) => {
+      setPage(1);
+      if (sortCol === col) {
+        setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+      } else {
+        setSortCol(col);
+        setSortDir(DEFAULT_DIR[col]);
+      }
+    },
+    [sortCol],
+  );
 
   const exportCsv = useCallback(() => {
     if (selected.size === 0) {
@@ -565,10 +666,16 @@ export default function ContatosPage() {
               />
             )}
             <Dropdown
-              value={sort}
-              onChange={(v) => { setSort(v as SortKey); setPage(1); }}
+              value={sortValue}
+              onChange={(v) => {
+                const [c, d] = v.split(":") as [SortCol, SortDir];
+                setSortCol(c);
+                setSortDir(d);
+                setPage(1);
+              }}
               options={sortOptions}
               ariaLabel="Ordenar"
+              placeholder="Ordenar"
               className="min-w-[150px]"
             />
             <input
@@ -671,13 +778,13 @@ export default function ContatosPage() {
             onChange={selectAll}
             className="h-4 w-4 cursor-pointer rounded"
           />
-          <span>Negócio</span>
-          <span>Status</span>
-          <span>Local</span>
+          <SortTh col="name" label="Negócio" sortCol={sortCol} sortDir={sortDir} onSort={onSort} />
+          <SortTh col="status" label="Status" sortCol={sortCol} sortDir={sortDir} onSort={onSort} />
+          <SortTh col="city" label="Local" sortCol={sortCol} sortDir={sortDir} onSort={onSort} />
           <span>Contato</span>
-          <span>{signalCol.header}</span>
-          <span>Score</span>
-          <span>Atualizado</span>
+          <SortTh col="signal" label={signalCol.header} sortCol={sortCol} sortDir={sortDir} onSort={onSort} />
+          <SortTh col="score" label="Score" sortCol={sortCol} sortDir={sortDir} onSort={onSort} />
+          <SortTh col="recent" label="Atualizado" sortCol={sortCol} sortDir={sortDir} onSort={onSort} />
           <span className="text-right">Ações</span>
         </div>
 
