@@ -133,6 +133,51 @@ def test_search_by_name_casa_e_devolve_page_id_e_plataformas():
     assert r["platforms"] == ["facebook", "instagram"]
 
 
+# ------------------------------------------------------------------
+# instagram como vanity do Facebook (mesmo @ nos dois) -> page_id
+# ------------------------------------------------------------------
+from garimpo_esteira.sources.ad_library import ig_to_slug
+
+
+def test_ig_to_slug_limpa_arroba_e_url():
+    assert ig_to_slug("@clinicabella") == "clinicabella"
+    assert ig_to_slug("https://instagram.com/clinicabella/") == "clinicabella"
+    assert ig_to_slug("instagram.com/clinicabella?igshid=x") == "clinicabella"
+    assert ig_to_slug(None) is None
+    assert ig_to_slug("   ") is None
+
+
+def test_probe_resolve_por_instagram_quando_nao_ha_facebook():
+    # sem fb_page_id e sem facebook: cai no @ do IG como vanity do FB
+    def get(url, params=None, timeout=None):
+        if url.endswith("/clinicabella"):
+            return FakeResp(200, {"id": "999"})
+        return FakeResp(200, {"data": [{"id": "ad1", "ad_delivery_start_time": "2025-01-10"}]})
+
+    probe = meta_ads_probe("tok", get=get)
+    lead = Lead(id="1", owner_id="o", business_name="Clinica Bella", instagram="@clinicabella")
+    r = probe(lead)
+    assert r["active"] is True
+    assert r["page_id"] == "999"
+
+
+def test_probe_facebook_tem_prioridade_sobre_instagram():
+    # facebook resolve -> nem tenta o IG (curto-circuito do `or`)
+    calls = []
+
+    def get(url, params=None, timeout=None):
+        calls.append(url)
+        if url.endswith("/facepage"):
+            return FakeResp(200, {"id": "555"})
+        return FakeResp(200, {"data": []})
+
+    probe = meta_ads_probe("tok", get=get)
+    lead = Lead(id="1", owner_id="o", facebook="facepage", instagram="@outracoisa")
+    r = probe(lead)
+    assert r["page_id"] == "555"
+    assert not any(u.endswith("/outracoisa") for u in calls)  # IG nem consultado
+
+
 def test_search_by_name_sem_match_e_none():
     payload = {"data": [{"page_id": "111", "page_name": "Empresa Aleatoria"}]}
     assert search_by_name("Barbearia Lobo", "tok", lambda *a, **k: FakeResp(200, payload), "BR", 5) is None

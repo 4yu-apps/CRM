@@ -6,7 +6,9 @@ Anota proveniência ads_active (sim/nao), ads_count, ads_since e as plataformas
 CAMINHOS (do mais confiável pro fallback):
  1. fb_page_id já salvo no lead -> pergunta direto (preciso, rápido).
  2. facebook raspado do site (rodapé etc) -> resolve o page_id -> pergunta.
- 3. SEM página: busca por nome (search_terms) no Brasil e SÓ aceita se o
+ 3. instagram do lead -> tenta o mesmo @ como vanity do Facebook -> resolve o
+    page_id (negócio pequeno usa o mesmo usuário nos dois) -> pergunta.
+ 4. SEM página: busca por nome (search_terms) no Brasil e SÓ aceita se o
     page_name do resultado casar (fuzzy) com o nome do lead. Isso evita o ruído
     do search_terms (que casa o TEXTO do anúncio, não o anunciante). Nunca marca
     "não anuncia" por busca vazia — só promove desconhecido -> sim, sem chute.
@@ -75,6 +77,19 @@ def resolve_page_id(facebook: str | None, token: str, get, timeout: float) -> st
         return r.json().get("id")
     except Exception:
         return None
+
+
+def ig_to_slug(instagram: str | None) -> str | None:
+    """Handle do Instagram -> possivel vanity do Facebook. Negocio pequeno quase
+    sempre usa o MESMO usuario nos dois (instagram.com/x e facebook.com/x), entao o
+    slug do IG costuma resolver a pagina do FB pelo Graph (GET /{slug}?fields=id) e,
+    dai, o page_id do anunciante. Tira @, instagram.com/, querystring e path."""
+    s = (instagram or "").strip()
+    if not s:
+        return None
+    s = re.sub(r"^(https?://)?(www\.)?instagram\.com/", "", s, flags=re.I)
+    s = s.lstrip("@").strip("/").split("?")[0].split("/")[0]
+    return s or None
 
 
 def _platforms(data: list[dict]) -> list[str]:
@@ -178,7 +193,15 @@ def meta_ads_probe(
     _get = get or httpx.get
 
     def probe(lead: Lead) -> dict | None:
-        page_id = (lead.fb_page_id or "").strip() or resolve_page_id(lead.facebook, token, _get, timeout)
+        # Cadeia de resolucao do page_id (mais confiavel -> fallback):
+        #  1. fb_page_id ja salvo   2. facebook do site   3. IG como vanity do FB.
+        # O passo 3 aproveita que negocio pequeno usa o mesmo @ nos dois: 1 chamada
+        # barata ao Graph, gratis, e o page_id achado fica salvo pra proxima vez.
+        page_id = (
+            (lead.fb_page_id or "").strip()
+            or resolve_page_id(lead.facebook, token, _get, timeout)
+            or resolve_page_id(ig_to_slug(lead.instagram), token, _get, timeout)
+        )
         if page_id:
             info = has_ads_info(page_id, token, _get, country, timeout)
             if info is not None:
