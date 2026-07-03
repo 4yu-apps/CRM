@@ -103,6 +103,7 @@ function sweepTargets(leads) {
 }
 
 async function runSweep() {
+  if (!state.cfg?.waSweepEnabled) return; // varredura OPT-IN (anti-ban): so roda se ligada nas opcoes
   if (sweeping) return;
   sweeping = true;
   try {

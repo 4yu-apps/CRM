@@ -5,7 +5,43 @@
 // de conversa naquela aba.
 //
 // Obs: o fluxo mobile (pagina "No celular") segue usando wa.me, que abre o app.
+import { toast } from "sonner";
+
 export const WA_TAB = "whatsapp";
+
+// Guarda anti-bloqueio no disparo. O maior risco de ban NAO e "colar texto pronto"
+// (o WhatsApp ve um clique humano no enviar), e sim o VOLUME e a VELOCIDADE de
+// conversas novas abertas em sequencia. Aqui limitamos disparos/dia e forcamos um
+// respiro entre um e outro. Contagem no localStorage (por navegador, reseta no dia).
+const WA_DAILY_CAP = 80;
+const WA_COOLDOWN_MS = 6000;
+const WA_COUNT_PREFIX = "wa-open-count-";
+const WA_LAST_KEY = "wa-open-last";
+
+// true = pode disparar agora (e ja contabiliza); false = barrado (avisa por toast).
+// Sem localStorage (ou erro), nao bloqueia: a guarda e best-effort, nunca trava o app.
+function throttleOk(): boolean {
+  try {
+    const now = Date.now();
+    const last = Number(localStorage.getItem(WA_LAST_KEY) || 0);
+    const since = now - last;
+    if (last && since < WA_COOLDOWN_MS) {
+      toast.warning(`Espera ${Math.ceil((WA_COOLDOWN_MS - since) / 1000)}s entre disparos (anti-bloqueio).`);
+      return false;
+    }
+    const key = WA_COUNT_PREFIX + new Date().toISOString().slice(0, 10);
+    const count = Number(localStorage.getItem(key) || 0);
+    if (count >= WA_DAILY_CAP) {
+      toast.error(`Limite de ${WA_DAILY_CAP} disparos hoje (anti-bloqueio). Continue amanhã.`);
+      return false;
+    }
+    localStorage.setItem(WA_LAST_KEY, String(now));
+    localStorage.setItem(key, String(count + 1));
+    return true;
+  } catch {
+    return true;
+  }
+}
 
 export function waSend(phone?: string | null, text?: string): string | undefined {
   const d = (phone ?? "").replace(/\D/g, "");
@@ -60,6 +96,8 @@ function openWeb(phone?: string | null, text?: string): boolean {
 // fallback web sozinho — assim NUNCA fica "nada acontecendo".
 export function openWhatsApp(phone?: string | null, text?: string): boolean {
   if (typeof window === "undefined") return false;
+  if (!(phone ?? "").replace(/\D/g, "")) return false; // numero invalido: nao conta nem dispara
+  if (!throttleOk()) return false; // cap diario / cooldown (anti-bloqueio)
   if (document.documentElement.getAttribute("data-garimpo-ext") !== "1") {
     return openWeb(phone, text);
   }

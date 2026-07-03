@@ -46,17 +46,6 @@
     return d.startsWith("55") ? d : d.length >= 12 ? d : `55${d}`;
   }
 
-  async function resolveChatId(num) {
-    let id = `${num}@c.us`;
-    try {
-      const r = await window.WPP.contact.queryExists(num);
-      if (r && r.wid) id = r.wid._serialized || (r.wid.user ? `${r.wid.user}@c.us` : id);
-    } catch {
-      /* sem queryExists: usa o id padrao */
-    }
-    return id;
-  }
-
   // Numero (so digitos) da conversa aberta agora, pra confirmar se o open pegou.
   function activeNum() {
     try {
@@ -167,7 +156,10 @@
       window.postMessage({ source: "garimpo-page", type: "no_whatsapp", phone }, "*");
       return false; // nao abre conversa pra numero sem WhatsApp
     }
-    const id = await resolveChatId(num);
+    // id padrao @c.us direto (SEM outro queryExists): checkWhatsapp acima ja fez
+    // a unica consulta necessaria, e o openChat resolve o lid via chat.find. Menos
+    // consulta de existencia = menos cara de bot pro WhatsApp (anti-ban).
+    const id = `${num}@c.us`;
     await openChat(id, num);
     // Conversa aberta = sucesso. Responde JA (nao segura o ack ate o prefill, senao
     // o relay/background podem dar timeout e recarregar mesmo com a conversa aberta).

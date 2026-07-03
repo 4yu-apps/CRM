@@ -9,8 +9,10 @@
     // JWT do usuario logado (RLS) — vem do login no card
     refreshToken: "",
     // renova o token sozinho (sessao longa, sem cair a cada 1h)
-    expiresAt: 0
+    expiresAt: 0,
     // epoch ms de expiracao do accessToken
+    waSweepEnabled: false
+    // varredura de validacao de numero: OPT-IN (anti-ban), liga nas opcoes
   };
   async function getConfig() {
     if (typeof chrome === "undefined" || !chrome.storage) return { ...DEFAULTS };

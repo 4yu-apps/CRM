@@ -9,8 +9,10 @@
     // JWT do usuario logado (RLS) — vem do login no card
     refreshToken: "",
     // renova o token sozinho (sessao longa, sem cair a cada 1h)
-    expiresAt: 0
+    expiresAt: 0,
     // epoch ms de expiracao do accessToken
+    waSweepEnabled: false
+    // varredura de validacao de numero: OPT-IN (anti-ban), liga nas opcoes
   };
   async function getConfig() {
     if (typeof chrome === "undefined" || !chrome.storage) return { ...DEFAULTS };
@@ -411,8 +413,8 @@
   }
 
   // src/lib/wa-quota.mjs
-  var SWEEP_DAILY_CAP = 150;
-  var SWEEP_MIN_INTERVAL_MS = 4e3;
+  var SWEEP_DAILY_CAP = 60;
+  var SWEEP_MIN_INTERVAL_MS = 9e3;
   var PREFIX = "wa-check-";
   function dayKey(ms) {
     return PREFIX + new Date(ms).toISOString().slice(0, 10);
@@ -511,6 +513,7 @@
     return leads.filter((l) => (l.status === "rascunho_pronto" || l.status === "aprovado") && !l.archived && !l.whatsapp_checked_at).filter((l) => l.whatsapp || l.phone).sort((a, b) => new Date(a.updated_at) - new Date(b.updated_at));
   }
   async function runSweep() {
+    if (!state.cfg?.waSweepEnabled) return;
     if (sweeping) return;
     sweeping = true;
     try {

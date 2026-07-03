@@ -1,6 +1,10 @@
 // Cota diaria de checagens de WhatsApp, anti-ban. Espelha o padrao da cota do Maps.
-export const SWEEP_DAILY_CAP = 150;
-export const SWEEP_MIN_INTERVAL_MS = 4000;
+// Numeros conservadores de proposito: a varredura consulta existencia (queryExists)
+// em lote, que e o vetor classico de ban do wa-js. Teto baixo + intervalo alto pra
+// nao parecer enumeracao de lista. A varredura ainda e OPT-IN (desligada por padrao,
+// liga nas opcoes da extensao).
+export const SWEEP_DAILY_CAP = 60;
+export const SWEEP_MIN_INTERVAL_MS = 9000;
 
 const PREFIX = "wa-check-";
 

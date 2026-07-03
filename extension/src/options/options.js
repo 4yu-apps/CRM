@@ -1,16 +1,18 @@
 const FIELDS = ["dataSource", "supabaseUrl", "anonKey", "accessToken"];
 
 async function load() {
-  const stored = await chrome.storage.local.get(FIELDS);
+  const stored = await chrome.storage.local.get([...FIELDS, "waSweepEnabled"]);
   for (const f of FIELDS) {
     const el = document.getElementById(f);
     if (el && stored[f] != null) el.value = stored[f];
   }
+  document.getElementById("waSweepEnabled").checked = stored.waSweepEnabled === true;
 }
 
 document.getElementById("save").addEventListener("click", async () => {
   const patch = {};
   for (const f of FIELDS) patch[f] = document.getElementById(f).value.trim();
+  patch.waSweepEnabled = document.getElementById("waSweepEnabled").checked;
   await chrome.storage.local.set(patch);
   flash("status", "salvo ✓");
 });

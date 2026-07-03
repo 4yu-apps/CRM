@@ -32,15 +32,6 @@
       if (!d) return null;
       return d.startsWith("55") ? d : d.length >= 12 ? d : `55${d}`;
     }
-    async function resolveChatId(num) {
-      let id = `${num}@c.us`;
-      try {
-        const r = await window.WPP.contact.queryExists(num);
-        if (r && r.wid) id = r.wid._serialized || (r.wid.user ? `${r.wid.user}@c.us` : id);
-      } catch {
-      }
-      return id;
-    }
     function activeNum() {
       try {
         const ac = window.WPP.chat.getActiveChat && window.WPP.chat.getActiveChat();
@@ -127,7 +118,7 @@
         window.postMessage({ source: "garimpo-page", type: "no_whatsapp", phone }, "*");
         return false;
       }
-      const id = await resolveChatId(num);
+      const id = `${num}@c.us`;
       await openChat(id, num);
       if (text && String(text).trim()) prefill(String(text));
       return true;

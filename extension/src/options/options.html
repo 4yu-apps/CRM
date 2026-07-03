@@ -94,6 +94,15 @@
         <label>ACCESS TOKEN</label>
         <input id="accessToken" placeholder="Preenchido automaticamente pelo login" />
 
+        <fieldset>
+          <legend>Validacao de numeros (WhatsApp)</legend>
+          <p class="muted" style="margin-top:0;">Varre a fila consultando o WhatsApp se cada numero existe. Fica DESLIGADA por padrao: consultar existencia em lote pode marcar sua conta como automacao. Ligue so se precisar e com moderacao.</p>
+          <label class="row" style="font-weight:750; cursor:pointer;">
+            <input id="waSweepEnabled" type="checkbox" style="width:auto; margin:0;" />
+            Ativar varredura de validacao
+          </label>
+        </fieldset>
+
         <div class="row"><button id="save">Salvar configuracao</button><span id="status" class="ok"></span></div>
       </section>
     </main>
