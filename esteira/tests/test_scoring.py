@@ -158,12 +158,47 @@ def test_marketing_parado_pontua_mais_alto_que_ativo():
     assert parado > ativo
 
 
-def test_marketing_sem_instagram_score_22_no_item():
-    # sem Instagram => item Instagram vale 22 pts
+def test_marketing_sem_instagram_presenca_vale_30():
+    # sem Instagram => item Presenca (eixo do U) vale 30 pts: construir do zero
     r = score_lead(_lead(instagram=None), profession="marketing")
     crit = r.reason["marketing"]["criteria"]
-    ig_item = next(c for c in crit if c["label"] == "Instagram")
-    assert ig_item["points"] == 22
+    item = next(c for c in crit if c["label"] == "Presenca")
+    assert item["points"] == 30
+
+
+def test_marketing_presenca_forte_tambem_qualifica():
+    # ICP em U: presenca forte (ativo + recorrente + audiencia) qualifica tanto
+    # quanto a ausencia; o meio-termo morno (ativo sem ritmo) fica abaixo.
+    forte = score_lead(
+        _lead(instagram="@conta", reviews_count=200, phone="4499"),
+        {"instagram_status": "ativo", "instagram_post_freq": "3",
+         "instagram_followers": "12000", "instagram_engagement": "300"},
+        profession="marketing",
+    ).reason["marketing"]["score"]
+    morno = score_lead(
+        _lead(instagram="@conta", reviews_count=200, phone="4499"),
+        {"instagram_status": "ativo", "instagram_post_freq": "0.2",
+         "instagram_followers": "1000", "instagram_engagement": "20"},
+        profession="marketing",
+    ).reason["marketing"]["score"]
+    assert forte > morno
+
+
+def test_marketing_gmb_ausente_pontua_mais_que_completo():
+    # sem Perfil de Empresa no Google = presenca incompleta (mais pontos que completo)
+    sem_gmb = score_lead(
+        _lead(instagram="@x", rating=None, reviews_count=0, maps_place_id=None),
+        profession="marketing",
+    )
+    ausente = next(c for c in sem_gmb.reason["marketing"]["criteria"] if c["label"] == "Google")
+    completo = score_lead(
+        _lead(instagram="@x", rating=4.6, reviews_count=300, opening_hours="Seg 9-18",
+              website="https://x.com"),
+        profession="marketing",
+    )
+    ok = next(c for c in completo.reason["marketing"]["criteria"] if c["label"] == "Google")
+    assert ausente["points"] == 12
+    assert ok["points"] == 3
 
 
 def test_marketing_summary_com_instagram_parado_menciona_parado():

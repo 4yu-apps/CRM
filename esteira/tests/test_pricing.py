@@ -39,6 +39,16 @@ def test_valor_fica_na_faixa_esperada():
             assert 200 <= v <= 2500, (st, revs, v)
 
 
+def test_marketing_faixa_atualizada_por_porte():
+    # gestao de redes: 800 / 1.200 / 1.600 / 2.200 por porte crescente
+    assert suggest_value("marketing", 30)[0] == 800     # pequeno
+    assert suggest_value("marketing", 100)[0] == 1200   # medio
+    assert suggest_value("marketing", 400)[0] == 1600   # grande
+    assert suggest_value("marketing", 1000)[0] == 2200  # muito grande
+    _, motivo = suggest_value("marketing", 100)
+    assert "redes" in motivo.lower() or "social" in motivo.lower()
+
+
 def test_valor_e_multiplo_de_100():
     for st in ("trafego", "automacao", "ambos"):
         v, _ = suggest_value(st, 300)

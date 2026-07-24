@@ -25,6 +25,8 @@ _SOCIAL_FIELDS = {
     "instagram_post_freq": ("post_freq", float),
     "instagram_post_freq_label": ("post_freq_label", str),
     "instagram_engagement": ("engagement", float),
+    "instagram_engagement_rate": ("engagement_rate", float),
+    "instagram_bio": ("bio", str),
     "instagram_status": ("ig_status", str),
     "ads_count": ("ads_count", int),
     "ads_since": ("ads_since", str),

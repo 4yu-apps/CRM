@@ -34,7 +34,7 @@ def process_one_lead(
     {"enriched": bool, "discarded": bool, "drafted": bool}."""
     enrich_lead(lead, sources, sink)  # bruto -> enriquecido
     result = score_one(lead, sink, profession, min_score, professions=professions)  # -> qualificado | descartado
-    apply_ai(ai_reader, lead, sink)  # Leitura da IA (Gemini->Groq), se houver chave
+    apply_ai(ai_reader, lead, sink, profession)  # Leitura da IA (area-aware)
     drafted = False
     if result.decision == "qualificado":
         if draft_one(

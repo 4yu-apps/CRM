@@ -35,28 +35,47 @@ SYSTEM = (
 )
 
 
+# Angulo por AREA do dono. So marketing tem tratamento proprio por enquanto; as
+# demais areas herdam o SYSTEM padrao (sem linha extra). Espelha professions.ts.
+_AREA_ANGLE = {
+    "marketing": (
+        "AREA DO DONO: MARKETING/SOCIAL. Avalie a MATURIDADE DE PRESENCA DIGITAL "
+        "(redes sociais + Perfil de Empresa no Google), NAO a de site. maturity: "
+        "1=sem Instagram e fraco no Google, 3=tem rede mas parada/sem ritmo, "
+        "5=redes ativas com recorrencia e bom engajamento. O 'pain' deve ser de "
+        "PRESENCA (ex.: 'Instagram parado ha meses', 'posta sem constancia', "
+        "'Perfil no Google incompleto'); NUNCA use 'nao tem site' como dor "
+        "principal — site nao e o servico dele."
+    ),
+}
+
+
 def _facts(lead: Lead) -> str:
     sig = lead.site_signals or {}
     soc = lead.social_signals or {}
     def yn(v):
         return "sim" if v else ("nao" if v is False else "?")
+    tem_gmb = bool(lead.maps_place_id) or lead.rating is not None
     linhas = [
         f"nome: {lead.business_name or '-'}",
         f"categoria/CNAE: {lead.category or '-'}",
         f"cidade/UF: {(lead.city or '-')}/{(lead.state or '-')}",
         f"nota google: {lead.rating if lead.rating is not None else '-'} ({lead.reviews_count or 0} avaliacoes)",
+        f"perfil no google (GMB): {yn(tem_gmb)} | horario cadastrado: {yn(bool(lead.opening_hours))}",
         f"abertura: {lead.opened_on or '-'} | porte: {lead.porte or '-'} | capital: {lead.capital_social or '-'} | socios: {lead.socios_count if lead.socios_count is not None else '-'}",
         f"tem site: {yn(bool(lead.website))} | site lento: {yn(sig.get('slow'))} | mobile ok: {yn(sig.get('mobile_ready'))}",
         f"agendamento online: {yn(sig.get('has_online_booking'))} | e-commerce: {yn(sig.get('has_ecommerce'))}",
-        f"instagram: {lead.instagram or '-'} | seguidores: {soc.get('followers') or '-'} | status: {soc.get('ig_status') or '-'} | engajamento: {soc.get('engagement') or '-'}",
+        f"instagram: {lead.instagram or '-'} | seguidores: {soc.get('followers') or '-'} | status: {soc.get('ig_status') or '-'} | posts/semana: {soc.get('post_freq') or '-'} | engajamento: {soc.get('engagement_rate') and str(soc.get('engagement_rate')) + '%' or soc.get('engagement') or '-'}",
         f"ja anuncia: {yn(soc.get('ads_active') if soc.get('ads_active') is not None else lead.ads_active)}",
         f"horario (texto bruto, pode estar vazio): {lead.opening_hours or '-'}",
     ]
     return "\n".join(linhas)
 
 
-def build_ai_prompt(lead: Lead) -> str:
-    return f"{SYSTEM}\n\nFATOS:\n{_facts(lead)}"
+def build_ai_prompt(lead: Lead, profession: str | None = None) -> str:
+    angle = _AREA_ANGLE.get((profession or "").strip().lower(), "")
+    system = f"{SYSTEM}\n\n{angle}" if angle else SYSTEM
+    return f"{system}\n\nFATOS:\n{_facts(lead)}"
 
 
 def _norm_hours(h: Any) -> dict | None:
@@ -136,8 +155,8 @@ def _groq_json(api_key: str, base_url: str, model: str, prompt: str, timeout: fl
     return json.loads(r.json()["choices"][0]["message"]["content"])
 
 
-# read(lead) -> dict de ai_signals | None
-AIReader = Callable[[Lead], "dict | None"]
+# read(lead, profession=None) -> dict de ai_signals | None
+AIReader = Callable[..., "dict | None"]
 
 
 def make_ai_reader(
@@ -167,9 +186,9 @@ def make_ai_reader(
 
     _call = call or _chain
 
-    def read(lead: Lead) -> dict | None:
+    def read(lead: Lead, profession: str | None = None) -> dict | None:
         try:
-            raw = _call(build_ai_prompt(lead))
+            raw = _call(build_ai_prompt(lead, profession))
         except Exception:
             return None  # rede/limite/JSON quebrado: segue sem IA
         return parse_ai(raw)
@@ -177,13 +196,16 @@ def make_ai_reader(
     return read
 
 
-def apply_ai(reader: "AIReader | None", lead: Lead, sink) -> None:
+def apply_ai(
+    reader: "AIReader | None", lead: Lead, sink, profession: str | None = None
+) -> None:
     """Roda o leitor (se houver) e grava ai_signals + hours_struct no lead/sink.
     horario só preenche se o lead ainda não tem um estruturado. Não quebra nada
-    se a IA falhar (reader devolve None)."""
+    se a IA falhar (reader devolve None). `profession` orienta o angulo da leitura
+    (ex.: marketing -> maturidade de presenca digital, nao de site)."""
     if reader is None:
         return
-    ai = reader(lead)
+    ai = reader(lead, profession)
     if not ai:
         return
     hours = ai.pop("hours", None)

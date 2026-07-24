@@ -42,6 +42,7 @@ import { waSend, openWhatsApp } from "@/lib/whatsapp";
 import { Skeleton } from "@/components/skeleton";
 import { googleSearchUrl, googleMapsUrl } from "@/lib/links";
 import { siteSignalChips, signalChipClass } from "@/lib/site-signals";
+import { marketingSignalChips } from "@/lib/marketing-signals";
 import { openState } from "@/lib/business-hours";
 import { useCancelMeeting } from "@/hooks/use-cancel-meeting";
 import { SERVICE_META } from "@/lib/service";
@@ -250,6 +251,32 @@ function SiteSignalsPanel({ signals, since }: { signals: SiteSignals; since?: st
         {since && (
           <span className="text-[11px] text-faint" title="Quando o robô conferiu por último">
             verificado {fmtRelative(since)}
+          </span>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {chips.map((chip, i) => (
+          <span key={i} className={cn("rounded-full px-2.5 py-1 text-[12px]", signalChipClass(chip.variant))}>
+            {chip.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Painel MARKETING-FIRST: presenca digital (Google + Instagram + canais). Lidera
+// quando a area do dono e marketing; o site vira coadjuvante (recolhido).
+function MarketingSignalsPanel({ lead }: { lead: Lead }) {
+  const chips = marketingSignalChips(lead);
+  if (chips.length === 0) return null;
+  return (
+    <div className="rounded-[14px] border border-border bg-surface-2 p-4">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-faint">Presença digital</span>
+        {lead.updated_at && (
+          <span className="text-[11px] text-faint" title="Quando o robô conferiu por último">
+            verificado {fmtRelative(lead.updated_at)}
           </span>
         )}
       </div>
@@ -1022,10 +1049,34 @@ export default function FichaPage() {
             factual. Largura cheia pra os fatos curtos respirarem em grade, em
             vez de espremidos numa coluna estreita virando tabela de traços. */}
         <div className="border-t border-border p-6 sm:p-7">
-          {lead.site_signals && (
-            <div className="mb-5">
-              <SiteSignalsPanel signals={lead.site_signals} since={lead.updated_at} />
-            </div>
+          {lead.service_target === "marketing" ? (
+            <>
+              {/* Marketing: presença digital lidera; o site vira coadjuvante
+                  (recolhido), aparece só se quiserem espiar. */}
+              <div className="mb-5">
+                <MarketingSignalsPanel lead={lead} />
+              </div>
+              {lead.site_signals && siteSignalChips(lead.site_signals).length > 0 && (
+                <details className="mb-5 rounded-[14px] border border-border bg-surface-2 p-4">
+                  <summary className="cursor-pointer text-[11px] font-bold uppercase tracking-wider text-faint">
+                    Diagnóstico do site (opcional)
+                  </summary>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {siteSignalChips(lead.site_signals).map((chip, i) => (
+                      <span key={i} className={cn("rounded-full px-2.5 py-1 text-[12px]", signalChipClass(chip.variant))}>
+                        {chip.label}
+                      </span>
+                    ))}
+                  </div>
+                </details>
+              )}
+            </>
+          ) : (
+            lead.site_signals && (
+              <div className="mb-5">
+                <SiteSignalsPanel signals={lead.site_signals} since={lead.updated_at} />
+              </div>
+            )
           )}
           <RawSignalsPanel lead={lead} />
         </div>

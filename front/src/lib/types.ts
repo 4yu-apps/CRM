@@ -97,6 +97,8 @@ export interface SocialSignals {
   post_freq?: number;
   post_freq_label?: string;
   engagement?: number;
+  engagement_rate?: number;
+  bio?: string;
   ig_status?: "ativo" | "parado";
   ads_active?: boolean;
   ads_count?: number;

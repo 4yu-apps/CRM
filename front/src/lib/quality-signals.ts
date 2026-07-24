@@ -15,6 +15,11 @@ export type SignalFilter =
   | "sem_agendamento"
   | "tem_loja"
   | "sem_instagram"
+  | "ig_parado"
+  | "sem_post_recorrente"
+  | "baixo_engajamento"
+  | "presenca_forte"
+  | "gmb_incompleto"
   | "empresa_nova";
 
 export const SIGNAL_FILTER_OPTIONS: { value: SignalFilter; label: string }[] = [
@@ -28,6 +33,11 @@ export const SIGNAL_FILTER_OPTIONS: { value: SignalFilter; label: string }[] = [
   { value: "sem_agendamento", label: "Automação: sem agendamento online" },
   { value: "tem_loja", label: "Automação: tem loja online" },
   { value: "sem_instagram", label: "Marketing: sem Instagram" },
+  { value: "ig_parado", label: "Marketing: Instagram parado" },
+  { value: "sem_post_recorrente", label: "Marketing: sem post recorrente" },
+  { value: "baixo_engajamento", label: "Marketing: baixo engajamento" },
+  { value: "presenca_forte", label: "Marketing: presença forte (escalar)" },
+  { value: "gmb_incompleto", label: "Marketing: Google incompleto" },
 ];
 
 export function jaAnuncia(l: Lead): boolean {
@@ -98,6 +108,35 @@ export function negocioNovoChip(l: Lead): SignalChip | null {
   return { label: m < 6 ? "Negocio novo" : "Negocio recente", variant: "positive" };
 }
 
+// --- Sinais de MARKETING (presenca digital), derivados do social_signals ---
+export function igParado(l: Lead): boolean {
+  return temInstagram(l) && l.social_signals?.ig_status === "parado";
+}
+
+export function semPostRecorrente(l: Lead): boolean {
+  const pf = l.social_signals?.post_freq;
+  return temInstagram(l) && typeof pf === "number" && pf < 1;
+}
+
+export function baixoEngajamento(l: Lead): boolean {
+  const er = l.social_signals?.engagement_rate;
+  return typeof er === "number" && er < 1;
+}
+
+// Presenca forte (candidato a "escalar"): IG ativo + posta com recorrencia.
+export function presencaForte(l: Lead): boolean {
+  const s = l.social_signals;
+  return temInstagram(l) && s?.ig_status === "ativo" && typeof s?.post_freq === "number" && s.post_freq >= 1;
+}
+
+// GMB (Perfil de Empresa no Google) incompleto: esta no Google mas falta
+// site/horario/volume de avaliacoes.
+export function gmbIncompleto(l: Lead): boolean {
+  const onGoogle = !!l.maps_place_id || l.rating != null || !!l.reviews_count;
+  if (!onGoogle) return true;
+  return !(l.opening_hours && temSite(l) && (l.reviews_count ?? 0) >= 20);
+}
+
 export function matchesSignal(l: Lead, f: SignalFilter): boolean {
   switch (f) {
     case "":
@@ -118,6 +157,16 @@ export function matchesSignal(l: Lead, f: SignalFilter): boolean {
       return temLoja(l);
     case "sem_instagram":
       return !temInstagram(l);
+    case "ig_parado":
+      return igParado(l);
+    case "sem_post_recorrente":
+      return semPostRecorrente(l);
+    case "baixo_engajamento":
+      return baixoEngajamento(l);
+    case "presenca_forte":
+      return presencaForte(l);
+    case "gmb_incompleto":
+      return gmbIncompleto(l);
     case "empresa_nova":
       return negocioNovo(l);
     default:

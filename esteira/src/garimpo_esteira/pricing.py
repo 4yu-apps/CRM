@@ -26,10 +26,11 @@ _TIERS = [
 # Servicos MENSAIS (recorrente): trafego, automacao, ambos, marketing.
 # trafego:  pequeno 700, medio 1000, grande 1400, muito grande 1800
 # automacao: pequeno 400, medio 600, grande 800,  muito grande 1000
-# marketing: pequeno 600, medio 900, grande 1200, muito grande 1600
+# marketing: pequeno 800, medio 1200, grande 1600, muito grande 2200
+# (social media bem feito = conteudo + gestao; a faixa antiga subestimava)
 _TRAFEGO = [700, 1000, 1400, 1800]
 _AUTOMACAO = [400, 600, 800, 1000]
-_MARKETING = [600, 900, 1200, 1600]
+_MARKETING = [800, 1200, 1600, 2200]
 # Servico de PROJETO (valor unico): design/web. Site institucional/landing.
 # E-commerce custa mais (catalogo, carrinho, pagamento): multiplicador.
 _DESIGN_SITE = [1500, 2500, 4000, 6000]

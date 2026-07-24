@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from ..models import Lead
 from ..validation import is_present
-from .prompt import _brief_key, lead_brief, self_desc
+from .prompt import _brief_key, _marketing_angle, lead_brief, self_desc
 
 # Categorias de alimentacao que pedem o angulo iFood (pergunta genuina de canal).
 _FOOD_KEYWORDS = (
@@ -54,6 +54,16 @@ def _gancho(b: dict, lead: Lead, service: str) -> str:
     # So quem vende site (design/web/branding -> "design") usa falta de site como
     # gancho. Trafego/automacao NUNCA comentam site na abertura.
     sells_site = service == "design"
+    # Marketing: o gancho e a PRESENCA nas redes, nao anuncio nem site.
+    if service == "marketing":
+        ang = _marketing_angle(lead)
+        if ang == "escalar":
+            return "vi que vocês já estão ativos nas redes, com um público formado"
+        if not b["tem_instagram"]:
+            return "procurei o Instagram de vocês e não achei"
+        if ang == "construir":
+            return "vi que o Instagram de vocês está meio parado"
+        return "dei uma olhada no Instagram de vocês, dá pra dar um ritmo mais constante"
     if _advertises(lead) and boa:
         return "vi que já anunciam e ainda têm uma ótima reputação"
     if _advertises(lead):
@@ -73,6 +83,12 @@ def _pergunta(b: dict, lead: Lead, service: str) -> str:
     """Pergunta genuina e aberta, ligada ao sinal e ao servico. Quando faz
     sentido, ja puxa quem cuida daquilo (pra descobrir com quem se fala). Sempre
     UMA frase so."""
+    # Marketing pergunta das redes primeiro (senao as regras de site/IG abaixo
+    # sequestram a pergunta pro lado errado).
+    if service == "marketing":
+        if _marketing_angle(lead) == "escalar":
+            return "Quem cuida das redes de vocês hoje, e a ideia é crescer mais o alcance?"
+        return "Quem cuida das redes de vocês hoje, é alguém de fora ou vocês mesmos?"
     if service in ("trafego", "ambos", "indefinido") and _is_food(b):
         return "Vocês já trabalham com iFood ou é mais no salão e entrega própria?"
     if _advertises(lead):
@@ -83,8 +99,6 @@ def _pergunta(b: dict, lead: Lead, service: str) -> str:
         return "Trabalham mais no boca a boca, ou já tentaram as redes pra atrair gente nova?"
     if service == "automacao":
         return "Quem cuida do atendimento e da agenda aí, é tudo na mão pelo WhatsApp?"
-    if service == "marketing":
-        return "Quem cuida das redes aí hoje, é alguém de fora ou vocês mesmos?"
     if service == "design":
         return "Quem cuida do site de vocês no dia a dia?"
     return "Como o cliente costuma chegar até aí hoje, mais indicação ou divulgação?"

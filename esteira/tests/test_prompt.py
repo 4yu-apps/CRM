@@ -32,6 +32,36 @@ def test_angulo_1_ads_sem_site():
     assert "escapar" in p or "reter" in p
 
 
+def _mkt_lead(**kw) -> Lead:
+    lead = _lead(**kw)
+    setattr(lead, "profession", "marketing")  # a profissao e injetada no draft_stage
+    return lead
+
+
+def test_marketing_angulo_construir_quando_ig_parado():
+    lead = _mkt_lead(instagram="@conta", social_signals={"ig_status": "parado"})
+    p = build_prompt(lead)
+    assert "CONSTRUIR" in p
+    assert "ESCALAR" not in p
+
+
+def test_marketing_angulo_escalar_quando_presenca_forte():
+    lead = _mkt_lead(instagram="@conta",
+                     social_signals={"ig_status": "ativo", "post_freq": 3, "followers": 8000,
+                                     "engagement_rate": 3.2})
+    p = build_prompt(lead)
+    assert "ESCALAR" in p
+    # sinais de mkt entram como contexto pro modelo
+    assert "seguidores" in p.lower()
+
+
+def test_marketing_nunca_sugere_criar_site():
+    lead = _mkt_lead(website=None, instagram="@conta", social_signals={"ig_status": "parado"})
+    p = build_prompt(lead)
+    assert "oportunidade de criar a presenca" not in p
+    assert "da pra modernizar" not in p
+
+
 def test_trafego_nao_sugere_site():
     # Regra do dono: trafego/automacao NUNCA comentam falta de site nem citam
     # WordPress/Wix nos sinais (so design/web vendem site). Checa as frases que

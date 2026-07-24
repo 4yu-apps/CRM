@@ -76,7 +76,7 @@ export const PROFESSIONS: Profession[] = [
     icon: Megaphone,
     mira: "Rede social fraca ou abandonada.",
     suggestedNiches: ["Restaurante", "Estética", "Loja de roupas", "Academia"],
-    defaultService: "indefinido",
+    defaultService: "marketing",
   },
   {
     id: "branding",

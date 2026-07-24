@@ -66,3 +66,20 @@ def test_apply_ai_reader_none_no_op(tmp_path):
     lid = sink.insert_lead(Lead(id="", owner_id="o"))
     ai_stage.apply_ai(None, sink.get_lead(lid), sink)  # não quebra
     assert sink.get_lead(lid).ai_signals is None
+
+
+def test_prompt_marketing_ganha_angulo_de_presenca():
+    lead = Lead(id="1", owner_id="o", business_name="Salao X")
+    base = ai_stage.build_ai_prompt(lead)
+    mkt = ai_stage.build_ai_prompt(lead, "marketing")
+    assert "PRESENCA DIGITAL" in mkt
+    assert "PRESENCA DIGITAL" not in base
+    # area sem tratamento proprio herda o SYSTEM padrao (sem linha extra)
+    assert ai_stage.build_ai_prompt(lead, "trafego") == base
+
+
+def test_reader_repassa_profession():
+    vistos = []
+    reader = ai_stage.make_ai_reader(call=lambda prompt: (vistos.append(prompt), {"segment": "x"})[1])
+    reader(Lead(id="1", owner_id="o", business_name="X"), "marketing")
+    assert "PRESENCA DIGITAL" in vistos[0]

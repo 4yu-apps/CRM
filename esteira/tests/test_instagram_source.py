@@ -239,6 +239,38 @@ def test_source_com_probe_valores_corretos():
     assert by_field["instagram_status"].value == "ativo"
 
 
+def test_source_expoe_engagement_rate_e_bio():
+    # taxa = engajamento medio / seguidores * 100; bio vem de graca na query
+    def probe(handle):
+        return {
+            "followers": 1000,
+            "engagement": 30,  # 30/1000 = 3.0%
+            "bio": "  Pizzaria artesanal · delivery  ",
+            "last_post": "2026-06-12T10:00:00+0000",
+        }
+    findings = InstagramSource(probe=probe, now=NOW).enrich(_lead(instagram="clinica"))
+    by_field = {f.field_name: f for f in findings}
+    assert by_field["instagram_engagement_rate"].value == "3.0"
+    assert by_field["instagram_bio"].value == "Pizzaria artesanal · delivery"
+
+
+def test_bio_e_taxa_saem_da_query_business_discovery():
+    # a query pede biography; o probe devolve bio + calcula nada (rate e no enrich)
+    def fake_get(url, params=None, timeout=None):
+        payload = {
+            "business_discovery": {
+                "followers_count": 2000,
+                "biography": "loja de roupas",
+                "media": {"data": [{"like_count": 40, "comments_count": 10}]},
+            }
+        }
+        return FakeResp(200, payload)
+    probe = business_discovery_probe("123", "tok", get=fake_get)
+    result = probe("loja")
+    assert result["bio"] == "loja de roupas"
+    assert result["engagement"] == 50.0  # (40+10)/1 post
+
+
 def test_source_com_probe_retornando_none_so_normaliza():
     src = InstagramSource(probe=lambda h: None, now=NOW)
     findings = src.enrich(_lead(instagram="clinica"))

@@ -226,6 +226,45 @@ def _brief_key(lead: Lead) -> str:
     return getattr(lead, "service_target", "indefinido") or "indefinido"
 
 
+def _marketing_angle(lead: Lead) -> str:
+    """Faixa do ICP de marketing pra escolher o angulo da copy: 'construir'
+    (sem/fraca presenca), 'escalar' (presenca ativa e recorrente) ou 'morno'.
+    Le social_signals (ig_status/post_freq) — o retrato ja guardado no lead."""
+    if not (getattr(lead, "instagram", None) or "").strip():
+        return "construir"
+    soc = getattr(lead, "social_signals", None) or {}
+    status = soc.get("ig_status")
+    try:
+        pf = float(soc["post_freq"]) if soc.get("post_freq") is not None else None
+    except (TypeError, ValueError):
+        pf = None
+    recurrent = pf is not None and pf >= 1.0
+    if status == "parado":
+        return "construir"
+    if recurrent and status != "parado":
+        return "escalar"
+    return "morno"
+
+
+_MARKETING_ANGLE_BRIEF = {
+    "escalar": (
+        " ANGULO: a marca JA tem presenca ativa (posta, tem audiencia). Nao fale "
+        "como se ela nao existisse nas redes; o gancho e ESCALAR/OTIMIZAR — mais "
+        "alcance, conteudo com estrategia, constancia com qualidade. Reconheca o "
+        "que ja fazem antes de propor."
+    ),
+    "construir": (
+        " ANGULO: presenca fraca ou ausente; o gancho e CONSTRUIR/MOVIMENTAR a "
+        "presenca — assumir as redes, dar ritmo, aparecer pra quem ainda nao "
+        "conhece o negocio."
+    ),
+    "morno": (
+        " ANGULO: presenca inconstante (posta as vezes, sem ritmo); o gancho e "
+        "PROFISSIONALIZAR — transformar posts avulsos numa presenca com estrategia."
+    ),
+}
+
+
 def build_prompt(lead: Lead) -> str:
     b = lead_brief(lead)
     key = _brief_key(lead)
@@ -270,6 +309,21 @@ def build_prompt(lead: Lead) -> str:
         sinais.append("ja usa agendamento online")
     if sig.get("has_ecommerce") is True:
         sinais.append("vende online (loja/checkout no site)")
+
+    # Sinais de MARKETING: presenca digital (IG rico + Google). Contexto pra VOCE,
+    # modelo — NUNCA repita numeros na mensagem. So entram na area de marketing.
+    if key == "marketing":
+        fol = social.get("followers")
+        if isinstance(fol, int) and fol > 0:
+            sinais.append(f"{fol} seguidores no Instagram")
+        er = social.get("engagement_rate")
+        if isinstance(er, (int, float)):
+            sinais.append(f"engajamento de {er}% no Instagram")
+        pf = social.get("post_freq")
+        if isinstance(pf, (int, float)):
+            sinais.append("posta com recorrencia" if pf >= 1 else "quase nao posta (presenca parada)")
+        if not (getattr(lead, "maps_place_id", None) or b["nota"] is not None):
+            sinais.append("sem Perfil de Empresa no Google (presenca incompleta)")
 
     # "Ja anuncia?": define o angulo de trafego (otimizar x comecar). ad_platforms
     # diz EM QUE plataforma. Mantem o angulo condicional do anuncio-sem-site.
@@ -344,10 +398,14 @@ def build_prompt(lead: Lead) -> str:
         "NUNCA numero cru. Sem um fato concreto, nao escreva."
     )
 
+    brief_txt = _SERVICE_BRIEF.get(key, _SERVICE_BRIEF["indefinido"])
+    if key == "marketing":
+        brief_txt += _MARKETING_ANGLE_BRIEF.get(_marketing_angle(lead), "")
+
     return (
         f"{SYSTEM_INSTRUCTION}\n\n"
         f"{ident}"
-        f"{_SERVICE_BRIEF.get(key, _SERVICE_BRIEF['indefinido'])}\n\n"
+        f"{brief_txt}\n\n"
         f"{diag_linha}"
         f"Negocio: {b['nome']} ({b['segmento']}) em {b['cidade']}.\n"
         f"{cue_linha}"

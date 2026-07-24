@@ -147,6 +147,7 @@ def business_discovery_probe(ig_business_id: str, token: str, *, timeout: float 
                 "posts": posts,
                 "website": bd.get("website"),
                 "engagement": engagement,
+                "bio": bd.get("biography"),
             }
         except Exception:
             return None
@@ -194,4 +195,18 @@ class InstagramSource:
         # engajamento medio dos ultimos posts: sinal pro lens marketing.
         if data.get("engagement") is not None:
             findings.append(Finding("instagram_engagement", self.name, str(data["engagement"]), 0.7))
+        # taxa de engajamento (%) = interacoes medias / seguidores. Numero pronto
+        # pra ficha/score sem recalcular; so quando temos os dois dados.
+        fol, eng = data.get("followers"), data.get("engagement")
+        if fol and eng is not None:
+            try:
+                rate = round(float(eng) / float(fol) * 100, 1)
+                findings.append(Finding("instagram_engagement_rate", self.name, str(rate), 0.7))
+            except (TypeError, ValueError, ZeroDivisionError):
+                pass
+        # bio do IG: contexto de posicionamento da marca (segmento, oferta). Vem de
+        # graca na mesma query; hoje era descartada.
+        bio = (data.get("bio") or "").strip()
+        if bio:
+            findings.append(Finding("instagram_bio", self.name, bio[:300], 0.6))
         return findings

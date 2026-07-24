@@ -337,10 +337,84 @@ def score_design(
 
 
 # ---------------------------------------------------------------------
-# ICP marketing/social: presenca digital (redes + reputacao + site)
-# Presenca fraca/abandonada = oportunidade. Frequencia/engajamento de posts
-# NAO da pra medir de graca (IG/FB sao gated); usamos proxies de presenca.
+# ICP marketing/social: presenca digital (redes + Perfil de Empresa no Google).
+# ICP em U (dois extremos, escolhido pelo dono): SEM presenca = oportunidade de
+# CONSTRUIR; presenca FORTE = cliente com verba que valoriza mkt (ESCALAR). O
+# meio-termo morno (posta as vezes, sem ritmo) pontua baixo, fica abaixo do corte.
+# Site NAO entra aqui (isso e design/dev); a preocupacao e redes + Google.
 # ---------------------------------------------------------------------
+def _kfmt(n: int) -> str:
+    return f"{round(n / 1000)}k" if n >= 1000 else str(n)
+
+
+def _marketing_presence(
+    lead: Lead, signals: dict[str, Any]
+) -> tuple[int, str, str]:
+    """(pontos, nota, faixa) do eixo de presenca no Instagram. faixa in
+    {construir, escalar, morno} — a espinha do U e o gancho da copy. Sem IG e IG
+    parado pontuam alto (construir); ativo+recorrente pontua alto (escalar);
+    ativo sem ritmo pontua baixo (morno)."""
+    if not is_present("instagram", lead.instagram):
+        return 30, "sem Instagram, presenca a construir do zero", "construir"
+    status = signals.get("instagram_status")
+    freq = signals.get("instagram_post_freq")
+    try:
+        pf = float(freq) if freq is not None else None
+    except (TypeError, ValueError):
+        pf = None
+    recurrent = pf is not None and pf >= 1.0  # >=1 post/semana = ritmo
+    if status == "parado":
+        return 26, "Instagram parado, da pra assumir a gestao", "construir"
+    if status == "ativo" and recurrent:
+        return 26, "Instagram ativo e postando com recorrencia, angulo de escalar/otimizar", "escalar"
+    if status == "ativo":
+        return 12, "Instagram ativo mas sem ritmo constante, da pra profissionalizar", "morno"
+    # sem token / status desconhecido: nao chuta, mas usa a recorrencia se houver
+    if recurrent:
+        return 24, "Instagram com posts recorrentes, presenca a elevar", "escalar"
+    return 14, "tem Instagram (da pra avaliar a gestao)", "morno"
+
+
+def _followers_points(followers: Any) -> tuple[int, str] | None:
+    """Valor de audiencia (nao oportunidade): base grande = mais pra gerir, bom
+    pro cliente de escala; base pequena = presenca a crescer. None sem dado."""
+    try:
+        f = int(followers)
+    except (TypeError, ValueError):
+        return None
+    if f < 0:
+        return None
+    if f >= 10000:
+        return 10, f"base grande ({_kfmt(f)} seguidores), audiencia valiosa pra gerir"
+    if f >= 3000:
+        return 8, f"base media ({_kfmt(f)} seguidores)"
+    if f >= 500:
+        return 6, f"base pequena ({f} seguidores), da pra crescer"
+    return 5, f"poucos seguidores ({f}), presenca a construir"
+
+
+def _gmb_presence_points(lead: Lead) -> tuple[int, str]:
+    """Perfil de Empresa no Google (GMB) — composto do que ja temos. Sem perfil =
+    presenca incompleta (oportunidade); perfil rico = marca bem posicionada."""
+    on_google = bool(lead.maps_place_id) or lead.rating is not None or bool(lead.reviews_count)
+    if not on_google:
+        return 12, "sem Perfil de Empresa no Google, presenca incompleta"
+    complete = (
+        bool(lead.opening_hours)
+        and is_present("website", lead.website)
+        and (lead.reviews_count or 0) >= 20
+    )
+    if complete:
+        return 3, "Perfil de Empresa no Google bem preenchido"
+    return 7, "Perfil de Empresa no Google incompleto (falta site/horario/avaliacoes)"
+
+
+def marketing_angle(lead: Lead, signals: dict[str, Any] | None = None) -> str:
+    """Faixa do ICP de marketing (construir/escalar/morno) — reusada pela copy
+    pra escolher o angulo (construir presenca x escalar/otimizar)."""
+    return _marketing_presence(lead, signals or {})[2]
+
+
 def score_marketing(
     lead: Lead, signals: dict[str, Any], today: date | None = None
 ) -> tuple[int, list[dict[str, Any]]]:
@@ -349,35 +423,28 @@ def score_marketing(
     def add(label: str, pts_note: tuple[int, str]) -> None:
         crit.append({"label": label, "points": pts_note[0], "note": pts_note[1]})
 
-    ig_status = signals.get("instagram_status")
-    if not is_present("instagram", lead.instagram):
-        add("Instagram", (22, "sem Instagram, presenca a construir"))
-    elif ig_status == "parado":
-        add("Instagram", (18, "tem Instagram mas parado, da pra assumir a gestao"))
-    elif ig_status == "ativo":
-        add("Instagram", (6, "Instagram ativo, bem cuidado"))
-    else:
-        add("Instagram", (6, "tem Instagram (da pra avaliar a gestao)"))
-    # engajamento real do IG (B6): taxa = interacoes medias / seguidores. Baixa =
-    # audiencia parada, da pra movimentar (oportunidade); saudavel = bem gerido.
+    pts, note, _faixa = _marketing_presence(lead, signals)
+    add("Presenca", (pts, note))
+    fol = _followers_points(signals.get("instagram_followers"))
+    if fol is not None:
+        add("Alcance", fol)
+    # engajamento real do IG: taxa = interacoes medias / seguidores. Baixa =
+    # audiencia parada, da pra movimentar; saudavel = bem gerido (menos pontos).
     eng = _engagement_points(signals.get("instagram_followers"), signals.get("instagram_engagement"))
     if eng is not None:
         add("Engajamento", eng)
+    add("Google", _gmb_presence_points(lead))
     if is_present("facebook", lead.facebook):
         add("Facebook", (3, "tem Facebook"))
     else:
-        add("Facebook", (8, "sem Facebook"))
-    if is_present("website", lead.website):
-        add("Site", (4, "tem site"))
-    else:
-        add("Site", (10, "sem site, presenca incompleta"))
+        add("Facebook", (7, "sem Facebook"))
 
-    # reputacao: pouca avaliacao = precisa movimentar a marca
+    # reputacao: pouca avaliacao = marca pouco movimentada
     n = lead.reviews_count
     if n is None or n < 30:
-        add("Reputacao", (14, "pouca avaliacao, marca pouco movimentada"))
+        add("Reputacao", (12, "pouca avaliacao, marca pouco movimentada"))
     elif n < 150:
-        add("Reputacao", (8, f"reputacao em construcao ({n} avaliacoes)"))
+        add("Reputacao", (7, f"reputacao em construcao ({n} avaliacoes)"))
     else:
         add("Reputacao", (4, f"ja tem volume ({n} avaliacoes)"))
 
@@ -428,6 +495,12 @@ def _summary(lens: str, target: ServiceTarget, lead: Lead, signals: dict[str, An
         det = ", ".join(defeitos) or "da pra modernizar"
         return f"Bom pra design/web. {nome} tem site, mas {det}. Cabe um redesign."
     if lens == "marketing":
+        faixa = marketing_angle(lead, signals)
+        gmb_incompleto = not (bool(lead.maps_place_id) or lead.rating is not None)
+        if faixa == "escalar":
+            base = movimento or "audiencia ja formada"
+            return (f"Bom pra marketing/social. {nome} ja tem presenca ativa ({base}). "
+                    f"O angulo e escalar e otimizar o que ja roda (conteudo, ritmo, alcance).")
         falta = []
         if not is_present("instagram", lead.instagram):
             falta.append("sem Instagram")
@@ -435,6 +508,8 @@ def _summary(lens: str, target: ServiceTarget, lead: Lead, signals: dict[str, An
             falta.append("Instagram parado")
         if not is_present("facebook", lead.facebook):
             falta.append("sem Facebook")
+        if gmb_incompleto:
+            falta.append("fraco no Google")
         det = ", ".join(falta) or "presenca a fortalecer"
         return (f"Bom pra marketing/social. {nome} tem {det}. "
                 f"Da pra construir e movimentar a presenca da marca.")
