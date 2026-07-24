@@ -199,7 +199,7 @@ export default function BuscarPage() {
   // F5 — sugestoes derivadas dos leads reais: top 3 combos que mais fecham.
   const suggestions = useMemo(() => suggestSearches(leads), [leads]);
 
-  // Nichos oferecidos: os do perfil primeiro, depois os 20 ramos canonicos (sem repetir).
+  // Nichos oferecidos: os do perfil primeiro, depois os ramos canonicos (sem repetir).
   const nicheOptions = useMemo(() => {
     return Array.from(new Set([...(profile?.niches ?? []), ...RAMOS_DISPONIVEIS]));
   }, [profile]);

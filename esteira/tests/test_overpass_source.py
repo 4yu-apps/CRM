@@ -39,6 +39,8 @@ def test_osm_filters_conhecidos():
     assert ("shop", "hairdresser") in osm_filters_for("barbearia")
     assert ("amenity", "dentist") in osm_filters_for("dentista")
     assert ("amenity", "restaurant") in osm_filters_for("restaurante")
+    # pizzaria e distinta de restaurante: cuisine=pizza, nao amenity=restaurant
+    assert osm_filters_for("pizzaria") == [("cuisine", "pizza")]
 
 
 def test_osm_filters_desconhecido_vazio():
