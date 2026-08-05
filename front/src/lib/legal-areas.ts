@@ -41,6 +41,14 @@ export const LEGAL_AREAS: LegalArea[] = [
     label: "LGPD / Digital",
     descricao: "Quem coleta dado e não tem política de privacidade.",
   },
+  {
+    // Quem atua fora do contencioso (contratos, compliance, negociação) não
+    // tinha onde se encaixar: marcava societário + LGPD e funcionava por
+    // acidente, não por desenho.
+    id: "consultivo",
+    label: "Consultivo / Contratos",
+    descricao: "Empresas com operação contratual recorrente.",
+  },
 ];
 
 export function getLegalArea(id: string | null | undefined): LegalArea | undefined {

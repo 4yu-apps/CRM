@@ -330,6 +330,7 @@ _LEGAL_SELF_DESC = {
     "societario": "atuo na área empresarial e societária, com contratos e sociedades",
     "consumidor": "atuo com direito do consumidor, do lado de empresas",
     "lgpd": "atuo com proteção de dados e contratos digitais (LGPD)",
+    "consultivo": "atuo na área consultiva, com contratos e o dia a dia jurídico de empresas",
 }
 
 # O que cada area OBSERVA numa empresa — orienta qual fato neutro puxar.
@@ -340,6 +341,7 @@ _LEGAL_AREA_CUE = {
     "societario": "empresa constituída como sociedade, com mais de um sócio",
     "consumidor": "empresa que atende consumidor final no dia a dia",
     "lgpd": "empresa que coleta dados de cliente no digital",
+    "consultivo": "empresa com operacao contratual recorrente (fornecedores, clientes, equipe)",
 }
 
 
@@ -377,6 +379,7 @@ def legal_self_desc(lead: Lead) -> str:
         "trabalhista": "trabalhista", "tributario": "tributária",
         "societario": "empresarial", "consumidor": "do consumidor",
         "lgpd": "de proteção de dados",
+        "consultivo": "consultiva",
     }
     a, b = nomes[areas[0]], nomes[areas[1]]
     return f"atuo nas áreas {a} e {b}, com empresas"

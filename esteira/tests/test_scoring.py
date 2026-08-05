@@ -505,3 +505,18 @@ def test_resumo_do_mei_nao_se_contradiz():
     assert "MEI" in resumo
     assert "Bom pra advocacia" not in resumo
     assert "Perfil de empresa que sustenta" not in resumo
+
+
+def test_area_consultiva_pesa_natureza_e_idade():
+    """Sub-pesos proprios: contrato social (natureza) e o momento da empresa
+    (nova constitui, madura acumula obrigacao) pesam mais que o resto."""
+    lead = _empresa_forte(phone="43998887766")
+    com = score_lead(lead, {"simples": False}, professions=["advocacia"],
+                     legal_areas=["consultivo"])
+    sem = score_lead(lead, {"simples": False}, professions=["advocacia"])
+    assert com.score > sem.score
+
+    crit = {c["label"]: c["points"] for c in com.reason["advocacia"]["criteria"]}
+    base = {c["label"]: c["points"] for c in sem.reason["advocacia"]["criteria"]}
+    assert crit["Natureza"] > base["Natureza"]
+    assert crit["Idade"] > base["Idade"]

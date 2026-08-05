@@ -478,8 +478,12 @@ export default function ConfigPage() {
             {professions.includes("advocacia") && (
               <div className="mt-5 rounded-[14px] border border-border-2 bg-surface-2 px-4 py-4">
                 <div className="mb-1 text-[13px] font-bold text-ink">Suas áreas de atuação</div>
+                {/* Mesmo aviso do onboarding: a busca cobre cliente empresarial. */}
                 <p className="mb-3 text-[12.5px] text-faint">
-                  Cada área muda o que eu procuro na empresa. Pode marcar mais de uma.
+                  Eu procuro <span className="font-semibold text-ink-2">empresas</span>, então isso
+                  serve pra quem atende cliente empresarial. Se a sua atuação é com pessoa física
+                  (família, sucessões, previdenciário, criminal), a busca não vai te ajudar.
+                  Cada área marcada muda o que eu procuro na empresa; pode marcar mais de uma.
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {LEGAL_AREAS.map((a) => {
@@ -568,8 +572,12 @@ export default function ConfigPage() {
             {professions.includes("advocacia") && (
               <div className="mt-5 rounded-[14px] border border-border-2 bg-surface-2 px-4 py-4">
                 <div className="mb-1 text-[13px] font-bold text-ink">Suas áreas de atuação</div>
+                {/* Mesmo aviso do onboarding: a busca cobre cliente empresarial. */}
                 <p className="mb-3 text-[12.5px] text-faint">
-                  Cada área muda o que eu procuro na empresa. Pode marcar mais de uma.
+                  Eu procuro <span className="font-semibold text-ink-2">empresas</span>, então isso
+                  serve pra quem atende cliente empresarial. Se a sua atuação é com pessoa física
+                  (família, sucessões, previdenciário, criminal), a busca não vai te ajudar.
+                  Cada área marcada muda o que eu procuro na empresa; pode marcar mais de uma.
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {LEGAL_AREAS.map((a) => {

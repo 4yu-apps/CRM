@@ -489,6 +489,10 @@ _AREA_WEIGHTS: dict[str, dict[str, float]] = {
     "societario": {"Socios": 1.8, "Natureza": 1.4},
     "consumidor": {"Atrito": 1.8, "Risco do ramo": 1.3},
     "lgpd": {"Assessoria": 1.8},
+    # Consultivo/contratual: quem tem contrato pra revisar e uma operacao que
+    # gera obrigacao. Natureza (sociedade tem contrato social) e idade (nova
+    # constitui, madura acumula) pesam; o resto fica neutro.
+    "consultivo": {"Natureza": 1.5, "Idade": 1.4, "Risco do ramo": 1.2},
 }
 
 

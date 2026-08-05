@@ -568,3 +568,33 @@ def test_prompt_da_ia_carrega_a_flexao_escolhida():
     from garimpo_esteira.draft.prompt import build_email_prompt
     e = build_email_prompt(lead)
     assert "Advogada" in e
+
+
+# ------------------------------------------------------------------
+# Area consultiva: quem atua fora do contencioso (contratos, compliance,
+# negociacao) marcava societario + LGPD e funcionava por acidente. Agora
+# tem area propria, com apresentacao e sub-pesos proprios.
+# ------------------------------------------------------------------
+
+def test_area_consultiva_se_apresenta_pela_atuacao_consultiva():
+    from garimpo_esteira.draft.prompt import legal_self_desc
+    lead = _lead_adv()
+    setattr(lead, "legal_areas", ["consultivo"])
+    desc = legal_self_desc(lead)
+    assert "consultiva" in desc
+    assert "contratos" in desc
+
+
+def test_area_consultiva_combina_com_outra_area():
+    from garimpo_esteira.draft.prompt import legal_self_desc
+    lead = _lead_adv()
+    setattr(lead, "legal_areas", ["consultivo", "trabalhista"])
+    assert "consultiva" in legal_self_desc(lead)
+
+
+def test_area_consultiva_entra_no_prompt_com_o_que_observar():
+    lead = _lead_adv()
+    setattr(lead, "profession", "advocacia")
+    setattr(lead, "legal_areas", ["consultivo"])
+    p = build_prompt(lead)
+    assert "contratual" in p
