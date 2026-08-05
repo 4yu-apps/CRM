@@ -242,6 +242,19 @@ _STACKS = {
 }
 
 
+# Assessoria juridica aparente: quem tem politica de privacidade, termos de uso
+# e CNPJ no rodape provavelmente passou por advogado. A AUSENCIA e o sinal — e o
+# proxy de "ainda nao tem assessoria", nucleo do ICP da area de advocacia.
+_PRIVACY_RE = re.compile(
+    r"pol[ií]tica\s+de\s+privacidade|privacy\s+policy|/privacidade|privacy-policy|\bLGPD\b",
+    re.I,
+)
+_TERMS_RE = re.compile(
+    r"termos\s+de\s+uso|termos\s+e\s+condi[çc][õo]es|terms\s+of\s+(?:use|service)|/termos",
+    re.I,
+)
+_CNPJ_FOOTER_RE = re.compile(r"\b\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}\b")
+
 # Link-na-bio (Linktree e similares) e presenca em marketplace: sinais GRATIS de
 # maturidade digital extraidos do HTML que ja baixamos (zero chamada nova).
 _LINKTREE_RE = re.compile(r"linktr\.ee|lit\.link|beacons\.ai|bio\.link|linkr\.bio|campsite\.bio", re.I)
@@ -310,6 +323,10 @@ def extract_site_signals(html: str, *, url: str = "") -> dict:
         "linkedin_url": _first_url(_LINKEDIN_URL_RE, h),
         "has_linktree": bool(_LINKTREE_RE.search(h)),
         "has_marketplace": bool(_MARKETPLACE_RE.search(h)),
+        # assessoria juridica aparente (area de advocacia)
+        "has_privacy_policy": bool(_PRIVACY_RE.search(h)),
+        "has_terms": bool(_TERMS_RE.search(h)),
+        "has_cnpj_footer": bool(_CNPJ_FOOTER_RE.search(h)),
         "mobile_ready": bool(_VIEWPORT_RE.search(h)),
         "page_kb": page_kb,
         "slow": page_kb > 1500,

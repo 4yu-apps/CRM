@@ -104,6 +104,7 @@ def test_extract_site_signals_returns_dict_with_all_keys():
         "has_tiktok", "has_youtube", "has_linkedin",
         "tiktok_url", "youtube_url", "linkedin_url",
         "has_linktree", "has_marketplace",
+        "has_privacy_policy", "has_terms", "has_cnpj_footer",
         "mobile_ready", "page_kb", "slow", "stack",
         "https", "has_h1", "has_title", "has_description", "og_image"
     }
@@ -373,3 +374,35 @@ def test_website_source_site_signals_complete_check():
     assert sig["chat_vendor"] == "tawk"
     assert sig["has_fb_pixel"] is True
     assert sig["https"] is True
+
+
+# ============================================================================
+# Assessoria juridica aparente (area de advocacia): politica de privacidade,
+# termos de uso e CNPJ no rodape. A AUSENCIA e o sinal — proxy de "ainda nao
+# passou por advogado".
+# ============================================================================
+
+def test_detecta_politica_de_privacidade_e_termos():
+    html = """
+      <footer>
+        <a href="/politica-de-privacidade">Politica de Privacidade</a>
+        <a href="/termos-de-uso">Termos de Uso</a>
+        <p>CNPJ: 11.222.333/0001-81</p>
+      </footer>
+    """
+    s = extract_site_signals(html, url="https://x.com")
+    assert s["has_privacy_policy"] is True
+    assert s["has_terms"] is True
+    assert s["has_cnpj_footer"] is True
+
+
+def test_site_sem_juridico_marca_tudo_falso():
+    s = extract_site_signals("<html><body><h1>Oi</h1></body></html>", url="https://x.com")
+    assert s["has_privacy_policy"] is False
+    assert s["has_terms"] is False
+    assert s["has_cnpj_footer"] is False
+
+
+def test_lgpd_sozinho_conta_como_politica():
+    s = extract_site_signals("<p>Tratamos seus dados conforme a LGPD.</p>", url="https://x.com")
+    assert s["has_privacy_policy"] is True
