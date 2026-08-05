@@ -35,7 +35,7 @@ def process_one_lead(
     enrich_lead(lead, sources, sink)  # bruto -> enriquecido
     result = score_one(lead, sink, profession, min_score, professions=professions,
                        legal_areas=legal_areas)  # -> qualificado | descartado
-    apply_ai(ai_reader, lead, sink, profession)  # Leitura da IA (area-aware)
+    apply_ai(ai_reader, lead, sink, profession, legal_areas)  # Leitura da IA (area-aware)
     drafted = False
     if result.decision == "qualificado":
         if draft_one(

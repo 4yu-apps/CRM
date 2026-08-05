@@ -111,3 +111,32 @@ def test_parse_ai_aceita_exposure_e_context():
                     "context": "empresa com 12 anos e 3 socios"})
     assert out["exposure"].startswith("rotatividade")
     assert out["context"].startswith("empresa com 12 anos")
+
+
+def test_ia_recebe_a_lente_da_area_juridica():
+    lead = Lead(id="1", owner_id="o", business_name="Transportadora Y",
+                natureza_juridica="206-2 - Sociedade Empresaria Limitada")
+    p = ai_stage.build_ai_prompt(lead, "advocacia", ["trabalhista"])
+    assert "TRABALHISTA" in p
+    assert "rotatividade" in p.lower()
+    assert "TRIBUTARIO" not in p  # so a area marcada
+
+
+def test_ia_junta_as_lentes_de_varias_areas():
+    lead = Lead(id="1", owner_id="o", business_name="X")
+    p = ai_stage.build_ai_prompt(lead, "advocacia", ["tributario", "lgpd"])
+    assert "TRIBUTARIO" in p and "LGPD" in p
+
+
+def test_angulo_juridico_dispara_pelo_service_target():
+    """Advocacia marcada em SEGUNDO lugar: profession e professions[0], entao o
+    angulo tem que sair do alvo que o score resolveu."""
+    lead = Lead(id="1", owner_id="o", business_name="X", service_target="advocacia")
+    p = ai_stage.build_ai_prompt(lead, "trafego", ["societario"])
+    assert "AREA DO DONO: ADVOCACIA" in p
+    assert "SOCIETARIO" in p
+
+
+def test_area_sem_angulo_proprio_nao_muda_nada():
+    lead = Lead(id="1", owner_id="o", business_name="X", service_target="trafego")
+    assert ai_stage.build_ai_prompt(lead, "trafego") == ai_stage.build_ai_prompt(lead, None)

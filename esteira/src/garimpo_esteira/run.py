@@ -396,7 +396,8 @@ def cmd_reprocess(cfg: Config) -> int:
                 qualif += 1
             # Leitura da IA: lê os dados já guardados (não re-baixa) e grava
             # ai_signals + hours_struct (horário normalizado pro "aberto agora?").
-            apply_ai(ai_reader, lead, sink, profession)
+            apply_ai(ai_reader, lead, sink, profession,
+                     list(prof.get("legal_areas") or []))
             print(f"  {lead.id}: score={res.score} {res.decision} alvo={res.service_target}")
         except Exception as e:
             # carimba mesmo no erro pra a onda avancar; como a ordem e

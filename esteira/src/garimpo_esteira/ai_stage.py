@@ -66,6 +66,52 @@ _AREA_ANGLE = {
 }
 
 
+# O que a IA deve OLHAR em cada area juridica. Sem isso ela sabe que o dono e
+# advogado, mas escreve uma exposicao generica — inutil pra priorizar.
+_LEGAL_AREA_LENS = {
+    "trabalhista": (
+        "TRABALHISTA: olhe porte da operacao, ramo de rotatividade alta "
+        "(alimentacao, construcao, transporte, limpeza, seguranca), tempo de "
+        "casa e numero de estabelecimentos. Exposicao tipica: passivo de horas, "
+        "jornada, terceirizacao, adicionais."
+    ),
+    "tributario": (
+        "TRIBUTARIO: olhe regime (Simples x fora do Simples), capital social, "
+        "porte da Receita e CNAEs secundarios. Exposicao tipica: enquadramento "
+        "errado, carga em regime inadequado, obrigacao acessoria."
+    ),
+    "societario": (
+        "SOCIETARIO/EMPRESARIAL: olhe numero de socios, data de entrada de cada "
+        "um, natureza juridica e idade da empresa. Exposicao tipica: falta de "
+        "acordo de socios, sucessao, saida de socio, contrato desatualizado."
+    ),
+    "consumidor": (
+        "CONSUMIDOR: olhe se atende consumidor final, se vende online, e o "
+        "padrao das avaliacoes. Exposicao tipica: politica de troca, cobranca, "
+        "atraso de entrega, garantia."
+    ),
+    "lgpd": (
+        "LGPD/DIGITAL: olhe se ha site com formulario, e-commerce, e se existe "
+        "politica de privacidade e termos de uso. Exposicao tipica: coleta de "
+        "dado sem base legal, ausencia de politica, contrato digital fragil."
+    ),
+}
+
+
+def _legal_lens_block(legal_areas: list[str] | None) -> str:
+    """Bloco com a lente de CADA area que o dono atua. Vazio sem area marcada."""
+    linhas = [
+        _LEGAL_AREA_LENS[a] for a in (legal_areas or [])
+        if a in _LEGAL_AREA_LENS
+    ]
+    if not linhas:
+        return ""
+    return (
+        "\n\nAREAS DE ATUACAO DO DONO — a exposicao e o contexto que voce "
+        "devolver TEM que ser relevantes pra estas areas:\n- " + "\n- ".join(linhas)
+    )
+
+
 def _facts(lead: Lead) -> str:
     sig = lead.site_signals or {}
     soc = lead.social_signals or {}
@@ -92,9 +138,23 @@ def _facts(lead: Lead) -> str:
     return "\n".join(linhas)
 
 
-def build_ai_prompt(lead: Lead, profession: str | None = None) -> str:
+def build_ai_prompt(
+    lead: Lead, profession: str | None = None,
+    legal_areas: list[str] | None = None,
+) -> str:
+    """Prompt da leitura. O angulo sai da profissao do dono; se ela nao tiver
+    angulo proprio, cai no service_target que o score resolveu — assim a area
+    de advocacia funciona mesmo quando o dono a marcou em segundo lugar
+    (profession e sempre professions[0])."""
     angle = _AREA_ANGLE.get((profession or "").strip().lower(), "")
+    if not angle:
+        alvo = (getattr(lead, "service_target", None) or "").strip().lower()
+        angle = _AREA_ANGLE.get(alvo, "")
+        if angle:
+            profession = alvo
     system = f"{SYSTEM}\n\n{angle}" if angle else SYSTEM
+    if angle and (profession or "").strip().lower() == "advocacia":
+        system += _legal_lens_block(legal_areas)
     return f"{system}\n\nFATOS:\n{_facts(lead)}"
 
 
@@ -212,9 +272,10 @@ def make_ai_reader(
 
     _call = call or _chain
 
-    def read(lead: Lead, profession: str | None = None) -> dict | None:
+    def read(lead: Lead, profession: str | None = None,
+             legal_areas: list[str] | None = None) -> dict | None:
         try:
-            raw = _call(build_ai_prompt(lead, profession))
+            raw = _call(build_ai_prompt(lead, profession, legal_areas))
         except Exception:
             return None  # rede/limite/JSON quebrado: segue sem IA
         return parse_ai(raw)
@@ -223,7 +284,8 @@ def make_ai_reader(
 
 
 def apply_ai(
-    reader: "AIReader | None", lead: Lead, sink, profession: str | None = None
+    reader: "AIReader | None", lead: Lead, sink, profession: str | None = None,
+    legal_areas: list[str] | None = None,
 ) -> None:
     """Roda o leitor (se houver) e grava ai_signals + hours_struct no lead/sink.
     horario só preenche se o lead ainda não tem um estruturado. Não quebra nada
@@ -231,7 +293,7 @@ def apply_ai(
     (ex.: marketing -> maturidade de presenca digital, nao de site)."""
     if reader is None:
         return
-    ai = reader(lead, profession)
+    ai = reader(lead, profession, legal_areas)
     if not ai:
         return
     hours = ai.pop("hours", None)
