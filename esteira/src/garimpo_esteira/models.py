@@ -17,8 +17,11 @@ LeadSource = Literal[
 ]
 
 # Servico-alvo do lead, dirigido pela profissao do dono: trafego/automacao/ambos
-# (gestor), design (UX/web/branding), marketing (social), ou indefinido.
-ServiceTarget = Literal["trafego", "automacao", "ambos", "design", "marketing", "indefinido"]
+# (gestor), design (UX/web/branding), marketing (social), advocacia (assessoria
+# juridica), ou indefinido.
+ServiceTarget = Literal[
+    "trafego", "automacao", "ambos", "design", "marketing", "advocacia", "indefinido"
+]
 
 # Campos do lead que as fontes podem preencher (proveniência por campo).
 ENRICHABLE_FIELDS = (

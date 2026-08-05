@@ -1,7 +1,7 @@
 from datetime import date
 
 from garimpo_esteira.models import Lead
-from garimpo_esteira.scoring import THRESHOLD, score_lead
+from garimpo_esteira.scoring import THRESHOLD, is_mei, score_advocacia, score_lead
 
 TODAY = date(2026, 6, 25)
 
@@ -346,3 +346,90 @@ def test_marketing_engajamento_baixo_pontua_mais_que_alto():
 def test_marketing_sem_engajamento_nao_cria_item():
     r = score_lead(_lead(instagram="@x"), profession="marketing")
     assert _crit(r.reason, "marketing", "Engajamento") is None
+
+
+# ------------------------------------------------------------------
+# Lente de advocacia: o ICP juridico. Nao olha Instagram, engajamento nem
+# GMB; olha empresa (natureza juridica, socios, capital, situacao, idade,
+# assessoria aparente).
+# ------------------------------------------------------------------
+
+def _adv(**kw) -> Lead:
+    base = dict(
+        id="l", owner_id="o", phone="44999990000", business_name="Empresa X",
+        company_status="ATIVA",
+        natureza_juridica="206-2 - Sociedade Empresaria Limitada",
+        opened_on="2014-02-01", capital_social=200000.0, socios_count=3,
+    )
+    base.update(kw)
+    return Lead(**base)
+
+
+def test_mei_e_cortado_da_lente_de_advocacia():
+    mei = _adv(natureza_juridica="213-5 - Empresario (Individual)", porte="MEI")
+    assert is_mei(mei) is True
+    r = score_lead(mei, {"site": {"mei": True}}, professions=["advocacia"], today=TODAY)
+    assert r.decision == "descartado"
+
+
+def test_ltda_com_socios_e_idade_qualifica():
+    r = score_lead(_adv(), {"site": {}}, professions=["advocacia"], today=TODAY)
+    assert r.decision == "qualificado"
+    assert r.service_target == "advocacia"
+
+
+def test_idade_juridica_em_u_reprova_o_meio_termo():
+    nova, _ = score_advocacia(_adv(opened_on="2025-06-01"), {}, TODAY)
+    meio, _ = score_advocacia(_adv(opened_on="2023-01-01"), {}, TODAY)
+    madura, _ = score_advocacia(_adv(opened_on="2014-02-01"), {}, TODAY)
+    assert nova > meio
+    assert madura > meio
+
+
+def test_sem_politica_de_privacidade_pontua_mais():
+    com, _ = score_advocacia(
+        _adv(website="https://x.com"),
+        {"site": {"has_privacy_policy": True, "has_terms": True}}, TODAY)
+    sem, _ = score_advocacia(
+        _adv(website="https://x.com"),
+        {"site": {"has_privacy_policy": False, "has_terms": False}}, TODAY)
+    assert sem > com
+
+
+def test_empresa_irregular_qualifica_pra_advogado():
+    r = score_lead(_adv(company_status="INAPTA"), {"site": {}},
+                   professions=["advocacia"], today=TODAY)
+    assert r.decision == "qualificado"
+
+
+def test_regressao_empresa_irregular_continua_cortada_fora_da_advocacia():
+    inapta = _adv(company_status="INAPTA", rating=4.8, reviews_count=300,
+                  website="https://x.com")
+    for profs in (["trafego"], ["marketing"], ["design"], ["automacao"], []):
+        r = score_lead(inapta, {"site": {}}, professions=profs, today=TODAY)
+        assert r.decision == "descartado", profs
+
+
+def test_advocacia_ignora_instagram_e_anuncio():
+    ruido = {"instagram_followers": 50000, "instagram_status": "ativo",
+             "instagram_post_freq": 4.0, "ads_active": True}
+    com_ruido, _ = score_advocacia(_adv(instagram="@x", facebook="fb.com/x"), ruido, TODAY)
+    sem_ruido, _ = score_advocacia(_adv(), {}, TODAY)
+    assert com_ruido == sem_ruido
+
+
+def test_legal_area_pesa_o_criterio_que_importa():
+    lead = _adv(category="transportadora")
+    neutro, crit_n = score_advocacia(lead, {}, TODAY)
+    trab, crit_t = score_advocacia(lead, {}, TODAY, ["trabalhista"])
+    risco_n = next(c["points"] for c in crit_n if c["label"] == "Risco do ramo")
+    risco_t = next(c["points"] for c in crit_t if c["label"] == "Risco do ramo")
+    assert risco_t > risco_n
+    assert trab > neutro
+
+
+def test_reason_traz_a_lente_de_advocacia():
+    r = score_lead(_adv(), {"site": {}}, professions=["advocacia"], today=TODAY)
+    assert "advocacia" in r.reason
+    assert r.reason["lens"] == "advocacia"
+    assert "advocacia" in r.reason["summary"].lower()

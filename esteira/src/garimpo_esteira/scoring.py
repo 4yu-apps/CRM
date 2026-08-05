@@ -165,6 +165,7 @@ _LENS = {
     "web": "design",
     "branding": "design",
     "marketing": "marketing",
+    "advocacia": "advocacia",
 }
 
 
@@ -456,6 +457,209 @@ def score_marketing(
 
 
 # ---------------------------------------------------------------------
+# ICP advocacia: o INVERSO do de marketing. Nao olha Instagram, engajamento,
+# GMB nem "ja anuncia" — nada disso e leitura juridica. Olha EMPRESA: natureza
+# juridica, socios, capital, regime, situacao na Receita, idade e assessoria
+# aparente. MEI corta antes de tudo: e pessoa com CNPJ, nao contrata advogado.
+# ---------------------------------------------------------------------
+_MEI_MARKERS = ("MEI", "MICROEMPREENDEDOR INDIVIDUAL")
+
+# Ramo -> dor juridica dominante. Alimenta o criterio "Risco do ramo".
+_RISCO_JURIDICO: tuple[tuple[tuple[str, ...], int, str], ...] = (
+    (("clinic", "clínic", "odonto", "medic", "médic", "laborator", "fisio", "psicolog"),
+     14, "saude: consumo, conselho profissional e dado sensivel (LGPD)"),
+    (("restaurante", "pizzaria", "lanchonete", "hamburg", "padaria", "buffet",
+      "hotel", "pousada", "construc", "construç", "constru", "transport",
+      "logistic", "limpeza", "seguranca", "segurança"),
+     16, "ramo de rotatividade alta, exposicao trabalhista tipica"),
+    (("oficina", "mecanic", "mecânic", "loja", "varejo", "otica", "ótica",
+      "farmacia", "farmácia", "movei", "móvei", "eletro", "academia", "escola",
+      "curso", "petshop", "pet shop", "estetic", "estétic"),
+     12, "ramo de relacao de consumo intensa (CDC)"),
+    (("imobiliar", "imobiliár", "incorporad", "corretor", "contabil", "contábil",
+      "distribuid", "atacad", "industri", "indústri"),
+     12, "ramo contratual/regulatorio, demanda consultiva recorrente"),
+)
+
+# Sub-pesos por area juridica marcada pelo dono: multiplica o criterio que mais
+# importa naquela area. Sem area marcada, todos valem 1.0 (leitura neutra).
+_AREA_WEIGHTS: dict[str, dict[str, float]] = {
+    "trabalhista": {"Risco do ramo": 1.6, "Idade": 1.3},
+    "tributario": {"Capital": 1.6, "Regime": 1.8},
+    "societario": {"Socios": 1.8, "Natureza": 1.4},
+    "consumidor": {"Atrito": 1.8, "Risco do ramo": 1.3},
+    "lgpd": {"Assessoria": 1.8},
+}
+
+
+def is_mei(lead: Lead) -> bool:
+    """MEI pela natureza juridica ou pelo porte da Receita. Corte duro do ICP:
+    MEI e uma pessoa com CNPJ, nao um cliente de assessoria juridica."""
+    nat = (getattr(lead, "natureza_juridica", None) or "").upper()
+    porte = (lead.porte or "").upper()
+    return any(m in nat for m in _MEI_MARKERS) or porte == "MEI"
+
+
+def _natureza_points(lead: Lead) -> tuple[int, str]:
+    nat = (getattr(lead, "natureza_juridica", None) or "").upper()
+    if not nat:
+        return 8, "natureza juridica desconhecida"
+    if "LIMITADA" in nat or "ANONIMA" in nat or "ANÔNIMA" in nat or "S/A" in nat:
+        return 22, "sociedade (contrato social, governanca, demanda societaria)"
+    if "INDIVIDUAL" in nat or "EIRELI" in nat:
+        return 12, "empresario individual, demanda mais enxuta"
+    return 10, f"natureza juridica: {nat.lower()}"
+
+
+def _socios_points(lead: Lead) -> tuple[int, str] | None:
+    """Ao contrario das outras lentes, socio aqui e DEMANDA (acordo, saida,
+    sucessao, conflito), nao obstaculo de venda."""
+    # o cascade grava o valor cru da fonte (string) na coluna; coage aqui.
+    try:
+        n = int(lead.socios_count)
+    except (TypeError, ValueError):
+        return None
+    if n >= 3:
+        return 16, f"{n} socios (acordo de socios, sucessao, conflito)"
+    if n == 2:
+        return 12, "2 socios (acordo de socios, saida, sucessao)"
+    return 4, "socio unico"
+
+
+def _capital_points(lead: Lead) -> tuple[int, str] | None:
+    try:
+        c = float(lead.capital_social)
+    except (TypeError, ValueError):
+        return None
+    if c >= 500000:
+        return 16, "capital alto, empresa estruturada"
+    if c >= 100000:
+        return 12, "capital medio"
+    if c >= 10000:
+        return 7, "capital pequeno"
+    return 3, "capital baixo"
+
+
+def _regime_points(signals: dict[str, Any]) -> tuple[int, str] | None:
+    simples = _sig(signals, "simples")
+    if simples is None:
+        return None
+    if simples is False:
+        return 14, "fora do Simples (demanda tributaria de verdade)"
+    return 5, "optante pelo Simples"
+
+
+def _situacao_juridica_points(lead: Lead) -> tuple[int, str]:
+    """Empresa irregular NAO e lead morto aqui: e empresa com demanda de
+    regularizacao em curso. O oposto do que vale pras outras lentes."""
+    status = (lead.company_status or "").strip().upper()
+    if not status:
+        return 0, "situacao cadastral desconhecida"
+    if status == "ATIVA":
+        return 6, "empresa ativa na Receita"
+    return 18, f"empresa {status.lower()} na Receita, demanda de regularizacao"
+
+
+def _idade_juridica_points(
+    opened_on: str | None, today: date | None = None
+) -> tuple[int, str] | None:
+    """U: recem-aberta (constituicao, contratos, marca, LGPD) e madura com tempo
+    de casa (passivo e sucessao acumulam). O meio pontua baixo."""
+    d = _parse_opened_on(opened_on)
+    if d is None:
+        return None
+    months = _months_since(d, today or date.today())
+    quando = _idade_label(months)
+    if months <= 18:
+        return 16, f"empresa nova ({quando}), fase de constituicao e contratos"
+    if months >= 60:
+        return 14, f"empresa madura ({quando}), passivo e sucessao acumulam"
+    return 4, f"empresa em consolidacao ({quando})"
+
+
+def _assessoria_points(lead: Lead, signals: dict[str, Any]) -> tuple[int, str] | None:
+    """Ausencia de politica de privacidade / termos = provavelmente ninguem
+    revisou. So opina quando o site existe E foi lido."""
+    if not is_present("website", lead.website):
+        return None
+    priv = _sig(signals, "has_privacy_policy")
+    terms = _sig(signals, "has_terms")
+    if priv is None and terms is None:
+        return None
+    faltas = []
+    if priv is False:
+        faltas.append("sem politica de privacidade")
+    if terms is False:
+        faltas.append("sem termos de uso")
+    if not faltas:
+        return 4, "site com politica e termos (ja tem assessoria)"
+    nota = ", ".join(faltas)
+    if _sig(signals, "has_ecommerce") is True:
+        return 22, f"vende online e {nota} (exposicao de consumo e LGPD)"
+    return 16, f"site {nota}"
+
+
+def _risco_ramo_points(lead: Lead, signals: dict[str, Any]) -> tuple[int, str] | None:
+    alvo = " ".join([
+        (lead.category or ""),
+        (lead.business_name or ""),
+        " ".join(_sig(signals, "cnaes_sec") or []),
+    ]).lower()
+    if not alvo.strip():
+        return None
+    for keys, pts, nota in _RISCO_JURIDICO:
+        if any(k in alvo for k in keys):
+            return pts, nota
+    return None
+
+
+def _atrito_consumidor_points(lead: Lead) -> tuple[int, str] | None:
+    """Nota baixa COM volume = atrito real com cliente. Sinal INTERNO: prioriza
+    na ficha, NUNCA entra na copy (a muralha, ver o spec da area)."""
+    n = lead.reviews_count or 0
+    if lead.rating is None or n < 30:
+        return None
+    if lead.rating < 3.5:
+        return 14, f"reputacao em atrito (nota {lead.rating} em {n} avaliacoes)"
+    if lead.rating < 4.0:
+        return 8, f"reputacao mediana (nota {lead.rating} em {n} avaliacoes)"
+    return None
+
+
+def score_advocacia(
+    lead: Lead, signals: dict[str, Any], today: date | None = None,
+    legal_areas: list[str] | None = None,
+) -> tuple[int, list[dict[str, Any]]]:
+    crit: list[dict[str, Any]] = []
+    weights: dict[str, float] = {}
+    for a in (legal_areas or []):
+        for label, mult in _AREA_WEIGHTS.get((a or "").strip().lower(), {}).items():
+            weights[label] = max(weights.get(label, 1.0), mult)
+
+    def add(label: str, pts_note: tuple[int, str] | None) -> None:
+        if pts_note is None:
+            return
+        pts = int(round(pts_note[0] * weights.get(label, 1.0)))
+        crit.append({"label": label, "points": pts, "note": pts_note[1]})
+
+    if is_mei(lead):
+        return 0, [{"label": "Porte", "points": 0,
+                    "note": "MEI: pessoa com CNPJ, nao contrata advogado"}]
+
+    add("Natureza", _natureza_points(lead))
+    add("Socios", _socios_points(lead))
+    add("Capital", _capital_points(lead))
+    add("Regime", _regime_points(signals))
+    add("Situacao", _situacao_juridica_points(lead))
+    add("Idade", _idade_juridica_points(lead.opened_on, today))
+    add("Assessoria", _assessoria_points(lead, signals))
+    add("Risco do ramo", _risco_ramo_points(lead, signals))
+    add("Atrito", _atrito_consumidor_points(lead))
+    add("Contato", _contact_points(lead))
+    return sum(c["points"] for c in crit), crit
+
+
+# ---------------------------------------------------------------------
 # decisao + motivo em PT
 # ---------------------------------------------------------------------
 @dataclass
@@ -513,6 +717,22 @@ def _summary(lens: str, target: ServiceTarget, lead: Lead, signals: dict[str, An
         det = ", ".join(falta) or "presenca a fortalecer"
         return (f"Bom pra marketing/social. {nome} tem {det}. "
                 f"Da pra construir e movimentar a presenca da marca.")
+    if lens == "advocacia":
+        partes = []
+        nat = (getattr(lead, "natureza_juridica", None) or "")
+        if nat:
+            partes.append(nat.split(" - ")[-1].lower())
+        if lead.socios_count:
+            partes.append(f"{lead.socios_count} socios")
+        idade = _idade_juridica_points(lead.opened_on)
+        if idade is not None:
+            partes.append(idade[1].split(" (")[0])
+        situacao = (lead.company_status or "").strip().upper()
+        if situacao and situacao != "ATIVA":
+            partes.append(f"situacao {situacao.lower()} na Receita")
+        det = ", ".join(partes) or "empresa formalizada"
+        return (f"Bom pra advocacia. {nome}: {det}. "
+                f"Perfil de empresa que sustenta assessoria juridica.")
     if lens == "trafego" or target == "trafego":
         extra = []
         if sem_site:
@@ -543,7 +763,7 @@ def _offered_lenses(professions: list[str]) -> set[str]:
         lens = _LENS.get((p or "").strip().lower())
         if lens == "ambos":
             lenses.update({"trafego", "automacao"})
-        elif lens in ("trafego", "automacao", "design", "marketing"):
+        elif lens in ("trafego", "automacao", "design", "marketing", "advocacia"):
             lenses.add(lens)
     return lenses or {"trafego", "automacao"}
 
@@ -551,6 +771,7 @@ def _offered_lenses(professions: list[str]) -> set[str]:
 def score_lead(
     lead: Lead, signals: dict[str, Any] | None = None, profession: str | None = None,
     *, professions: list[str] | None = None, today: date | None = None,
+    legal_areas: list[str] | None = None,
 ) -> ScoreResult:
     """Pontua o lead pelas LENTES dos servicos que o dono oferta (pode ser mais
     de um). Qualifica pelo MELHOR encaixe entre as lentes ofertadas.
@@ -559,7 +780,10 @@ def score_lead(
     dos leads e "ambos" (precisam atrair E operar); so vira "automacao" quando o
     negocio JA anuncia (ja faz trafego, a lacuna passa a ser atendimento). ads
     desconhecido (None) = ambos. Se a oferta cobre so um eixo, mantem esse eixo;
-    design/marketing entram quando pontuam mais que o eixo trafego/automacao."""
+    design/marketing/advocacia entram quando pontuam mais que o eixo.
+
+    legal_areas so tem efeito na lente de advocacia (pesa os criterios da area
+    de atuacao escolhida); nas demais e ignorado."""
     signals = signals or {}
     profs = professions if professions is not None else ([profession] if profession else [])
     lenses = _offered_lenses(profs)
@@ -568,9 +792,11 @@ def score_lead(
     a_score, a_crit = score_automacao(lead, signals)
     d_score, d_crit = score_design(lead, signals, today)
     m_score, m_crit = score_marketing(lead, signals, today)
+    adv_score, adv_crit = score_advocacia(lead, signals, today, legal_areas)
     by_lens = {
         "trafego": (t_score, t_crit), "automacao": (a_score, a_crit),
         "design": (d_score, d_crit), "marketing": (m_score, m_crit),
+        "advocacia": (adv_score, adv_crit),
     }
 
     # qualifica pelo melhor encaixe entre as lentes ofertadas
@@ -586,7 +812,8 @@ def score_lead(
     if offers_traf and offers_auto:
         # eixo trafego+automacao presente: regra #2. So abre pra design/marketing
         # se um deles pontuar acima do eixo.
-        non_axis = {k: candidates[k] for k in candidates if k in ("design", "marketing")}
+        non_axis = {k: candidates[k] for k in candidates
+                    if k in ("design", "marketing", "advocacia")}
         axis_best = max(t_score, a_score)
         if non_axis and max(non_axis.values()) > axis_best:
             target = max(non_axis, key=lambda k: non_axis[k])
@@ -598,8 +825,11 @@ def score_lead(
     # corte duro: empresa nao-ATIVA na Receita (baixada/inapta/suspensa/nula) =
     # negocio morto, nao vale prospectar. Vence ate score alto. So corta quando se
     # SABE a situacao (status vazio = desconhecido, segue o fluxo normal).
+    # EXCECAO (area de advocacia): empresa irregular e negocio morto pra quem
+    # vende marketing, e e CLIENTE pra quem vende advogado — regularizacao em
+    # curso. O corte so vale quando a lente vencedora NAO e a de advocacia.
     status = (lead.company_status or "").strip().upper()
-    inactive = bool(status) and status != "ATIVA"
+    inactive = bool(status) and status != "ATIVA" and best_lens != "advocacia"
     contactable = is_present("phone", lead.phone)
     if inactive:
         decision: Decision = "descartado"
@@ -620,7 +850,7 @@ def score_lead(
 
     # lente do resumo: design/marketing usam a propria; trafego/automacao/ambos
     # seguem o alvo (pra _summary escolher o texto certo).
-    lens_label = best_lens if best_lens in ("design", "marketing") else target
+    lens_label = best_lens if best_lens in ("design", "marketing", "advocacia") else target
     reason = {
         "total": best,
         "threshold": THRESHOLD,
@@ -634,5 +864,6 @@ def score_lead(
         "automacao": {"score": a_score, "criteria": a_crit},
         "design": {"score": d_score, "criteria": d_crit},
         "marketing": {"score": m_score, "criteria": m_crit},
+        "advocacia": {"score": adv_score, "criteria": adv_crit},
     }
     return ScoreResult(score=best, decision=decision, service_target=target, reason=reason)
