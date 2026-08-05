@@ -428,3 +428,52 @@ def test_oab_label_monta_numero_barra_uf():
     assert _oab_label({"oab_number": "123456", "oab_uf": "pr"}) == "123456/PR"
     assert _oab_label({"oab_number": "123456"}) == "123456"
     assert _oab_label({}) is None
+
+
+# ------------------------------------------------------------------
+# Contexto por AREA de atuacao: o advogado se apresenta pela area que
+# atua, em linguagem de leigo, no WhatsApp e no e-mail.
+# ------------------------------------------------------------------
+
+def test_area_de_atuacao_muda_a_apresentacao():
+    from garimpo_esteira.draft.prompt import legal_self_desc
+    lead = _lead_adv()
+    assert "assessoria jurídica" in legal_self_desc(lead)  # sem area marcada
+
+    setattr(lead, "legal_areas", ["trabalhista"])
+    assert "trabalhista" in legal_self_desc(lead)
+    assert "funcionários" in legal_self_desc(lead)  # linguagem de leigo
+
+    setattr(lead, "legal_areas", ["tributario"])
+    assert "tributária" in legal_self_desc(lead)
+
+
+def test_duas_areas_nomeiam_as_duas_sem_virar_lista():
+    from garimpo_esteira.draft.prompt import legal_self_desc
+    lead = _lead_adv()
+    setattr(lead, "legal_areas", ["trabalhista", "tributario", "lgpd"])
+    d = legal_self_desc(lead)
+    assert "trabalhista" in d and "tributária" in d
+    assert "proteção de dados" not in d  # so as duas primeiras
+
+
+def test_prompt_e_mock_usam_a_area_e_sempre_dizem_advogado():
+    from garimpo_esteira.draft.mock import MockDraftProvider
+    lead = _lead_adv()
+    setattr(lead, "sender_name", "Ana")
+    setattr(lead, "legal_areas", ["trabalhista"])
+
+    p = build_prompt(lead)
+    assert "trabalhista" in p
+    assert "advogado" in p.lower()
+
+    msg1, _ = MockDraftProvider().generate(lead)
+    assert "advogado" in msg1.lower()
+    assert "trabalhista" in msg1.lower()
+
+
+def test_email_leva_a_area_de_atuacao():
+    from garimpo_esteira.draft.prompt import build_email_prompt
+    lead = _lead_adv()
+    setattr(lead, "legal_areas", ["societario"])
+    assert "empresarial" in build_email_prompt(lead)

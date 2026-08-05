@@ -16,6 +16,7 @@ from .sink.base import LeadSink
 def draft_one(
     lead, provider: DraftProvider, sink: LeadSink, profession: str | None = None,
     reviews_source=None, sender_name: str | None = None, oab: str | None = None,
+    legal_areas: list[str] | None = None,
 ) -> tuple[str, str] | None:
     if lead.opt_out:
         return None  # LGPD: nao rascunha contato pra quem pediu opt-out
@@ -25,6 +26,9 @@ def draft_one(
         setattr(lead, "sender_name", sender_name)
     if oab:
         setattr(lead, "oab", oab)  # assinatura do e-mail (area de advocacia)
+    if legal_areas:
+        # areas de atuacao: definem COMO o advogado se apresenta na copy
+        setattr(lead, "legal_areas", legal_areas)
     if reviews_source is not None:
         try:
             for f in reviews_source.enrich(lead):

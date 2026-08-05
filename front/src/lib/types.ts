@@ -35,7 +35,8 @@ export type ActorType = "human" | "system" | "extension";
 
 // Servico-alvo do lead, dirigido pela profissao do dono: trafego, automacao,
 // ambos (gestor), design (UX/web/branding), marketing (social), ou indefinido.
-export type ServiceTarget = "trafego" | "automacao" | "ambos" | "design" | "marketing" | "indefinido";
+export type ServiceTarget =
+  | "trafego" | "automacao" | "ambos" | "design" | "marketing" | "advocacia" | "indefinido";
 
 // Tipo de cobranca do valor fechado (B8): mensal fixo ou por prazo X meses.
 export type DealBilling = "mensal_fixo" | "por_prazo";
@@ -335,11 +336,18 @@ export interface SearchProfile {
   // Nome de quem prospecta (coletado no onboarding). A esteira injeta na copy:
   // "me chamo {sender_name}, ...". Sem ele, a abertura nao se apresenta.
   sender_name?: string | null;
+  // Areas de atuacao juridica (catalogo em lib/legal-areas). So preenchido
+  // quando a profissao inclui "advocacia"; a esteira le pra pesar o score.
+  legal_areas?: string[];
+  // Inscricao na OAB: assina o e-mail rascunhado da area de advocacia.
+  oab_number?: string | null;
+  oab_uf?: string | null;
   created_at: string;
   updated_at: string;
 }
 export type SearchProfileInput = Partial<Pick<SearchProfile,
-  "niches" | "city" | "state" | "neighborhood" | "radius" | "default_service_target" | "autopilot" | "profession" | "professions" | "min_score" | "sender_name">>;
+  "niches" | "city" | "state" | "neighborhood" | "radius" | "default_service_target" | "autopilot" | "profession" | "professions" | "min_score" | "sender_name" |
+  "legal_areas" | "oab_number" | "oab_uf">>;
 
 // Template de mensagem (#18).
 export type MessageTemplateKind = "abertura" | "follow_up" | "objecao" | "reativacao";

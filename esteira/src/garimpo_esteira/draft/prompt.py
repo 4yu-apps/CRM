@@ -314,6 +314,51 @@ _ADVOCACIA_SYSTEM = (
 )
 
 
+# Como o advogado se apresenta, por AREA DE ATUACAO. Linguagem de leigo: o
+# cliente entende "processo de funcionario", nao "reclamatoria trabalhista".
+# Vai VERBATIM na mensagem, entao e acentuado de proposito.
+_LEGAL_SELF_DESC = {
+    "trabalhista": "atuo na área trabalhista, com empresas que têm funcionários",
+    "tributario": "atuo na área tributária, com impostos e questões fiscais de empresas",
+    "societario": "atuo na área empresarial e societária, com contratos e sociedades",
+    "consumidor": "atuo com direito do consumidor, do lado de empresas",
+    "lgpd": "atuo com proteção de dados e contratos digitais (LGPD)",
+}
+
+# O que cada area OBSERVA numa empresa — orienta qual fato neutro puxar.
+# Nunca o problema: so o angulo do olhar.
+_LEGAL_AREA_CUE = {
+    "trabalhista": "empresa com equipe e operação em funcionamento",
+    "tributario": "empresa com porte e estrutura fiscal propria",
+    "societario": "empresa constituída como sociedade, com mais de um sócio",
+    "consumidor": "empresa que atende consumidor final no dia a dia",
+    "lgpd": "empresa que coleta dados de cliente no digital",
+}
+
+
+def legal_self_desc(lead: Lead) -> str:
+    """Como o advogado se apresenta. Com mais de uma area, junta as duas
+    primeiras; sem area marcada, fica no generico."""
+    areas = [a for a in (getattr(lead, "legal_areas", None) or []) if a in _LEGAL_SELF_DESC]
+    if not areas:
+        return "atuo com assessoria jurídica a empresas"
+    if len(areas) == 1:
+        return _LEGAL_SELF_DESC[areas[0]]
+    # duas ou mais: nomeia as duas primeiras, sem virar lista
+    nomes = {
+        "trabalhista": "trabalhista", "tributario": "tributária",
+        "societario": "empresarial", "consumidor": "do consumidor",
+        "lgpd": "de proteção de dados",
+    }
+    a, b = nomes[areas[0]], nomes[areas[1]]
+    return f"atuo nas áreas {a} e {b}, com empresas"
+
+
+def _legal_area_cue(lead: Lead) -> str:
+    areas = [a for a in (getattr(lead, "legal_areas", None) or []) if a in _LEGAL_AREA_CUE]
+    return _LEGAL_AREA_CUE[areas[0]] if areas else ""
+
+
 def _build_prompt_advocacia(lead: Lead) -> str:
     """Prompt da area de advocacia. Le SO o `context` da IA (fato neutro) e o
     numero de socios. Nenhum sinal de exposicao, reputacao, situacao cadastral
@@ -332,13 +377,17 @@ def _build_prompt_advocacia(lead: Lead) -> str:
     fatos = "; ".join(neutros) or "poucos fatos publicos"
 
     sender = (getattr(lead, "sender_name", None) or "").strip()
+    desc = legal_self_desc(lead)
     if sender:
         ident = (f"Quem fala: {sender}, advogado. Apresente-se assim: "
-                 f"'me chamo {sender}, sou advogado'.\n")
+                 f"'me chamo {sender}, sou advogado e {desc}'. A palavra "
+                 f"'advogado' e OBRIGATORIA na apresentacao.\n")
     else:
-        ident = ("Quem fala nao tem nome cadastrado: NAO invente nome nem numero "
-                 "de OAB. Apresente-se apenas como advogado.\n")
+        ident = (f"Quem fala nao tem nome cadastrado: NAO invente nome nem numero "
+                 f"de OAB. Apresente-se so pela atuacao: '{desc}'.\n")
 
+    cue = _legal_area_cue(lead)
+    cue_linha = f"O que a sua area costuma observar: {cue}.\n" if cue else ""
     cidade = lead.city or ""
     return (
         f"{_ADVOCACIA_SYSTEM}\n"
@@ -346,6 +395,7 @@ def _build_prompt_advocacia(lead: Lead) -> str:
         f"{_SERVICE_BRIEF['advocacia']}\n\n"
         f"Empresa: {lead.business_name or 'a empresa'}"
         f"{f' em {cidade}' if cidade else ''}.\n"
+        f"{cue_linha}"
         f"Fatos neutros (use no maximo UM, e so estes): {fatos}.\n\n"
         "Ancora obrigatoria: a observacao da msg1 sai de UM dos fatos neutros "
         "acima. Se nao houver nenhum fato util, escreva sem observacao — melhor "
@@ -561,6 +611,7 @@ def build_email_prompt(lead: Lead) -> str:
         f"empresa: {lead.business_name or '-'}",
         f"cidade: {lead.city or '-'}",
         f"fato neutro (use no maximo este): {ctx or '-'}",
+        f"area de atuacao (diga assim, com estas palavras): {legal_self_desc(lead)}",
         assinatura + ".",
     ]
     return (

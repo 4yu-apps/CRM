@@ -27,6 +27,11 @@ export const SERVICE_META: Record<ServiceTarget, { label: string; short: string;
     short: "Marketing",
     badge: "bg-pink-500/15 text-pink-700 dark:text-pink-300",
   },
+  advocacia: {
+    label: "Assessoria jurídica",
+    short: "Advocacia",
+    badge: "bg-slate-500/15 text-slate-700 dark:text-slate-300",
+  },
   indefinido: {
     label: "A definir",
     short: "A definir",

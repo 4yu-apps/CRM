@@ -4,13 +4,17 @@ export const RAMOS_DISPONIVEIS = [
   "Barbearia",
   "Cafe",
   "Clinica odontologica",
+  "Construtora",
   "Consultorio",
-  "Estetica",
+  "Distribuidora",
   "Escritorio contabil",
+  "Estetica",
   "Farmacia",
   "Fotografo",
   "Hamburgueria",
   "Hotel",
+  "Imobiliaria",
+  "Industria",
   "Loja de roupas",
   "Manicure",
   "Massagem",
@@ -24,6 +28,7 @@ export const RAMOS_DISPONIVEIS = [
   "Restaurante",
   "Salao de beleza",
   "Spa",
+  "Transportadora",
 ] as const;
 
 export type Ramo = (typeof RAMOS_DISPONIVEIS)[number];

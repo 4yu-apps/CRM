@@ -41,6 +41,7 @@ def process_one_lead(
         if draft_one(
             lead, provider, sink, profession,
             reviews_source=reviews_source, sender_name=sender_name, oab=oab,
+            legal_areas=legal_areas,
         ):
             drafted = True  # -> rascunho_pronto (entra na fila agora)
     return {

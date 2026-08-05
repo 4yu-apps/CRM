@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from ..models import Lead
 from ..validation import is_present
-from .prompt import _brief_key, _marketing_angle, lead_brief, self_desc
+from .prompt import _brief_key, _marketing_angle, lead_brief, legal_self_desc, self_desc
 
 # Categorias de alimentacao que pedem o angulo iFood (pergunta genuina de canal).
 _FOOD_KEYWORDS = (
@@ -157,7 +157,11 @@ def _abertura_advocacia(lead: Lead) -> str:
     reputacao, nunca situacao cadastral. Ver a muralha em prompt.py."""
     nome = lead.business_name or "a empresa"
     sender = (getattr(lead, "sender_name", None) or "").strip()
-    intro = f"Me chamo {sender}, sou advogado. " if sender else "Sou advogado. "
+    desc = legal_self_desc(lead)
+    # "advogado" e obrigatorio na apresentacao: identificar a profissao e o
+    # que a publicidade informativa exige.
+    intro = (f"Me chamo {sender}, sou advogado e {desc}. " if sender
+             else f"Sou advogado e {desc}. ")
 
     ctx = ((getattr(lead, "ai_signals", None) or {}).get("context") or "").strip()
     if ctx:
@@ -199,7 +203,7 @@ class MockDraftProvider:
         corpo = (
             f"Prezados,\n\n"
             f"Escrevo para me apresentar.{observacao} "
-            f"Atuo com assessoria jurídica a empresas.\n\n"
+            f"{legal_self_desc(lead).capitalize()}.\n\n"
             f"Caso ainda não contem com assessoria jurídica, fico à disposição "
             f"para uma conversa, sem qualquer compromisso da parte de vocês.\n\n"
             f"Atenciosamente,\n{assinatura}"

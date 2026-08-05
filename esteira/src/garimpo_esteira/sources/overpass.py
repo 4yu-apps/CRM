@@ -63,6 +63,11 @@ _OSM_FILTERS: list[tuple[tuple[str, ...], list[tuple[str, str]]]] = [
     (("calçad", "calcad", "sapat"), [("shop", "shoes")]),
     (("oficina", "mecanic", "mecânic", "autocenter", "auto center", "funilaria"), [("shop", "car_repair")]),
     (("imobiliar", "imobiliár"), [("office", "estate_agent")]),
+    # B2B de densidade juridica alta (area de advocacia).
+    (("construtora", "construc", "construç"), [("office", "company"), ("craft", "builder")]),
+    (("transportadora", "transporte", "logistic"), [("office", "logistics")]),
+    (("distribuidora", "atacad"), [("shop", "wholesale")]),
+    (("industria", "indústria", "fabrica", "fábrica"), [("landuse", "industrial")]),
     (("advocac", "advogad"), [("office", "lawyer")]),
     (("contabil", "contábil", "contador"), [("office", "accountant")]),
     (("autoescola", "auto escola", "escola", "curso"), [("amenity", "driving_school"), ("amenity", "school")]),

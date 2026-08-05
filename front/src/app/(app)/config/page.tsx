@@ -23,6 +23,7 @@ import { useAuth } from "@/lib/auth";
 import { LOCALES, useLocale, useT } from "@/lib/i18n";
 import { fetchEstados, fetchMunicipios, type Municipio, type UF } from "@/lib/ibge";
 import { PROFESSIONS, getProfession, type Profession } from "@/lib/professions";
+import { LEGAL_AREAS } from "@/lib/legal-areas";
 import type { SearchProfile, SearchProfileInput, ServiceTarget } from "@/lib/types";
 import { RAMOS_DISPONIVEIS } from "@/lib/ramos";
 import { Dropdown } from "@/components/dropdown";
@@ -140,6 +141,10 @@ export default function ConfigPage() {
   const [savedAutopilot, setSavedAutopilot] = useState(false);
   const [professions, setProfessions] = useState<string[]>([]);
   const [senderName, setSenderName] = useState(""); // nome que vai na copy ("me chamo X")
+  // Area de advocacia: areas de atuacao (pesam o score) e OAB (assina o e-mail).
+  const [legalAreas, setLegalAreas] = useState<string[]>([]);
+  const [oabNumber, setOabNumber] = useState("");
+  const [oabUf, setOabUf] = useState("");
 
   // Listas vindas do IBGE para os selects em cascata (estado -> cidade)
   const [estados, setEstados] = useState<UF[]>([]);
@@ -164,6 +169,9 @@ export default function ConfigPage() {
           setSavedAutopilot(profile.autopilot ?? false);
           setMinScore(profile.min_score ?? 0);
           setSenderName(profile.sender_name ?? "");
+          setLegalAreas(profile.legal_areas ?? []);
+          setOabNumber(profile.oab_number ?? "");
+          setOabUf(profile.oab_uf ?? "");
           setProfessions(
             profile.professions?.length
               ? profile.professions
@@ -285,6 +293,9 @@ export default function ConfigPage() {
         profession: professions[0] ?? null,
         min_score: minScore,
         sender_name: senderName.trim() || null,
+        legal_areas: legalAreas,
+        oab_number: oabNumber.trim() || null,
+        oab_uf: oabUf.trim().toUpperCase() || null,
       };
       await repo.saveProfile(input);
       setSavedAutopilot(autopilot);
@@ -300,7 +311,7 @@ export default function ConfigPage() {
     } finally {
       setSaving(false);
     }
-  }, [niches, city, state, radius, serviceTarget, autopilot, minScore, professions, senderName, repo, refreshProfile, isOnboarding, router]);
+  }, [niches, city, state, radius, serviceTarget, autopilot, minScore, professions, senderName, legalAreas, oabNumber, oabUf, repo, refreshProfile, isOnboarding, router]);
 
   // Ja conectou com o Google? (login via Google => agenda disponivel)
   const meta = session?.user?.app_metadata as { provider?: string; providers?: string[] } | undefined;
@@ -459,6 +470,68 @@ export default function ConfigPage() {
                 />
               ))}
             </div>
+            {professions.includes("advocacia") && (
+              <div className="mt-5 rounded-[14px] border border-border-2 bg-surface-2 px-4 py-4">
+                <div className="mb-1 text-[13px] font-bold text-ink">Suas áreas de atuação</div>
+                <p className="mb-3 text-[12.5px] text-faint">
+                  Cada área muda o que eu procuro na empresa. Pode marcar mais de uma.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {LEGAL_AREAS.map((a) => {
+                    const on = legalAreas.includes(a.id);
+                    return (
+                      <button
+                        key={a.id}
+                        type="button"
+                        title={a.descricao}
+                        onClick={() =>
+                          setLegalAreas((prev) =>
+                            prev.includes(a.id) ? prev.filter((x) => x !== a.id) : [...prev, a.id],
+                          )
+                        }
+                        className={
+                          on
+                            ? "rounded-full bg-brand-50 px-3 py-1.5 text-[12.5px] font-semibold text-brand"
+                            : "rounded-full border border-border-2 bg-surface px-3 py-1.5 text-[12.5px] font-medium text-ink-2 transition-colors hover:border-brand hover:text-brand"
+                        }
+                      >
+                        {on ? a.label : `+ ${a.label}`}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-end gap-3">
+                  <label className="flex flex-col gap-1">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-faint">
+                      Inscrição na OAB
+                    </span>
+                    <input
+                      value={oabNumber}
+                      onChange={(e) => setOabNumber(e.target.value)}
+                      placeholder="123456"
+                      inputMode="numeric"
+                      className="w-36 rounded-[10px] border border-border-2 bg-surface px-3 py-2 text-[13px] text-ink outline-none focus:border-brand"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-faint">
+                      Seccional
+                    </span>
+                    <input
+                      value={oabUf}
+                      onChange={(e) => setOabUf(e.target.value.toUpperCase().slice(0, 2))}
+                      placeholder="PR"
+                      maxLength={2}
+                      className="w-20 rounded-[10px] border border-border-2 bg-surface px-3 py-2 text-[13px] uppercase text-ink outline-none focus:border-brand"
+                    />
+                  </label>
+                  <p className="flex-1 text-[12px] leading-relaxed text-faint">
+                    Assina o e-mail que eu rascunho. Sem isso, eu não invento número.
+                  </p>
+                </div>
+              </div>
+            )}
             {selectedProfession && (
               <div className="mt-4 flex items-start gap-2.5 rounded-[14px] border border-brand/20 bg-brand-50/70 px-4 py-3 text-[13px] leading-relaxed text-ink-2">
                 <Target size={16} className="mt-0.5 flex-none text-brand" />
@@ -487,6 +560,68 @@ export default function ConfigPage() {
                 />
               ))}
             </div>
+            {professions.includes("advocacia") && (
+              <div className="mt-5 rounded-[14px] border border-border-2 bg-surface-2 px-4 py-4">
+                <div className="mb-1 text-[13px] font-bold text-ink">Suas áreas de atuação</div>
+                <p className="mb-3 text-[12.5px] text-faint">
+                  Cada área muda o que eu procuro na empresa. Pode marcar mais de uma.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {LEGAL_AREAS.map((a) => {
+                    const on = legalAreas.includes(a.id);
+                    return (
+                      <button
+                        key={a.id}
+                        type="button"
+                        title={a.descricao}
+                        onClick={() =>
+                          setLegalAreas((prev) =>
+                            prev.includes(a.id) ? prev.filter((x) => x !== a.id) : [...prev, a.id],
+                          )
+                        }
+                        className={
+                          on
+                            ? "rounded-full bg-brand-50 px-3 py-1.5 text-[12.5px] font-semibold text-brand"
+                            : "rounded-full border border-border-2 bg-surface px-3 py-1.5 text-[12.5px] font-medium text-ink-2 transition-colors hover:border-brand hover:text-brand"
+                        }
+                      >
+                        {on ? a.label : `+ ${a.label}`}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-end gap-3">
+                  <label className="flex flex-col gap-1">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-faint">
+                      Inscrição na OAB
+                    </span>
+                    <input
+                      value={oabNumber}
+                      onChange={(e) => setOabNumber(e.target.value)}
+                      placeholder="123456"
+                      inputMode="numeric"
+                      className="w-36 rounded-[10px] border border-border-2 bg-surface px-3 py-2 text-[13px] text-ink outline-none focus:border-brand"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-faint">
+                      Seccional
+                    </span>
+                    <input
+                      value={oabUf}
+                      onChange={(e) => setOabUf(e.target.value.toUpperCase().slice(0, 2))}
+                      placeholder="PR"
+                      maxLength={2}
+                      className="w-20 rounded-[10px] border border-border-2 bg-surface px-3 py-2 text-[13px] uppercase text-ink outline-none focus:border-brand"
+                    />
+                  </label>
+                  <p className="flex-1 text-[12px] leading-relaxed text-faint">
+                    Assina o e-mail que eu rascunho. Sem isso, eu não invento número.
+                  </p>
+                </div>
+              </div>
+            )}
             {selectedProfession ? (
               <div className="mt-4 flex items-start gap-2.5 rounded-[14px] border border-brand/20 bg-brand-50/70 px-4 py-3 text-[13px] leading-relaxed text-ink-2">
                 <Target size={16} className="mt-0.5 flex-none text-brand" />
