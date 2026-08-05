@@ -17,15 +17,18 @@ LeadSource = Literal[
 ]
 
 # Servico-alvo do lead, dirigido pela profissao do dono: trafego/automacao/ambos
-# (gestor), design (UX/web/branding), marketing (social), ou indefinido.
-ServiceTarget = Literal["trafego", "automacao", "ambos", "design", "marketing", "indefinido"]
+# (gestor), design (UX/web/branding), marketing (social), advocacia (assessoria
+# juridica), ou indefinido.
+ServiceTarget = Literal[
+    "trafego", "automacao", "ambos", "design", "marketing", "advocacia", "indefinido"
+]
 
 # Campos do lead que as fontes podem preencher (proveniência por campo).
 ENRICHABLE_FIELDS = (
     "phone", "whatsapp", "email", "instagram", "facebook", "website",
     "owner_name", "cnpj", "places_detailed_at", "opened_on",
     "company_status", "category", "porte", "capital_social", "socios_count",
-    "fb_page_id", "opening_hours",
+    "natureza_juridica", "fb_page_id", "opening_hours",
 )
 
 
@@ -81,6 +84,9 @@ class Lead:
     porte: str | None = None
     capital_social: float | None = None
     socios_count: int | None = None
+    # natureza juridica (BrasilAPI): "206-2 - Sociedade Empresaria Limitada".
+    # Filtro nº 1 da area de advocacia: MEI nao contrata advogado.
+    natureza_juridica: str | None = None
     # carimbo do enriquecimento via Google Places Details (contador da cota diaria)
     places_detailed_at: str | None = None
 
@@ -115,6 +121,10 @@ class Lead:
     draft_msg2: str | None = None
     draft_model: str | None = None
     draft_generated_at: str | None = None
+    # rascunho de e-mail (area de advocacia): registro formal, com assinatura e
+    # OAB. Canal proprio; sem envio automatico, igual ao WhatsApp.
+    draft_email_subject: str | None = None
+    draft_email_body: str | None = None
 
     # quando o backfill re-enriqueceu por ultimo (rotacao: processa os mais
     # antigos primeiro, pra varrer todos os leads ao longo do tempo sem travar).

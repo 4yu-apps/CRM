@@ -1,3 +1,5 @@
+import json
+
 from garimpo_esteira.models import Lead
 from garimpo_esteira.sources import CnpjSource
 from garimpo_esteira.sources.cnpj import _parse_brasilapi
@@ -39,6 +41,44 @@ def test_brasilapi_extrai_firmografia():
     assert fields["porte"] == "ME"
     assert fields["capital_social"] == "5000"
     assert fields["socios_count"] == "2"
+
+
+def test_brasilapi_extrai_natureza_juridica_cnaes_e_qsa():
+    # Firmografia juridica (area de advocacia): tudo ja vinha no mesmo JSON.
+    data = {
+        "natureza_juridica": "206-2 - Sociedade Empresaria Limitada",
+        "cnaes_secundarios": [
+            {"codigo": 4520001, "descricao": "Servicos de manutencao de veiculos"},
+            {"codigo": 4530703, "descricao": "Comercio a varejo de pecas"},
+        ],
+        "qsa": [
+            {"nome_socio": "Maria Souza", "data_entrada_sociedade": "2015-03-01"},
+            {"nome_socio": "Joao Lima", "data_entrada_sociedade": "2018-07-10"},
+        ],
+    }
+    fields = {f.field_name: f.value for f in _parse_brasilapi(data, "cnpj_brasilapi")}
+
+    assert fields["natureza_juridica"] == "206-2 - Sociedade Empresaria Limitada"
+    assert fields["socios_count"] == "2"
+
+    sig = json.loads(fields["site_signals"])
+    assert sig["cnaes_sec"] == [
+        "Servicos de manutencao de veiculos",
+        "Comercio a varejo de pecas",
+    ]
+    assert sig["socios"] == [
+        {"nome": "Maria Souza", "desde": "2015-03-01"},
+        {"nome": "Joao Lima", "desde": "2018-07-10"},
+    ]
+
+
+def test_brasilapi_sem_campos_juridicos_nao_quebra():
+    fields = {
+        f.field_name: f.value
+        for f in _parse_brasilapi({"ddd_telefone_1": "44 99999-0002"}, "cnpj_brasilapi")
+    }
+    assert "natureza_juridica" not in fields
+    assert fields["phone"]
 
 
 def test_cnpj_source_without_cnpj_is_silent():

@@ -76,3 +76,28 @@ def test_score_stage_idempotent(tmp_path):
     _enriquecido(sink, phone="44999990001", rating=4.6, reviews_count=200)
     score_batch(sink, batch=20)
     assert score_batch(sink, batch=20) == []  # nada mais em 'enriquecido'
+
+
+# ------------------------------------------------------------------
+# Area de advocacia: legal_areas do perfil chega ate a lente de score.
+# ------------------------------------------------------------------
+
+def test_legal_areas_chega_no_score(tmp_path):
+    sink = _sink(tmp_path)
+    lead = Lead(
+        id="", owner_id="o", business_name="Transportadora Y",
+        category="transportadora", phone="44999990000", company_status="ATIVA",
+        natureza_juridica="206-2 - Sociedade Empresaria Limitada",
+        opened_on="2012-01-01", socios_count=3,
+    )
+    lead.id = sink.insert_lead(lead)
+
+    neutro = score_one(lead, sink, professions=["advocacia"])
+    trab = score_one(lead, sink, professions=["advocacia"], legal_areas=["trabalhista"])
+
+    def risco(res):
+        return next(c["points"] for c in res.reason["advocacia"]["criteria"]
+                    if c["label"] == "Risco do ramo")
+
+    assert risco(trab) > risco(neutro)
+    assert trab.reason["advocacia"]["score"] > neutro.reason["advocacia"]["score"]

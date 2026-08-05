@@ -47,6 +47,22 @@ _AREA_ANGLE = {
         "'Perfil no Google incompleto'); NUNCA use 'nao tem site' como dor "
         "principal — site nao e o servico dele."
     ),
+    "advocacia": (
+        "AREA DO DONO: ADVOCACIA. Avalie a MATURIDADE INSTITUCIONAL da empresa "
+        "(formalizacao, governanca, se aparenta ter assessoria juridica), NAO a "
+        "presenca digital. maturity: 1=informal/sem estrutura, 3=empresa "
+        "formalizada sem sinais de assessoria, 5=estruturada com politica de "
+        "privacidade, termos e governanca. Instagram, seguidores e anuncio NAO "
+        "importam aqui.\n"
+        "Em vez de 'pain', devolva DOIS campos separados:\n"
+        "- exposure: a exposicao juridica observavel (rotatividade tipica do "
+        "ramo, situacao cadastral irregular, ausencia de politica/termos, atrito "
+        "com consumidor). Uso INTERNO, so pra priorizar na ficha.\n"
+        "- context: UM fato neutro, publico e nao constrangedor sobre a empresa "
+        "(tempo de casa, numero de socios, porte, expansao). Este e o UNICO campo "
+        "usado pra escrever a mensagem, entao NAO pode conter problema, "
+        "reclamacao, processo, irregularidade nem juizo de valor."
+    ),
 }
 
 
@@ -63,6 +79,10 @@ def _facts(lead: Lead) -> str:
         f"nota google: {lead.rating if lead.rating is not None else '-'} ({lead.reviews_count or 0} avaliacoes)",
         f"perfil no google (GMB): {yn(tem_gmb)} | horario cadastrado: {yn(bool(lead.opening_hours))}",
         f"abertura: {lead.opened_on or '-'} | porte: {lead.porte or '-'} | capital: {lead.capital_social or '-'} | socios: {lead.socios_count if lead.socios_count is not None else '-'}",
+        f"natureza juridica: {getattr(lead, 'natureza_juridica', None) or '-'}",
+        f"regime: {'Simples' if sig.get('simples') else ('fora do Simples' if sig.get('simples') is False else '?')} | MEI: {yn(sig.get('mei'))}",
+        f"politica de privacidade: {yn(sig.get('has_privacy_policy'))} | termos de uso: {yn(sig.get('has_terms'))} | CNPJ no rodape: {yn(sig.get('has_cnpj_footer'))}",
+        f"cnaes secundarios: {', '.join(sig.get('cnaes_sec') or []) or '-'}",
         f"tem site: {yn(bool(lead.website))} | site lento: {yn(sig.get('slow'))} | mobile ok: {yn(sig.get('mobile_ready'))}",
         f"agendamento online: {yn(sig.get('has_online_booking'))} | e-commerce: {yn(sig.get('has_ecommerce'))}",
         f"instagram: {lead.instagram or '-'} | seguidores: {soc.get('followers') or '-'} | status: {soc.get('ig_status') or '-'} | posts/semana: {soc.get('post_freq') or '-'} | engajamento: {soc.get('engagement_rate') and str(soc.get('engagement_rate')) + '%' or soc.get('engagement') or '-'}",
@@ -122,6 +142,12 @@ def parse_ai(raw: dict) -> dict | None:
     pain = raw.get("pain")
     if isinstance(pain, str) and pain.strip():
         out["pain"] = pain.strip()[:200]
+    # Area de advocacia: o pain se parte em dois. `exposure` e interno (so a
+    # ficha mostra); `context` e o unico que a camada de copy pode enxergar.
+    for extra in ("exposure", "context"):
+        v = raw.get(extra)
+        if isinstance(v, str) and v.strip():
+            out[extra] = v.strip()[:200]
     hours = _norm_hours(raw.get("hours"))
     if hours:
         out["hours"] = hours

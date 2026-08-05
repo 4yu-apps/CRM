@@ -13,7 +13,7 @@ import json
 import httpx
 
 from ..models import Lead
-from .prompt import build_prompt
+from .prompt import build_email_prompt, build_prompt
 
 API_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
@@ -44,3 +44,27 @@ class GeminiDraftProvider:
         text = data["candidates"][0]["content"]["parts"][0]["text"]
         parsed = json.loads(text)
         return parsed["msg1"], parsed["msg2"]
+
+    def generate_email(self, lead: Lead) -> tuple[str, str] | None:
+        """(assunto, corpo) do e-mail formal. None quando a area nao usa e-mail."""
+        prompt = build_email_prompt(lead)
+        if not prompt:
+            return None
+        body = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "responseMimeType": "application/json",
+                "temperature": 0.6,
+            },
+        }
+        with httpx.Client(timeout=self._timeout) as client:
+            resp = client.post(
+                API_URL.format(model=self.model),
+                params={"key": self._key},
+                json=body,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+
+        parsed = json.loads(data["candidates"][0]["content"]["parts"][0]["text"])
+        return parsed["assunto"], parsed["corpo"]

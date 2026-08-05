@@ -10,7 +10,7 @@ leva o nome de quem o achou (cnpj_brasilapi | cnpj_ws).
 from __future__ import annotations
 
 import json
-from typing import Callable
+from typing import Any, Callable
 
 import httpx
 
@@ -124,13 +124,42 @@ def _parse_brasilapi(data: dict, source: str) -> list[Finding]:
     if isinstance(qsa, list) and qsa:
         findings.append(Finding("socios_count", source, str(len(qsa)), 1.0))
 
+    # Natureza juridica: LTDA/SA/EI/MEI. Filtro nº 1 do ICP de advocacia — MEI e
+    # pessoa com CNPJ, nao contrata advogado.
+    natureza = clean("natureza_juridica", data.get("natureza_juridica"))
+    if natureza:
+        findings.append(Finding("natureza_juridica", source, natureza, 1.0))
+
     # Optante Simples / MEI: regime tributario, ja vem na resposta. Vai no
     # site_signals (jsonb, sem migration); o cascade faz merge entre fontes.
-    flags: dict[str, bool] = {}
+    # CNAEs secundarios e QSA completo seguem o mesmo caminho: sao listas, e o
+    # jsonb evita duas colunas novas so pra leitura da ficha.
+    flags: dict[str, Any] = {}
     if data.get("opcao_pelo_simples") is not None:
         flags["simples"] = bool(data.get("opcao_pelo_simples"))
     if data.get("opcao_pelo_mei") is not None:
         flags["mei"] = bool(data.get("opcao_pelo_mei"))
+
+    cnaes = data.get("cnaes_secundarios") or []
+    if isinstance(cnaes, list) and cnaes:
+        descr = [
+            str(c.get("descricao")).strip()
+            for c in cnaes
+            if isinstance(c, dict) and c.get("descricao")
+        ]
+        if descr:
+            flags["cnaes_sec"] = descr
+
+    if isinstance(qsa, list) and qsa:
+        socios = [
+            {"nome": s.get("nome_socio") or s.get("nome"),
+             "desde": s.get("data_entrada_sociedade")}
+            for s in qsa
+            if isinstance(s, dict) and (s.get("nome_socio") or s.get("nome"))
+        ]
+        if socios:
+            flags["socios"] = socios
+
     if flags:
         findings.append(Finding("site_signals", source, json.dumps(flags), 1.0))
 

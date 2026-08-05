@@ -311,3 +311,205 @@ def test_mock_sem_nome_nao_quebra():
     lead = _lead(website=None)
     msg1, _ = MockDraftProvider().generate(lead)
     assert "Me chamo" not in msg1 and len(msg1) > 0
+
+
+# ------------------------------------------------------------------
+# Area de advocacia: copy informativa (nao vende) e A MURALHA — sinal de
+# exposicao juridica prioriza na ficha e NUNCA entra na mensagem.
+# ------------------------------------------------------------------
+
+def _lead_adv(**kw) -> Lead:
+    base = dict(
+        id="l", owner_id="o", business_name="Transportadora Yara",
+        category="transportadora", city="Maringa", phone="44999990001",
+        service_target="advocacia", rating=3.1, reviews_count=280,
+        company_status="INAPTA", opened_on="2013-04-01",
+        natureza_juridica="206-2 - Sociedade Empresaria Limitada", socios_count=3,
+    )
+    base.update(kw)
+    return Lead(**base)
+
+
+def test_brief_juridico_entra_e_proibe_vender():
+    p = build_prompt(_lead_adv())
+    assert "ADVOCACIA" in p
+    assert "resultado" in p.lower()
+    assert "disposicao" in p.lower()
+
+
+def test_muralha_exposicao_nao_vaza_pra_copy():
+    lead = _lead_adv()
+    lead.ai_signals = {
+        "exposure": "empresa inapta e com reclamacoes de cobranca indevida",
+        "context": "empresa com 12 anos de casa e 3 socios",
+    }
+    # o summary do score cita a situacao cadastral de proposito (ficha);
+    # a copy nao pode ve-lo.
+    lead.score_reason = {"summary": "Bom pra advocacia. Transportadora Yara: "
+                                    "situacao inapta na Receita."}
+    p = build_prompt(lead)
+
+    # 1. Nenhum VALOR sensivel aparece em lugar nenhum do prompt. (Palavras
+    #    como "reclamacao" existem no texto de PROIBICAO — o que nao pode
+    #    vazar sao os dados deste lead.)
+    for valor in ("cobranca indevida", "inapta", "3.1", "280"):
+        assert valor.lower() not in p.lower(), valor
+
+    # 2. A linha de FATOS (o que o modelo pode usar) so tem o neutro.
+    fatos = next(l for l in p.splitlines() if l.startswith("Fatos neutros"))
+    assert "12 anos de casa" in fatos
+    assert "socios" in fatos
+    for valor in ("inapta", "reclamac", "cobranca", "atrito", "nota"):
+        assert valor not in fatos.lower(), valor
+
+
+def test_advocacia_nao_usa_site_nem_rede_como_gancho():
+    lead = _lead_adv(website=None, instagram=None)
+    lead.ai_signals = {"context": "empresa com 12 anos de casa"}
+    p = build_prompt(lead)
+    fatos = next(l for l in p.splitlines() if l.startswith("Fatos neutros"))
+    for termo in ("site", "instagram", "rede", "seguidores"):
+        assert termo not in fatos.lower(), termo
+
+
+def test_mock_de_advocacia_nao_vende_e_nao_vaza():
+    from garimpo_esteira.draft.mock import MockDraftProvider
+    lead = _lead_adv()
+    setattr(lead, "sender_name", "Ana")  # injetado pelo draft_stage, nao e campo
+    lead.ai_signals = {
+        "exposure": "empresa inapta com reclamacoes de cobranca indevida",
+        "context": "empresa com 12 anos de casa",
+    }
+    msg1, msg2 = MockDraftProvider().generate(lead)
+    texto = f"{msg1} {msg2}".lower()
+    assert "advogado" in texto
+    assert "disposi" in texto
+    for valor in ("inapta", "reclamac", "cobranca", "3.1", "280", "site",
+                  "instagram", "garantia", "resultado"):
+        assert valor not in texto, valor
+
+
+def test_email_juridico_tem_assunto_assinatura_e_a_mesma_muralha():
+    from garimpo_esteira.draft.prompt import build_email_prompt
+    lead = _lead_adv()
+    setattr(lead, "sender_name", "Ana Souza")
+    setattr(lead, "oab", "123456/PR")
+    lead.ai_signals = {"exposure": "empresa inapta", "context": "empresa com 12 anos de casa"}
+    p = build_email_prompt(lead)
+    assert "assunto" in p.lower()
+    assert "OAB 123456/PR" in p
+    assert "inapta" not in p.lower()
+    assert "12 anos de casa" in p
+
+
+def test_email_so_existe_pra_advocacia():
+    from garimpo_esteira.draft.prompt import build_email_prompt
+    assert build_email_prompt(_lead(service_target="trafego")) == ""
+
+
+def test_mock_gera_email_so_pra_advocacia():
+    from garimpo_esteira.draft.mock import MockDraftProvider
+    prov = MockDraftProvider()
+    assert prov.generate_email(_lead(service_target="trafego")) is None
+
+    lead = _lead_adv()
+    setattr(lead, "sender_name", "Ana Souza")
+    setattr(lead, "oab", "123456/PR")
+    lead.ai_signals = {"exposure": "empresa inapta", "context": "sociedade com 12 anos"}
+    assunto, corpo = prov.generate_email(lead)
+    assert assunto
+    assert "Advogado" in corpo and "OAB 123456/PR" in corpo
+    for valor in ("inapta", "reclamac", "3.1", "280", "garantia"):
+        assert valor not in corpo.lower(), valor
+
+
+def test_oab_label_monta_numero_barra_uf():
+    from garimpo_esteira.run import _oab_label
+    assert _oab_label({"oab_number": "123456", "oab_uf": "pr"}) == "123456/PR"
+    assert _oab_label({"oab_number": "123456"}) == "123456"
+    assert _oab_label({}) is None
+
+
+# ------------------------------------------------------------------
+# Contexto por AREA de atuacao: o advogado se apresenta pela area que
+# atua, em linguagem de leigo, no WhatsApp e no e-mail.
+# ------------------------------------------------------------------
+
+def test_area_de_atuacao_muda_a_apresentacao():
+    from garimpo_esteira.draft.prompt import legal_self_desc
+    lead = _lead_adv()
+    assert "assessoria jurídica" in legal_self_desc(lead)  # sem area marcada
+
+    setattr(lead, "legal_areas", ["trabalhista"])
+    assert "trabalhista" in legal_self_desc(lead)
+    assert "funcionários" in legal_self_desc(lead)  # linguagem de leigo
+
+    setattr(lead, "legal_areas", ["tributario"])
+    assert "tributária" in legal_self_desc(lead)
+
+
+def test_duas_areas_nomeiam_as_duas_sem_virar_lista():
+    from garimpo_esteira.draft.prompt import legal_self_desc
+    lead = _lead_adv()
+    setattr(lead, "legal_areas", ["trabalhista", "tributario", "lgpd"])
+    d = legal_self_desc(lead)
+    assert "trabalhista" in d and "tributária" in d
+    assert "proteção de dados" not in d  # so as duas primeiras
+
+
+def test_prompt_e_mock_usam_a_area_e_sempre_dizem_advogado():
+    from garimpo_esteira.draft.mock import MockDraftProvider
+    lead = _lead_adv()
+    setattr(lead, "sender_name", "Ana")
+    setattr(lead, "legal_areas", ["trabalhista"])
+
+    p = build_prompt(lead)
+    assert "trabalhista" in p
+    assert "advogado" in p.lower()
+
+    msg1, _ = MockDraftProvider().generate(lead)
+    assert "advogado" in msg1.lower()
+    assert "trabalhista" in msg1.lower()
+
+
+def test_email_leva_a_area_de_atuacao():
+    from garimpo_esteira.draft.prompt import build_email_prompt
+    lead = _lead_adv()
+    setattr(lead, "legal_areas", ["societario"])
+    assert "empresarial" in build_email_prompt(lead)
+
+
+def test_muralha_travada_nenhum_campo_sensivel_vaza():
+    """Guarda estrutural: enche TODO campo sensivel com um sentinela unico e
+    exige que nenhum apareca no WhatsApp nem no e-mail. Se alguem ligar um
+    campo novo no caminho de advocacia sem pensar, este teste quebra."""
+    from garimpo_esteira.draft.mock import MockDraftProvider
+    from garimpo_esteira.draft.prompt import build_email_prompt
+
+    lead = _lead_adv()
+    setattr(lead, "sender_name", "Ana")
+    setattr(lead, "legal_areas", ["trabalhista"])
+    sentinelas = {
+        "exposure": "SENTINELAEXPOSURE",
+        "company_status": "SENTINELASTATUS",
+        "score_summary": "SENTINELASUMMARY",
+        "review_elogio": "SENTINELAELOGIO",
+    }
+    lead.ai_signals = {
+        "exposure": sentinelas["exposure"],
+        "pain": sentinelas["exposure"],
+        "context": "empresa com 12 anos de casa",
+    }
+    lead.company_status = sentinelas["company_status"]
+    lead.score_reason = {"summary": sentinelas["score_summary"]}
+    setattr(lead, "review_themes", {"elogio": sentinelas["review_elogio"]})
+
+    saidas = [
+        build_prompt(lead),
+        build_email_prompt(lead),
+        " ".join(MockDraftProvider().generate(lead)),
+        " ".join(MockDraftProvider().generate_email(lead)),
+    ]
+    for saida in saidas:
+        for nome, sentinela in sentinelas.items():
+            assert sentinela not in saida, nome

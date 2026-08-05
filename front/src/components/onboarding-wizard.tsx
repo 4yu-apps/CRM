@@ -19,6 +19,7 @@ import { getRepo } from "@/lib/repo";
 import { getSupabase } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { getProfession, PROFESSIONS, type Profession } from "@/lib/professions";
+import { LEGAL_AREAS } from "@/lib/legal-areas";
 import type { SearchProfileInput, ServiceTarget } from "@/lib/types";
 import { CityAutocomplete } from "@/components/city-autocomplete";
 import { ProfessionCard } from "@/components/profession-card";
@@ -73,6 +74,9 @@ export function OnboardingWizard() {
 
   // Campos coletados no fluxo.
   const [professions, setProfessions] = useState<string[]>([]);
+  // Area de advocacia: as areas de atuacao pesam o score. A OAB (que assina
+  // o e-mail) fica pra Configuracao, pois so importa quando ha rascunho.
+  const [legalAreas, setLegalAreas] = useState<string[]>([]);
   const [niches, setNiches] = useState<string[]>([]);
   const [serviceTarget, setServiceTarget] = useState<ServiceTarget>("indefinido");
   const [state, setState] = useState("");
@@ -126,6 +130,7 @@ export function OnboardingWizard() {
       const input: SearchProfileInput = {
         professions,
         profession: professions[0] ?? null,
+        legal_areas: legalAreas,
         niches,
         default_service_target: serviceTarget,
         city: city.trim() || null,
@@ -150,7 +155,7 @@ export function OnboardingWizard() {
       toast.error(e instanceof Error ? e.message : "Erro ao salvar. Tenta de novo.");
       setSaving(false);
     }
-  }, [professions, niches, serviceTarget, city, state, name, mode, repo, refreshProfile, router]);
+  }, [professions, legalAreas, niches, serviceTarget, city, state, name, mode, repo, refreshProfile, router]);
 
   // Etapa 1 so avanca com profissao E nome (o nome entra na copy: "me chamo X").
   const canAdvance = step !== 0 || (professions.length > 0 && name.trim().length > 0);
@@ -273,6 +278,43 @@ export function OnboardingWizard() {
                   />
                 ))}
               </div>
+
+              {professions.includes("advocacia") && (
+                <div className="mt-4 rounded-[14px] border border-border-2 bg-surface-2 px-4 py-3">
+                  <div className="mb-1 text-[13px] font-bold text-ink">
+                    Suas áreas de atuação
+                  </div>
+                  <p className="mb-3 text-[12.5px] text-faint">
+                    Cada área muda o que eu procuro na empresa. Pode marcar mais de uma.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {LEGAL_AREAS.map((a) => {
+                      const on = legalAreas.includes(a.id);
+                      return (
+                        <button
+                          key={a.id}
+                          type="button"
+                          title={a.descricao}
+                          onClick={() =>
+                            setLegalAreas((prev) =>
+                              prev.includes(a.id)
+                                ? prev.filter((x) => x !== a.id)
+                                : [...prev, a.id],
+                            )
+                          }
+                          className={
+                            on
+                              ? "rounded-full bg-brand-50 px-3 py-1.5 text-[12.5px] font-semibold text-brand"
+                              : "rounded-full border border-border-2 bg-surface px-3 py-1.5 text-[12.5px] font-medium text-ink-2 transition-colors hover:border-brand hover:text-brand"
+                          }
+                        >
+                          {on ? a.label : `+ ${a.label}`}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {primaryProfession && (
                 <div className="mt-4 flex items-start gap-2.5 rounded-[14px] border border-brand/20 bg-brand-50/70 px-4 py-3 text-[13px] leading-relaxed text-ink-2">

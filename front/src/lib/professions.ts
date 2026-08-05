@@ -10,6 +10,7 @@ import {
   PaintBrush,
   Globe,
   PenNib,
+  Scales,
   type Icon,
 } from "@phosphor-icons/react";
 
@@ -95,6 +96,15 @@ export const PROFESSIONS: Profession[] = [
     mira: "Negócio sem site.",
     suggestedNiches: ["Clínica", "Advocacia", "Imobiliária", "Restaurante"],
     defaultService: "indefinido",
+  },
+  {
+    id: "advocacia",
+    label: "Advocacia",
+    descricao: "Você presta assessoria jurídica a empresas.",
+    icon: Scales,
+    mira: "Empresa formalizada, com sócios, sem assessoria aparente.",
+    suggestedNiches: ["Construtora", "Transportadora", "Distribuidora", "Oficina mecanica", "Restaurante"],
+    defaultService: "advocacia",
   },
 ];
 

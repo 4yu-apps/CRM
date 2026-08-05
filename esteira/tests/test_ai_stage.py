@@ -83,3 +83,31 @@ def test_reader_repassa_profession():
     reader = ai_stage.make_ai_reader(call=lambda prompt: (vistos.append(prompt), {"segment": "x"})[1])
     reader(Lead(id="1", owner_id="o", business_name="X"), "marketing")
     assert "PRESENCA DIGITAL" in vistos[0]
+
+
+# ------------------------------------------------------------------
+# Area de advocacia: leitura institucional e a separacao exposure/context,
+# que e o que sustenta a muralha (exposure so na ficha, context na copy).
+# ------------------------------------------------------------------
+
+def test_prompt_de_advocacia_fala_de_maturidade_institucional():
+    lead = Lead(id="1", owner_id="o", business_name="Empresa X",
+                natureza_juridica="206-2 - Sociedade Empresaria Limitada",
+                socios_count=3, capital_social=250000.0)
+    p = ai_stage.build_ai_prompt(lead, "advocacia")
+    assert "AREA DO DONO: ADVOCACIA" in p
+    assert "exposure" in p and "context" in p
+    assert "natureza juridica" in p.lower()
+
+
+def test_prompt_de_outra_area_nao_muda():
+    lead = Lead(id="1", owner_id="o", business_name="Empresa X")
+    assert ai_stage.build_ai_prompt(lead, "trafego") == ai_stage.build_ai_prompt(lead, None)
+
+
+def test_parse_ai_aceita_exposure_e_context():
+    out = ai_stage.parse_ai({"segment": "transportadora", "maturity": 3,
+                    "exposure": "rotatividade alta e sem politica de privacidade",
+                    "context": "empresa com 12 anos e 3 socios"})
+    assert out["exposure"].startswith("rotatividade")
+    assert out["context"].startswith("empresa com 12 anos")
