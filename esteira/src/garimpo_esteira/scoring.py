@@ -31,7 +31,13 @@ AMBOS_BAR = 70    # os dois servicos fortes => alvo "ambos"
 # capital, regime, situacao, idade), e nada disso existe sem o CNPJ resolvido.
 # Resultado: leads bons empacavam em 45-49 e caiam no descarte, correndo uma
 # prova diferente com a mesma regua.
-_THRESHOLD_BY_LENS = {"advocacia": 30}
+#
+# O corte e baixo de proposito: pro advogado B2B, empresa identificada com um
+# canal de contato JA e alguem a quem se apresentar. O score aqui serve pra
+# ORDENAR a fila (quem tem socios, capital, situacao irregular ou site sem
+# politica sobe), nao pra barrar. Barrar so o que nao da pra abordar ou nao da
+# pra reconhecer como empresa.
+_THRESHOLD_BY_LENS = {"advocacia": 20}
 
 
 def threshold_for(lens: str) -> int:
@@ -603,10 +609,12 @@ def _assessoria_points(lead: Lead, signals: dict[str, Any]) -> tuple[int, str] |
     """Ausencia de politica de privacidade / termos = provavelmente ninguem
     revisou. So opina quando o site existe E foi lido.
 
-    Pesa alto de proposito: e o unico criterio que aponta TRABALHO CONCRETO pro
-    advogado ("da pra escrever a politica e os termos"), e nao so um indicio de
-    porte. Os outros criterios dizem que a empresa aguenta pagar; este diz o que
-    fazer por ela. Tambem e o mais observavel sem consulta a Receita."""
+    E BONUS, nunca requisito. O advogado quer se apresentar a empresas; se a
+    empresa tem site ou nao, e se conseguimos ler o HTML dela, nao diz nada
+    sobre ela precisar de advogado. Este criterio pesava tanto que empresa sem
+    site caia no descarte por tabela — leitura de marketing infiltrada na lente
+    juridica. Agora ele so ORDENA: quem tem site sem politica sobe na fila,
+    quem nao tem site nao perde nada por isso."""
     if not is_present("website", lead.website):
         return None
     priv = _sig(signals, "has_privacy_policy")
@@ -623,11 +631,11 @@ def _assessoria_points(lead: Lead, signals: dict[str, Any]) -> tuple[int, str] |
         # online e IA produzem os dois em minutos, e o texto generico costuma
         # nao cobrir o negocio de verdade. Entao pesa pouco menos que a
         # ausencia, nao muito menos — a diferenca e de 5 pontos, nao de 20.
-        return 19, "site com politica e termos (pode ser modelo generico)"
+        return 9, "site com politica e termos (pode ser modelo generico)"
     nota = ", ".join(faltas)
     if _sig(signals, "has_ecommerce") is True:
-        return 30, f"vende online e {nota} (exposicao de consumo e LGPD)"
-    return 24, f"site {nota}, ninguem revisou"
+        return 18, f"vende online e {nota} (exposicao de consumo e LGPD)"
+    return 14, f"site {nota}, ninguem revisou"
 
 
 def _risco_ramo_points(lead: Lead, signals: dict[str, Any]) -> tuple[int, str] | None:

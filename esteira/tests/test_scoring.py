@@ -559,14 +559,20 @@ def test_dado_desconhecido_da_receita_nao_vira_ponto():
     assert "Situacao" not in labels
 
 
-def test_falta_de_politica_e_termos_e_o_criterio_mais_pesado():
-    """E o unico criterio que aponta trabalho concreto pro advogado; os outros
-    so dizem que a empresa aguenta pagar."""
-    r = score_lead(_transportadora_sem_receita(), _sem_receita_signals(),
-                   professions=["advocacia"])
-    crit = {c["label"]: c["points"] for c in r.reason["advocacia"]["criteria"]}
-    assert crit["Assessoria"] == 24
-    assert crit["Assessoria"] > crit["Risco do ramo"]
+def test_site_e_bonus_nao_requisito():
+    """O advogado quer se apresentar a empresas: a empresa ter site, e a gente
+    conseguir ler o HTML dela, nao diz nada sobre ela precisar de advogado.
+    Site sem politica SOBE na fila; sem site nao perde nada por isso."""
+    com_site = score_lead(_transportadora_sem_receita(), _sem_receita_signals(),
+                          professions=["advocacia"])
+    sem_site = Lead(id="s", owner_id="o", business_name="Transportes X",
+                    category="Transportadora", phone="43998887766")
+    r_sem = score_lead(sem_site, {}, professions=["advocacia"])
+
+    assert com_site.score > r_sem.score          # o bonus ordena
+    assert r_sem.decision == "qualificado"       # mas nao barra quem nao tem site
+    labels = {c["label"] for c in r_sem.reason["advocacia"]["criteria"]}
+    assert "Assessoria" not in labels            # ausencia de site nao vira criterio
 
 
 def test_ecommerce_sem_politica_pesa_ainda_mais():
@@ -574,14 +580,14 @@ def test_ecommerce_sem_politica_pesa_ainda_mais():
     sig = {"site": {**_sem_receita_signals()["site"], "has_ecommerce": True}}
     r = score_lead(lead, sig, professions=["advocacia"])
     crit = {c["label"]: c["points"] for c in r.reason["advocacia"]["criteria"]}
-    assert crit["Assessoria"] == 30
+    assert crit["Assessoria"] == 18
 
 
 def test_corte_da_advocacia_e_menor_que_o_das_outras_lentes():
     """O 50 foi calibrado pra quem soma nota + avaliacoes do Maps (ate 50 so
     nesses dois). A lente juridica nao usa nenhum dos dois."""
     from garimpo_esteira.scoring import THRESHOLD, threshold_for
-    assert threshold_for("advocacia") == 30
+    assert threshold_for("advocacia") == 20
     for lens in ("trafego", "automacao", "design", "marketing"):
         assert threshold_for(lens) == THRESHOLD
 
@@ -591,7 +597,7 @@ def test_transportadora_sem_receita_agora_qualifica():
     r = score_lead(_transportadora_sem_receita(), _sem_receita_signals(),
                    professions=["advocacia"])
     assert r.decision == "qualificado", (r.score, r.reason["verdict"])
-    assert r.reason["threshold"] == 30
+    assert r.reason["threshold"] == 20
 
 
 def test_regressao_corte_das_outras_areas_nao_muda():
