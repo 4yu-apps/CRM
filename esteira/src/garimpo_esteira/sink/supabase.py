@@ -78,6 +78,33 @@ class SupabaseSink:
         r.raise_for_status()
         return [self._to_lead(row) for row in r.json()]
 
+    def fetch_system_discarded(self, limit: int, owner_id: str | None = None) -> list[Lead]:
+        """Descartados cujo ULTIMO descarte veio do robo.
+
+        Descarte humano ("numero errado", "sem interesse") e decisao, nao falta
+        de dado: o requalify nao pode desfazer decisao do dono. Como o historico
+        e append-only, o que vale e a linha mais recente de cada lead.
+        """
+        leads = self.fetch_by_status("descartado", limit, owner_id)
+        if not leads:
+            return []
+        ids = [l.id for l in leads]
+        r = self._send(
+            "GET",
+            f"{self.base}/lead_status_history",
+            params={
+                "lead_id": f"in.({','.join(ids)})",
+                "to_status": "eq.descartado",
+                "select": "lead_id,actor,changed_at",
+                "order": "changed_at.desc",
+            },
+        )
+        r.raise_for_status()
+        ultimo: dict[str, str] = {}
+        for row in r.json():  # ja vem do mais recente pro mais antigo
+            ultimo.setdefault(row["lead_id"], row.get("actor") or "")
+        return [l for l in leads if ultimo.get(l.id, "system") == "system"]
+
     def fetch_backfill(self, limit: int, owner_id: str | None = None) -> list[Lead]:
         # Tem site, nao e opt-out, e falta algum dado que o site costuma ter
         # (facebook/instagram/whatsapp) ou ainda nao checamos anuncio (ads_active).

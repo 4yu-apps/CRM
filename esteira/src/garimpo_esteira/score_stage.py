@@ -174,9 +174,12 @@ def rescore_no_status(
 def score_batch(
     sink: LeadSink, *, batch: int = 20, status="enriquecido", owner_id: str | None = None,
     profession: str | None = None, min_score: int = 0, professions: list[str] | None = None,
-    legal_areas: list[str] | None = None,
+    legal_areas: list[str] | None = None, leads: list | None = None,
 ) -> list[ScoreResult]:
-    leads = sink.fetch_by_status(status, batch, owner_id)
+    # leads explicito pula o fetch por status (o requalify ja filtrou quem pode
+    # voltar: so os descartados pelo robo, nunca os descartados pelo dono).
+    if leads is None:
+        leads = sink.fetch_by_status(status, batch, owner_id)
     # prefetch da proveniencia de todos os leads numa chamada (corta o N+1).
     prov_by = sink.fetch_provenance_many([lead.id for lead in leads])
     results = [

@@ -108,6 +108,51 @@ def cmd_score(cfg: Config) -> int:
     return 0
 
 
+def cmd_requalify(cfg: Config) -> int:
+    """Re-pontua os DESCARTADOS com as regras de hoje, escopado a um dono.
+
+    Existia um caminho so de ida: mudanca de calibragem (peso de criterio, corte
+    da lente, criterio novo) nunca alcancava quem ja tinha sido descartado, e o
+    `reprocess` nao ajuda porque ele preserva o status de proposito (pra nao
+    regredir lead que ja avancou no funil).
+
+    Aqui o sentido e o oposto e so ele: quem passa a merecer volta pra fila.
+    Quem continua abaixo do corte segue descartado, entao rodar duas vezes nao
+    muda nada. Escopo por GARIMPO_OWNER e obrigatorio — recalibrar a lente de um
+    dono nao pode mexer na base de outro.
+    """
+    owner = os.getenv("GARIMPO_OWNER") or None
+    if not owner:
+        print("requalify: defina GARIMPO_OWNER (nao roda sobre a base toda).")
+        return 1
+    sink = build_sink(cfg)
+    prof = fetch_profile(sink, owner)
+    print(f"requalify · owner={owner[:8]} prof={','.join(prof.professions) or '-'} "
+          f"areas={','.join(prof.legal_areas) or '-'} batch={cfg.batch}")
+    if not hasattr(sink, "fetch_system_discarded"):
+        print("  sink sem fetch_system_discarded (use --sink supabase)")
+        return 1
+    alvos = sink.fetch_system_discarded(cfg.batch, owner)
+    if not alvos:
+        print("  nenhum descartado do robo pra reavaliar")
+        return 0
+    results = score_batch(
+        sink, batch=cfg.batch, owner_id=owner, leads=alvos,
+        profession=prof.profession, professions=prof.professions,
+        min_score=prof.min_score, legal_areas=prof.legal_areas,
+    )
+    if not results:
+        print("  nenhum descartado pra reavaliar")
+        return 0
+    voltaram = [r for r in results if r.decision == "qualificado"]
+    for r in voltaram:
+        print(f"  + score={r.score} voltou pra fila ({r.reason['summary'][:60]})")
+    print(f"resumo: {len(results)} reavaliados · {len(voltaram)} voltaram · "
+          f"{len(results) - len(voltaram)} seguem descartados")
+    _print_counts(sink)
+    return 0
+
+
 def cmd_draft(cfg: Config) -> int:
     sink = build_sink(cfg)
     provider = build_provider(cfg)
@@ -424,7 +469,8 @@ def _print_counts(sink) -> None:
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="garimpo-esteira")
     sub = p.add_subparsers(dest="cmd", required=True)
-    for name in ("seed-demo", "discover", "enrich", "score", "draft", "redraft", "pipeline", "autopilot", "drain", "backfill", "reprocess", "counts", "search"):
+    for name in ("seed-demo", "discover", "enrich", "score", "draft", "redraft", "pipeline", "autopilot", "drain", "backfill", "reprocess", "requalify",
+                 "counts", "search"):
         sp = sub.add_parser(name)
         sp.add_argument("--sink", choices=["jsonfile", "supabase"])
         sp.add_argument("--json")
@@ -456,6 +502,7 @@ def main(argv: list[str] | None = None) -> int:
         "seed-demo": cmd_seed_demo,
         "enrich": cmd_enrich,
         "score": cmd_score,
+        "requalify": cmd_requalify,
         "draft": cmd_draft,
         "redraft": cmd_redraft,
         "pipeline": cmd_pipeline,
