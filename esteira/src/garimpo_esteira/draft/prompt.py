@@ -506,3 +506,64 @@ def build_prompt(lead: Lead) -> str:
         f"{ancora}\n\n"
         'Responda em JSON: {"msg1": "...", "msg2": "..."}'
     )
+
+
+# ---------------------------------------------------------------------
+# E-MAIL formal (canal proprio da area de advocacia)
+#
+# WhatsApp frio de advogado e o registro mais exposto da profissao; o e-mail
+# institucional cabe muito melhor. O endereco ja vem da Receita (cnpj.py emite
+# `email`), entao o dado existe sem coleta nova. Sem envio automatico: o humano
+# copia e manda, igual ao WhatsApp.
+#
+# Vale a MESMA muralha: le so `ai_signals.context`.
+# ---------------------------------------------------------------------
+_EMAIL_SYSTEM = (
+    "Voce escreve um E-MAIL institucional de apresentacao EM NOME de um ADVOGADO. "
+    "Registro formal, portugues do Brasil com acentuacao correta, sem emoji e sem "
+    "informalidade. NUNCA invente dados.\n\n"
+
+    "O e-mail NAO VENDE e NAO OFERECE: apresenta quem e, cita UM fato neutro e "
+    "publico sobre a empresa, e se coloca a disposicao caso ainda nao tenham "
+    "assessoria juridica. Fecha com assinatura: nome, 'Advogado', e OAB/UF.\n\n"
+
+    "O assunto e curto e descritivo, sem verbo de venda e sem promessa "
+    "(ex.: 'Apresentacao profissional' ou 'Assessoria juridica empresarial').\n\n"
+
+    "PROIBIDO, sem excecao:\n"
+    "- prometer, insinuar ou sugerir resultado de qualquer natureza\n"
+    "- mencionar caso concreto, processo, reclamacao, divida, irregularidade, "
+    "situacao cadastral, nota ou avaliacao da empresa\n"
+    "- falar de honorarios, valores, condicoes ou desconto\n"
+    "- urgencia, medo ou escassez\n"
+    "- citar exito passado, numero de casos, ou comparar com outro profissional\n"
+    "- pergunta-diagnostico\n"
+)
+
+
+def build_email_prompt(lead: Lead) -> str:
+    """Prompt do e-mail formal. SO a area de advocacia usa; nas outras devolve
+    string vazia (o canal continua sendo so o WhatsApp)."""
+    if _brief_key(lead) != "advocacia":
+        return ""
+
+    ctx = ((getattr(lead, "ai_signals", None) or {}).get("context") or "").strip()
+    sender = (getattr(lead, "sender_name", None) or "").strip()
+    oab = (getattr(lead, "oab", None) or "").strip()
+
+    if sender:
+        assinatura = f"Assine como: {sender}, Advogado" + (f", OAB {oab}" if oab else "")
+    else:
+        assinatura = ("Nao ha nome cadastrado: NAO invente nome nem numero de OAB; "
+                      "assine apenas como 'Advogado'")
+
+    linhas = [
+        f"empresa: {lead.business_name or '-'}",
+        f"cidade: {lead.city or '-'}",
+        f"fato neutro (use no maximo este): {ctx or '-'}",
+        assinatura + ".",
+    ]
+    return (
+        f"{_EMAIL_SYSTEM}\n\nFATOS:\n" + "\n".join(linhas) +
+        '\n\nResponda em JSON: {"assunto": "...", "corpo": "..."}'
+    )

@@ -387,3 +387,44 @@ def test_mock_de_advocacia_nao_vende_e_nao_vaza():
     for valor in ("inapta", "reclamac", "cobranca", "3.1", "280", "site",
                   "instagram", "garantia", "resultado"):
         assert valor not in texto, valor
+
+
+def test_email_juridico_tem_assunto_assinatura_e_a_mesma_muralha():
+    from garimpo_esteira.draft.prompt import build_email_prompt
+    lead = _lead_adv()
+    setattr(lead, "sender_name", "Ana Souza")
+    setattr(lead, "oab", "123456/PR")
+    lead.ai_signals = {"exposure": "empresa inapta", "context": "empresa com 12 anos de casa"}
+    p = build_email_prompt(lead)
+    assert "assunto" in p.lower()
+    assert "OAB 123456/PR" in p
+    assert "inapta" not in p.lower()
+    assert "12 anos de casa" in p
+
+
+def test_email_so_existe_pra_advocacia():
+    from garimpo_esteira.draft.prompt import build_email_prompt
+    assert build_email_prompt(_lead(service_target="trafego")) == ""
+
+
+def test_mock_gera_email_so_pra_advocacia():
+    from garimpo_esteira.draft.mock import MockDraftProvider
+    prov = MockDraftProvider()
+    assert prov.generate_email(_lead(service_target="trafego")) is None
+
+    lead = _lead_adv()
+    setattr(lead, "sender_name", "Ana Souza")
+    setattr(lead, "oab", "123456/PR")
+    lead.ai_signals = {"exposure": "empresa inapta", "context": "sociedade com 12 anos"}
+    assunto, corpo = prov.generate_email(lead)
+    assert assunto
+    assert "Advogado" in corpo and "OAB 123456/PR" in corpo
+    for valor in ("inapta", "reclamac", "3.1", "280", "garantia"):
+        assert valor not in corpo.lower(), valor
+
+
+def test_oab_label_monta_numero_barra_uf():
+    from garimpo_esteira.run import _oab_label
+    assert _oab_label({"oab_number": "123456", "oab_uf": "pr"}) == "123456/PR"
+    assert _oab_label({"oab_number": "123456"}) == "123456"
+    assert _oab_label({}) is None

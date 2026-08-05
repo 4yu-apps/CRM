@@ -15,7 +15,7 @@ from .sink.base import LeadSink
 
 def draft_one(
     lead, provider: DraftProvider, sink: LeadSink, profession: str | None = None,
-    reviews_source=None, sender_name: str | None = None,
+    reviews_source=None, sender_name: str | None = None, oab: str | None = None,
 ) -> tuple[str, str] | None:
     if lead.opt_out:
         return None  # LGPD: nao rascunha contato pra quem pediu opt-out
@@ -23,6 +23,8 @@ def draft_one(
         setattr(lead, "profession", profession)
     if sender_name:
         setattr(lead, "sender_name", sender_name)
+    if oab:
+        setattr(lead, "oab", oab)  # assinatura do e-mail (area de advocacia)
     if reviews_source is not None:
         try:
             for f in reviews_source.enrich(lead):
@@ -35,12 +37,24 @@ def draft_one(
         except Exception:
             pass
     msg1, msg2 = provider.generate(lead)
-    sink.update_lead_fields(lead.id, {
+    fields = {
         "draft_msg1": msg1,
         "draft_msg2": msg2,
         "draft_model": provider.model,
         "draft_generated_at": datetime.now(timezone.utc).isoformat(),
-    })
+    }
+    # Canal extra da area de advocacia: e-mail formal. Opcional no provedor
+    # (getattr) pra nao quebrar provider antigo, e nunca derruba o rascunho do
+    # WhatsApp se a chamada falhar.
+    gen_email = getattr(provider, "generate_email", None)
+    if callable(gen_email):
+        try:
+            email = gen_email(lead)
+        except Exception:
+            email = None
+        if email:
+            fields["draft_email_subject"], fields["draft_email_body"] = email
+    sink.update_lead_fields(lead.id, fields)
     if lead.status != "rascunho_pronto":
         sink.set_status(lead.id, "rascunho_pronto", actor="system", note=f"rascunho via {provider.model}")
     return msg1, msg2

@@ -206,6 +206,7 @@ def cmd_search(
     profession = None
     professions: list[str] = []
     legal_areas: list[str] = []
+    oab = None
     min_score = 0
     sender_name = None
     if hasattr(sink, "fetch_profile"):
@@ -214,6 +215,7 @@ def cmd_search(
             profession = prof.get("profession")
             professions = list(prof.get("professions") or ([profession] if profession else []))
             legal_areas = list(prof.get("legal_areas") or [])
+            oab = _oab_label(prof)
             min_score = int(prof.get("min_score") or 0)
             sender_name = prof.get("sender_name")
         except Exception:
@@ -235,7 +237,7 @@ def cmd_search(
         batch=cfg.batch, delay=cfg.delay, owner_id=owner_id,
         profession=profession, professions=professions,
         min_score=min_score, reviews_source=reviews_source,
-        sender_name=sender_name, legal_areas=legal_areas,
+        sender_name=sender_name, legal_areas=legal_areas, oab=oab,
         workers=workers, ai_reader=build_ai_reader(cfg),
     )
 
@@ -259,6 +261,16 @@ def cmd_search(
         pass
     _print_counts(sink)
     return 0
+
+
+def _oab_label(prof: dict) -> str | None:
+    """"123456" + "PR" -> "123456/PR". Assina o e-mail da area de advocacia.
+    Sem numero, devolve None (o prompt entao proibe inventar)."""
+    num = (prof.get("oab_number") or "").strip()
+    if not num:
+        return None
+    uf = (prof.get("oab_uf") or "").strip().upper()
+    return f"{num}/{uf}" if uf else num
 
 
 def _ads_from_prov(prov: list[dict]) -> bool | None:

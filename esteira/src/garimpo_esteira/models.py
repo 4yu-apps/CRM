@@ -121,6 +121,10 @@ class Lead:
     draft_msg2: str | None = None
     draft_model: str | None = None
     draft_generated_at: str | None = None
+    # rascunho de e-mail (area de advocacia): registro formal, com assinatura e
+    # OAB. Canal proprio; sem envio automatico, igual ao WhatsApp.
+    draft_email_subject: str | None = None
+    draft_email_body: str | None = None
 
     # quando o backfill re-enriqueceu por ultimo (rotacao: processa os mais
     # antigos primeiro, pra varrer todos os leads ao longo do tempo sem travar).

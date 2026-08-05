@@ -182,3 +182,26 @@ class MockDraftProvider:
         msg1 = _abertura(b, lead, service)
         msg2 = _PITCH.get(service, _PITCH["trafego"])
         return msg1, msg2
+
+
+    def generate_email(self, lead: Lead) -> tuple[str, str] | None:
+        """E-mail formal (so advocacia). Mesma muralha: le so `context`."""
+        if _brief_key(lead) != "advocacia":
+            return None
+        nome = lead.business_name or "a empresa"
+        sender = (getattr(lead, "sender_name", None) or "").strip()
+        oab = (getattr(lead, "oab", None) or "").strip()
+        ctx = ((getattr(lead, "ai_signals", None) or {}).get("context") or "").strip()
+
+        observacao = f" Vi que a {nome} é uma {ctx}." if ctx else ""
+        assinatura = (f"{sender}\nAdvogado" + (f"\nOAB {oab}" if oab else "")
+                      if sender else "Advogado")
+        corpo = (
+            f"Prezados,\n\n"
+            f"Escrevo para me apresentar.{observacao} "
+            f"Atuo com assessoria jurídica a empresas.\n\n"
+            f"Caso ainda não contem com assessoria jurídica, fico à disposição "
+            f"para uma conversa, sem qualquer compromisso da parte de vocês.\n\n"
+            f"Atenciosamente,\n{assinatura}"
+        )
+        return "Apresentação profissional", corpo
