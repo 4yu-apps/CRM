@@ -49,6 +49,7 @@ def _as_float(v) -> float | None:
 def score_one(
     lead, sink: LeadSink, profession: str | None = None, min_score: int = 0,
     *, professions: list[str] | None = None, prov: list[dict] | None = None,
+    legal_areas: list[str] | None = None,
 ) -> ScoreResult:
     # prov injetada pelo score_batch (prefetch em lote, corta N+1); sem ela, busca.
     if prov is None:
@@ -66,7 +67,8 @@ def score_one(
         "instagram_followers": _as_int(_prov(prov, "instagram_followers")),
         "instagram_engagement": _as_float(_prov(prov, "instagram_engagement")),
     }
-    result = score_lead(lead, signals, profession, professions=professions)
+    result = score_lead(lead, signals, profession, professions=professions,
+                        legal_areas=legal_areas)
     # O pipeline streaming reutiliza este objeto no draft logo em seguida.
     lead.ads_active = ads_active
     lead.score = result.score
@@ -110,6 +112,7 @@ def rescore_no_status(
     lead, sink: LeadSink, *, profession: str | None = None, min_score: int = 0,
     professions: list[str] | None = None, prov: list[dict] | None = None,
     extra_fields: dict[str, object] | None = None,
+    legal_areas: list[str] | None = None,
 ) -> ScoreResult:
     """Re-pontua um lead SEM tocar no status (Parte 2, reprocessamento).
 
@@ -130,7 +133,8 @@ def rescore_no_status(
         "instagram_followers": _as_int(_prov(prov, "instagram_followers")),
         "instagram_engagement": _as_float(_prov(prov, "instagram_engagement")),
     }
-    result = score_lead(lead, signals, profession, professions=professions)
+    result = score_lead(lead, signals, profession, professions=professions,
+                        legal_areas=legal_areas)
     lead.ads_active = ads_active
     # #19: piso de score por dono, sincronizando o reason (igual score_one).
     if min_score and result.score < min_score and result.decision != "descartado":
@@ -166,13 +170,14 @@ def rescore_no_status(
 def score_batch(
     sink: LeadSink, *, batch: int = 20, status="enriquecido", owner_id: str | None = None,
     profession: str | None = None, min_score: int = 0, professions: list[str] | None = None,
+    legal_areas: list[str] | None = None,
 ) -> list[ScoreResult]:
     leads = sink.fetch_by_status(status, batch, owner_id)
     # prefetch da proveniencia de todos os leads numa chamada (corta o N+1).
     prov_by = sink.fetch_provenance_many([lead.id for lead in leads])
     results = [
         score_one(lead, sink, profession, min_score, professions=professions,
-                  prov=prov_by.get(lead.id, []))
+                  prov=prov_by.get(lead.id, []), legal_areas=legal_areas)
         for lead in leads
     ]
     discarded = [r for r in results if r.decision == "descartado"]
