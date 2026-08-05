@@ -179,6 +179,11 @@
   color: #a1a1aa;
 }
 #garimpo-panel .gp-input {
+  /* Sem width:100% o input fica na largura INTRINSECA (~20 caracteres) e some
+     antes da borda do painel. O box-sizing e obrigatorio junto: sem ele, os
+     100% somam padding + borda e estouram pra fora. */
+  width: 100%;
+  box-sizing: border-box;
   border: 1px solid #e4e4e7;
   border-radius: 8px;
   padding: 6px 8px;
@@ -204,6 +209,11 @@
 
 /* Campos com prefixo (icone ou "R$") */
 #garimpo-panel .gp-inwrap { position: relative; display: flex; align-items: center; }
+/* O input e item de um flex em LINHA aqui. Sem flex+min-width:0 ele nao estica
+   nem encolhe (min-width:auto e o padrao de item flex), e era so nos campos com
+   icone/prefixo que a largura acabava cedo — a textarea, filha direta do flex
+   em coluna, ja esticava sozinha. */
+#garimpo-panel .gp-inwrap .gp-input { flex: 1 1 auto; min-width: 0; }
 #garimpo-panel .gp-ic {
   position: absolute; left: 9px; display: inline-flex; pointer-events: none; color: #a08fc4;
 }
