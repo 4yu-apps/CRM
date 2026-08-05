@@ -25,6 +25,18 @@ from .validation import is_present
 THRESHOLD = 50    # >= qualificado; abaixo, descartado
 AMBOS_BAR = 70    # os dois servicos fortes => alvo "ambos"
 
+# O corte de 50 foi calibrado pras lentes que somam nota + avaliacoes do Maps:
+# so esses dois criterios ja valem ate 50, e todo lead do Maps tem os dois. A
+# lente de advocacia nao usa nenhum dos dois — ela le EMPRESA (natureza, socios,
+# capital, regime, situacao, idade), e nada disso existe sem o CNPJ resolvido.
+# Resultado: leads bons empacavam em 45-49 e caiam no descarte, correndo uma
+# prova diferente com a mesma regua.
+_THRESHOLD_BY_LENS = {"advocacia": 30}
+
+
+def threshold_for(lens: str) -> int:
+    return _THRESHOLD_BY_LENS.get(lens, THRESHOLD)
+
 Decision = Literal["qualificado", "descartado"]
 
 # Ramos onde o atendimento/agendamento manual pesa (ouro pra automacao).
@@ -504,10 +516,13 @@ def is_mei(lead: Lead) -> bool:
     return any(m in nat for m in _MEI_MARKERS) or porte == "MEI"
 
 
-def _natureza_points(lead: Lead) -> tuple[int, str]:
+def _natureza_points(lead: Lead) -> tuple[int, str] | None:
+    """None quando nao se sabe. Dado desconhecido nao pode virar ponto: antes
+    'natureza juridica desconhecida' valia 8, entao um lead sem nenhuma consulta
+    a Receita ja largava com pontos que nao representavam nada."""
     nat = (getattr(lead, "natureza_juridica", None) or "").upper()
     if not nat:
-        return 8, "natureza juridica desconhecida"
+        return None
     if "LIMITADA" in nat or "ANONIMA" in nat or "ANÔNIMA" in nat or "S/A" in nat:
         return 22, "sociedade (contrato social, governanca, demanda societaria)"
     if "INDIVIDUAL" in nat or "EIRELI" in nat:
@@ -553,12 +568,15 @@ def _regime_points(signals: dict[str, Any]) -> tuple[int, str] | None:
     return 5, "optante pelo Simples"
 
 
-def _situacao_juridica_points(lead: Lead) -> tuple[int, str]:
+def _situacao_juridica_points(lead: Lead) -> tuple[int, str] | None:
     """Empresa irregular NAO e lead morto aqui: e empresa com demanda de
-    regularizacao em curso. O oposto do que vale pras outras lentes."""
+    regularizacao em curso. O oposto do que vale pras outras lentes.
+
+    None quando nao se sabe — um item de 0 ponto rotulado 'desconhecida' so
+    poluia o breakdown na ficha sem dizer nada."""
     status = (lead.company_status or "").strip().upper()
     if not status:
-        return 0, "situacao cadastral desconhecida"
+        return None
     if status == "ATIVA":
         return 6, "empresa ativa na Receita"
     return 18, f"empresa {status.lower()} na Receita, demanda de regularizacao"
@@ -583,7 +601,12 @@ def _idade_juridica_points(
 
 def _assessoria_points(lead: Lead, signals: dict[str, Any]) -> tuple[int, str] | None:
     """Ausencia de politica de privacidade / termos = provavelmente ninguem
-    revisou. So opina quando o site existe E foi lido."""
+    revisou. So opina quando o site existe E foi lido.
+
+    Pesa alto de proposito: e o unico criterio que aponta TRABALHO CONCRETO pro
+    advogado ("da pra escrever a politica e os termos"), e nao so um indicio de
+    porte. Os outros criterios dizem que a empresa aguenta pagar; este diz o que
+    fazer por ela. Tambem e o mais observavel sem consulta a Receita."""
     if not is_present("website", lead.website):
         return None
     priv = _sig(signals, "has_privacy_policy")
@@ -599,8 +622,8 @@ def _assessoria_points(lead: Lead, signals: dict[str, Any]) -> tuple[int, str] |
         return 4, "site com politica e termos (ja tem assessoria)"
     nota = ", ".join(faltas)
     if _sig(signals, "has_ecommerce") is True:
-        return 22, f"vende online e {nota} (exposicao de consumo e LGPD)"
-    return 16, f"site {nota}"
+        return 30, f"vende online e {nota} (exposicao de consumo e LGPD)"
+    return 24, f"site {nota}, ninguem revisou"
 
 
 def _risco_ramo_points(lead: Lead, signals: dict[str, Any]) -> tuple[int, str] | None:
@@ -875,7 +898,7 @@ def score_lead(
             if best_lens == "advocacia"
             else "sem telefone, nao da pra contatar no WhatsApp"
         )
-    elif best < THRESHOLD:
+    elif best < threshold_for(best_lens):
         decision = "descartado"
         target = "indefinido"
         verdict = "abaixo do corte do ICP"
@@ -888,7 +911,7 @@ def score_lead(
     lens_label = best_lens if best_lens in ("design", "marketing", "advocacia") else target
     reason = {
         "total": best,
-        "threshold": THRESHOLD,
+        "threshold": threshold_for(best_lens),
         "decision": decision,
         "verdict": verdict,
         "lens": lens_label,

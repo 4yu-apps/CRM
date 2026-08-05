@@ -456,14 +456,14 @@ def _empresa_forte(**kw) -> Lead:
 
 def test_advocacia_qualifica_lead_so_com_email():
     lead = _empresa_forte(phone=None, email="comercial@kranz.ind.br")
-    r = score_lead(lead, {"simples": False}, professions=["advocacia"])
+    r = score_lead(lead, {"site": {"simples": False}}, professions=["advocacia"])
     assert r.decision == "qualificado", r.reason["verdict"]
     assert r.service_target == "advocacia"
 
 
 def test_advocacia_descarta_sem_telefone_e_sem_email():
     lead = _empresa_forte(phone=None, email=None)
-    r = score_lead(lead, {"simples": False}, professions=["advocacia"])
+    r = score_lead(lead, {"site": {"simples": False}}, professions=["advocacia"])
     assert r.decision == "descartado"
     assert "e-mail" in r.reason["verdict"]
 
@@ -511,12 +511,89 @@ def test_area_consultiva_pesa_natureza_e_idade():
     """Sub-pesos proprios: contrato social (natureza) e o momento da empresa
     (nova constitui, madura acumula obrigacao) pesam mais que o resto."""
     lead = _empresa_forte(phone="43998887766")
-    com = score_lead(lead, {"simples": False}, professions=["advocacia"],
+    com = score_lead(lead, {"site": {"simples": False}}, professions=["advocacia"],
                      legal_areas=["consultivo"])
-    sem = score_lead(lead, {"simples": False}, professions=["advocacia"])
+    sem = score_lead(lead, {"site": {"simples": False}}, professions=["advocacia"])
     assert com.score > sem.score
 
     crit = {c["label"]: c["points"] for c in com.reason["advocacia"]["criteria"]}
     base = {c["label"]: c["points"] for c in sem.reason["advocacia"]["criteria"]}
     assert crit["Natureza"] > base["Natureza"]
     assert crit["Idade"] > base["Idade"]
+
+
+# ------------------------------------------------------------------
+# Calibragem da lente juridica (05/08). Tres decisoes do dono:
+# dado desconhecido nao pontua; ausencia de politica/termos e o sinal
+# mais acionavel; e o corte de 50 nao servia pra esta lente.
+# ------------------------------------------------------------------
+
+def _transportadora_sem_receita() -> Lead:
+    """O caso real da fila: veio do Maps, tem site e telefone, e o CNPJ nunca
+    foi resolvido — entao nada da Receita chegou."""
+    return Lead(
+        id="t", owner_id="o", business_name="Transportadora Real 94",
+        category="Transportadora", city="Londrina", state="PR",
+        phone="43998887766", website="https://real94.com.br",
+    )
+
+
+def _sem_receita_signals():
+    # os sinais de site chegam aninhados: score_stage monta signals["site"].
+    return {"site": {"has_privacy_policy": False, "has_terms": False}}
+
+
+def test_dado_desconhecido_da_receita_nao_vira_ponto():
+    """'natureza juridica desconhecida' valia 8 e 'situacao desconhecida' entrava
+    com 0: um lead sem nenhuma consulta a Receita largava com pontos que nao
+    representavam nada, e o breakdown na ficha mentia."""
+    r = score_lead(_transportadora_sem_receita(), _sem_receita_signals(),
+                   professions=["advocacia"])
+    labels = {c["label"] for c in r.reason["advocacia"]["criteria"]}
+    assert "Natureza" not in labels
+    assert "Situacao" not in labels
+
+
+def test_falta_de_politica_e_termos_e_o_criterio_mais_pesado():
+    """E o unico criterio que aponta trabalho concreto pro advogado; os outros
+    so dizem que a empresa aguenta pagar."""
+    r = score_lead(_transportadora_sem_receita(), _sem_receita_signals(),
+                   professions=["advocacia"])
+    crit = {c["label"]: c["points"] for c in r.reason["advocacia"]["criteria"]}
+    assert crit["Assessoria"] == 24
+    assert crit["Assessoria"] > crit["Risco do ramo"]
+
+
+def test_ecommerce_sem_politica_pesa_ainda_mais():
+    lead = _transportadora_sem_receita()
+    sig = {"site": {**_sem_receita_signals()["site"], "has_ecommerce": True}}
+    r = score_lead(lead, sig, professions=["advocacia"])
+    crit = {c["label"]: c["points"] for c in r.reason["advocacia"]["criteria"]}
+    assert crit["Assessoria"] == 30
+
+
+def test_corte_da_advocacia_e_menor_que_o_das_outras_lentes():
+    """O 50 foi calibrado pra quem soma nota + avaliacoes do Maps (ate 50 so
+    nesses dois). A lente juridica nao usa nenhum dos dois."""
+    from garimpo_esteira.scoring import THRESHOLD, threshold_for
+    assert threshold_for("advocacia") == 30
+    for lens in ("trafego", "automacao", "design", "marketing"):
+        assert threshold_for(lens) == THRESHOLD
+
+
+def test_transportadora_sem_receita_agora_qualifica():
+    """O caso concreto da fila: 47 pontos e descartada pelo corte de 50."""
+    r = score_lead(_transportadora_sem_receita(), _sem_receita_signals(),
+                   professions=["advocacia"])
+    assert r.decision == "qualificado", (r.score, r.reason["verdict"])
+    assert r.reason["threshold"] == 30
+
+
+def test_regressao_corte_das_outras_areas_nao_muda():
+    """Lead fraco pra trafego continua descartado com a regua de 50."""
+    fraco = Lead(id="f", owner_id="o", business_name="Fraco", phone="43998887766",
+                 rating=3.0, reviews_count=5, website="https://x.com.br",
+                 instagram="@x")
+    r = score_lead(fraco, {}, professions=["trafego"])
+    assert r.decision == "descartado"
+    assert r.reason["threshold"] == 50
