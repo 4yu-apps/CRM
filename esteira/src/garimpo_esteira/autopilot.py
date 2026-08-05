@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import random
 import re
+import traceback
 import unicodedata
 from collections.abc import Sequence
 
@@ -34,6 +35,20 @@ from .pipeline_stream import run_pipeline_streaming
 from .score_stage import score_batch
 from .sink.base import LeadSink
 from .sources.base import Source
+
+
+def _report(stage: str, owner: str, exc: BaseException) -> str:
+    """Erro de um dono nao pode derrubar os outros, mas TEM de aparecer.
+
+    Isto era `except Exception: pass`. Uma assinatura de funcao errada fez o
+    pipeline inteiro parar de rodar e o cron seguiu verde, sem uma linha de log
+    — o sintoma so apareceu em teste. Isolar a falha continua certo; esconder,
+    nao. O traceback vai junto porque erro raro sem pilha nao se diagnostica.
+    """
+    label = f"{type(exc).__name__}: {exc}"
+    print(f"  ERRO [{stage}] owner={(owner or '?')[:8]}: {label}")
+    traceback.print_exc()
+    return label
 
 
 def slug(text: str | None) -> str:
@@ -131,6 +146,7 @@ def run_autopilot(
             niches = niches + pool[:extra_niches]
 
         discovered = 0
+        erro: str | None = None
         for niche, term in generate_terms(niches, city, state, neighborhood):
             if (rkey, slug(niche)) in covered:
                 continue  # zona+nicho ja varridos: nunca repete
@@ -152,8 +168,9 @@ def run_autopilot(
                     inserted += 1
                     for f in findings:
                         sink.record_provenance(lead_id, f.field_name, f.source, f.value, f.confidence)
-            except Exception:
+            except Exception as e:
                 # Maps/sink instavel num nicho nao aborta os outros nichos.
+                _report(f"descoberta:{niche}", owner, e)
                 continue
 
             center_lat = sum(lats) / len(lats) if lats else None
@@ -204,10 +221,11 @@ def run_autopilot(
                 oab=settings.oab, legal_areas=settings.legal_areas,
                 professional_gender=settings.professional_gender,
             )
-        except Exception:
-            pass
+        except Exception as e:
+            erro = _report("pipeline", owner, e)
 
-        summary.append({"owner_id": owner, "discovered": discovered})
+        summary.append({"owner_id": owner, "discovered": discovered,
+                        **({"error": erro} if erro else {})})
 
     return summary
 
@@ -259,6 +277,6 @@ def run_drain(
                 professional_gender=settings.professional_gender,
             )
             summary.append({"owner_id": owner, **counts})
-        except Exception:
-            pass
+        except Exception as e:
+            summary.append({"owner_id": owner, "error": _report("drain", owner, e)})
     return summary

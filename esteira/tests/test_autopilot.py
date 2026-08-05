@@ -372,3 +372,77 @@ def test_areas_juridicas_pesam_o_score_no_autopilot(tmp_path):
     score_com = com.get_lead("x1").score
     score_sem = sem.get_lead("x1").score
     assert score_com > score_sem, (score_com, score_sem)
+
+
+# ------------------------------------------------------------------
+# Erro nao pode passar calado. Isolar a falha de um dono continua certo;
+# esconder, nao: um `except: pass` deixou o pipeline inteiro parado com
+# o cron verde e zero log.
+# ------------------------------------------------------------------
+
+class _ProviderQuebrado:
+    """Simula o que aconteceria com uma assinatura errada no meio do caminho."""
+    model = "quebrado"
+
+    def generate(self, lead):
+        raise TypeError("generate() got an unexpected keyword argument 'x'")
+
+
+def test_erro_no_pipeline_aparece_no_log_e_no_resumo(tmp_path, capsys):
+    sink = _sink(tmp_path)
+    _perfil_advogada(sink, owner="owner-erro", autopilot=True)
+    sink.insert_lead(_lead_juridico("e1", "owner-erro"))
+
+    summary = run_autopilot(sink, FakeMaps([]), _ProviderQuebrado(), [], batch=20)
+
+    saida = capsys.readouterr().out
+    assert "ERRO" in saida, "o erro tem de aparecer no log do cron"
+    assert "TypeError" in saida
+    assert summary and summary[0].get("error"), "o resumo tem de carregar o erro"
+
+
+def test_erro_de_um_dono_nao_derruba_os_outros(tmp_path, capsys):
+    """O isolamento continua: o segundo dono roda mesmo com o primeiro quebrando."""
+    sink = _sink(tmp_path)
+    _perfil_advogada(sink, owner="owner-a", autopilot=True)
+    _perfil_advogada(sink, owner="owner-b", autopilot=True)
+    sink.insert_lead(_lead_juridico("a1", "owner-a"))
+    sink.insert_lead(_lead_juridico("b1", "owner-b"))
+
+    class SoQuebraPraA:
+        model = "meio-quebrado"
+
+        def generate(self, lead):
+            if lead.owner_id == "owner-a":
+                raise RuntimeError("banco caiu pro dono A")
+            return ("ok msg1", "ok msg2")
+
+    summary = run_autopilot(sink, FakeMaps([]), SoQuebraPraA(), [], batch=20)
+
+    por_dono = {s["owner_id"]: s for s in summary}
+    assert por_dono["owner-a"].get("error"), "o erro do dono A precisa ser reportado"
+    assert not por_dono["owner-b"].get("error")
+    assert sink.get_lead("b1").draft_msg1 == "ok msg1", "o dono B tinha de rodar"
+
+
+def test_erro_na_descoberta_de_um_nicho_aparece_e_segue(tmp_path, capsys):
+    sink = _sink(tmp_path)
+    sink.upsert_profile("owner-1", niches=["estetica", "barbearia"],
+                        city="Maringa", state="PR", autopilot=True)
+
+    class MapsQuebradoNoPrimeiro:
+        def __init__(self):
+            self.n = 0
+
+        def search(self, term):
+            self.n += 1
+            if self.n == 1:
+                raise ConnectionError("Maps fora do ar")
+            return _two_results()
+
+    run_autopilot(sink, MapsQuebradoNoPrimeiro(), MockDraftProvider(), [], batch=20)
+
+    saida = capsys.readouterr().out
+    assert "ERRO [descoberta:estetica]" in saida
+    # o segundo nicho rodou mesmo assim
+    assert len([r for r in sink._db["leads"].values() if r["owner_id"] == "owner-1"]) == 2
