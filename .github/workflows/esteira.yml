@@ -19,7 +19,7 @@ on:
         description: "Comando da esteira"
         default: "autopilot"
         type: choice
-        options: ["autopilot", "drain", "backfill", "reprocess", "search", "redraft"]
+        options: ["autopilot", "drain", "backfill", "reprocess", "requalify", "search", "redraft"]
       batch:
         description: "Tamanho do lote"
         default: "60"
@@ -135,6 +135,14 @@ jobs:
             # cairia no mock). A rotacao (mais antigo primeiro) deixa re-rodar o
             # que sobrar caso a cota diaria de tokens corte no meio.
             GARIMPO_DELAY="2.5" python -m garimpo_esteira.run redraft
+          elif [ "$CMD" = "requalify" ]; then
+            # Reavalia os DESCARTADOS com as regras de hoje e devolve pra fila
+            # quem passou a merecer (calibragem nova, ou CNPJ que so agora foi
+            # resolvido). Escopo por dono e obrigatorio, e o comando ignora quem
+            # foi descartado POR VOCE — descarte humano e decisao, nao falta de
+            # dado.
+            GARIMPO_OWNER="${{ github.event.inputs.owner }}" \
+              python -m garimpo_esteira.run requalify --batch "${{ github.event.inputs.batch || '60' }}"
           elif [ "$CMD" = "reprocess" ]; then
             # Parte 2: re-enrich + re-score dos leads antigos, SEM mudar status.
             # Escopado a um dono (input owner) pra dividir a carga em paralelo sem
