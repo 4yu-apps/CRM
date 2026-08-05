@@ -311,3 +311,79 @@ def test_mock_sem_nome_nao_quebra():
     lead = _lead(website=None)
     msg1, _ = MockDraftProvider().generate(lead)
     assert "Me chamo" not in msg1 and len(msg1) > 0
+
+
+# ------------------------------------------------------------------
+# Area de advocacia: copy informativa (nao vende) e A MURALHA — sinal de
+# exposicao juridica prioriza na ficha e NUNCA entra na mensagem.
+# ------------------------------------------------------------------
+
+def _lead_adv(**kw) -> Lead:
+    base = dict(
+        id="l", owner_id="o", business_name="Transportadora Yara",
+        category="transportadora", city="Maringa", phone="44999990001",
+        service_target="advocacia", rating=3.1, reviews_count=280,
+        company_status="INAPTA", opened_on="2013-04-01",
+        natureza_juridica="206-2 - Sociedade Empresaria Limitada", socios_count=3,
+    )
+    base.update(kw)
+    return Lead(**base)
+
+
+def test_brief_juridico_entra_e_proibe_vender():
+    p = build_prompt(_lead_adv())
+    assert "ADVOCACIA" in p
+    assert "resultado" in p.lower()
+    assert "disposicao" in p.lower()
+
+
+def test_muralha_exposicao_nao_vaza_pra_copy():
+    lead = _lead_adv()
+    lead.ai_signals = {
+        "exposure": "empresa inapta e com reclamacoes de cobranca indevida",
+        "context": "empresa com 12 anos de casa e 3 socios",
+    }
+    # o summary do score cita a situacao cadastral de proposito (ficha);
+    # a copy nao pode ve-lo.
+    lead.score_reason = {"summary": "Bom pra advocacia. Transportadora Yara: "
+                                    "situacao inapta na Receita."}
+    p = build_prompt(lead)
+
+    # 1. Nenhum VALOR sensivel aparece em lugar nenhum do prompt. (Palavras
+    #    como "reclamacao" existem no texto de PROIBICAO — o que nao pode
+    #    vazar sao os dados deste lead.)
+    for valor in ("cobranca indevida", "inapta", "3.1", "280"):
+        assert valor.lower() not in p.lower(), valor
+
+    # 2. A linha de FATOS (o que o modelo pode usar) so tem o neutro.
+    fatos = next(l for l in p.splitlines() if l.startswith("Fatos neutros"))
+    assert "12 anos de casa" in fatos
+    assert "socios" in fatos
+    for valor in ("inapta", "reclamac", "cobranca", "atrito", "nota"):
+        assert valor not in fatos.lower(), valor
+
+
+def test_advocacia_nao_usa_site_nem_rede_como_gancho():
+    lead = _lead_adv(website=None, instagram=None)
+    lead.ai_signals = {"context": "empresa com 12 anos de casa"}
+    p = build_prompt(lead)
+    fatos = next(l for l in p.splitlines() if l.startswith("Fatos neutros"))
+    for termo in ("site", "instagram", "rede", "seguidores"):
+        assert termo not in fatos.lower(), termo
+
+
+def test_mock_de_advocacia_nao_vende_e_nao_vaza():
+    from garimpo_esteira.draft.mock import MockDraftProvider
+    lead = _lead_adv()
+    setattr(lead, "sender_name", "Ana")  # injetado pelo draft_stage, nao e campo
+    lead.ai_signals = {
+        "exposure": "empresa inapta com reclamacoes de cobranca indevida",
+        "context": "empresa com 12 anos de casa",
+    }
+    msg1, msg2 = MockDraftProvider().generate(lead)
+    texto = f"{msg1} {msg2}".lower()
+    assert "advogado" in texto
+    assert "disposi" in texto
+    for valor in ("inapta", "reclamac", "cobranca", "3.1", "280", "site",
+                  "instagram", "garantia", "resultado"):
+        assert valor not in texto, valor

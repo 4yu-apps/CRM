@@ -144,6 +144,13 @@ _SERVICE_BRIEF = {
         "Se tiver bem avaliado mas sem presenca digital, pergunte: "
         "'clientes que ja conhecem voltam, mas indicam? como chega gente nova?'"
     ),
+    "advocacia": (
+        "Servico: ADVOCACIA (assessoria juridica). A mensagem INFORMA "
+        "disponibilidade, nao vende: apresentacao sobria, uma observacao neutra, "
+        "e o fecho se colocando a disposicao caso a empresa ainda nao tenha "
+        "assessoria juridica. Nunca prometa resultado, nunca cite caso concreto "
+        "ou problema da empresa, nunca fale de valores."
+    ),
     "indefinido": (
         "Servico: a definir; lidere com trafego (anuncio local) como padrao. "
         "Nao sugira criar site nem cite WordPress/Wix."
@@ -154,7 +161,7 @@ _SERVICE_BRIEF = {
 _PROF_TO_BRIEF = {
     "trafego": "trafego", "automacao": "automacao", "ambos": "ambos",
     "design": "design", "web": "design", "branding": "design",
-    "marketing": "marketing",
+    "marketing": "marketing", "advocacia": "advocacia",
 }
 
 # Auto-descricao em LINGUAGEM DE LEIGO ("me chamo X, {isto}"). Ninguem entende
@@ -168,6 +175,7 @@ _SELF_DESC = {
     "automacao": "trabalho com atendimento no WhatsApp pra negócio local",
     "design": "mexo com criação de site pra negócio local",
     "dev": "desenvolvo site e sistema pra negócio local",
+    "advocacia": "sou advogado",
     "indefinido": "trabalho com marketing pra negócio local",
 }
 
@@ -265,9 +273,94 @@ _MARKETING_ANGLE_BRIEF = {
 }
 
 
+# ---------------------------------------------------------------------
+# ADVOCACIA — composicao PROPRIA, nao a compartilhada.
+#
+# A MURALHA: a montagem comum injeta score_reason.summary ("Diagnostico") e
+# sinais de reputacao/site/rede na mensagem. Pro advogado isso e proibido: o
+# summary da lente juridica cita situacao cadastral, e os sinais citam nota e
+# avaliacoes. Por isso advocacia NAO reusa aquela cauda — ela monta do zero,
+# lendo um unico campo neutro (ai_signals.context) e mais nada.
+# ---------------------------------------------------------------------
+_ADVOCACIA_SYSTEM = (
+    "Voce escreve a PRIMEIRA mensagem de um ADVOGADO a uma empresa, no WhatsApp. "
+    "Registro sobrio e institucional, portugues do Brasil com acentuacao correta, "
+    "sem emoji, sem girias e sem informalidade excessiva. NUNCA invente dados.\n\n"
+
+    "A mensagem NAO VENDE e NAO OFERECE nada. Ela apenas se apresenta e informa "
+    "disponibilidade. Estrutura da msg1 (3 a 4 frases):\n"
+    "1. Cumprimento formal e breve.\n"
+    "2. Quem fala: nome, que e advogado, e a area de atuacao.\n"
+    "3. UMA observacao neutra e publica sobre a empresa (tempo de casa, porte, "
+    "numero de socios). Nunca um problema, nunca um diagnostico.\n"
+    "4. Fecho se colocando a disposicao caso ainda nao tenham assessoria "
+    "juridica, sem pedir nada em troca.\n\n"
+
+    "msg2 (so se a pessoa responder): uma frase dizendo em que tipo de demanda "
+    "voce costuma atuar, e um convite leve pra conversar. Continua sem prometer "
+    "nada.\n\n"
+
+    "PROIBIDO, sem excecao:\n"
+    "- prometer, insinuar ou sugerir resultado de qualquer natureza\n"
+    "- mencionar caso concreto, processo, reclamacao, divida, irregularidade, "
+    "situacao cadastral, nota ou avaliacao da empresa\n"
+    "- falar de honorarios, valores, condicoes ou desconto\n"
+    "- urgencia, medo ou escassez ('antes que seja tarde', 'risco iminente')\n"
+    "- citar exito passado, numero de casos, ou comparar com outro profissional\n"
+    "- pergunta-diagnostico ('voces ja foram processados?', 'tem passivo?')\n"
+    "- falar de site, Instagram, marketing ou presenca digital\n"
+    "- a palavra 'oportunidade' e qualquer verbo de venda\n"
+    "- travessao, lista de bullets, emoji\n"
+)
+
+
+def _build_prompt_advocacia(lead: Lead) -> str:
+    """Prompt da area de advocacia. Le SO o `context` da IA (fato neutro) e o
+    numero de socios. Nenhum sinal de exposicao, reputacao, situacao cadastral
+    ou presenca digital passa por aqui — ver a muralha, acima."""
+    ai = getattr(lead, "ai_signals", None) or {}
+    neutros: list[str] = []
+    ctx = ai.get("context")
+    if isinstance(ctx, str) and ctx.strip():
+        neutros.append(ctx.strip())
+    try:
+        n_socios = int(lead.socios_count)
+    except (TypeError, ValueError):
+        n_socios = 0
+    if n_socios >= 2:
+        neutros.append(f"sociedade com {n_socios} socios")
+    fatos = "; ".join(neutros) or "poucos fatos publicos"
+
+    sender = (getattr(lead, "sender_name", None) or "").strip()
+    if sender:
+        ident = (f"Quem fala: {sender}, advogado. Apresente-se assim: "
+                 f"'me chamo {sender}, sou advogado'.\n")
+    else:
+        ident = ("Quem fala nao tem nome cadastrado: NAO invente nome nem numero "
+                 "de OAB. Apresente-se apenas como advogado.\n")
+
+    cidade = lead.city or ""
+    return (
+        f"{_ADVOCACIA_SYSTEM}\n"
+        f"{ident}"
+        f"{_SERVICE_BRIEF['advocacia']}\n\n"
+        f"Empresa: {lead.business_name or 'a empresa'}"
+        f"{f' em {cidade}' if cidade else ''}.\n"
+        f"Fatos neutros (use no maximo UM, e so estes): {fatos}.\n\n"
+        "Ancora obrigatoria: a observacao da msg1 sai de UM dos fatos neutros "
+        "acima. Se nao houver nenhum fato util, escreva sem observacao — melhor "
+        "uma mensagem curta que uma observacao inventada.\n\n"
+        'Responda em JSON: {"msg1": "...", "msg2": "..."}'
+    )
+
+
 def build_prompt(lead: Lead) -> str:
     b = lead_brief(lead)
     key = _brief_key(lead)
+    # advocacia tem composicao propria (a muralha): sai antes de montar
+    # qualquer sinal de reputacao, site, rede ou diagnostico do score.
+    if key == "advocacia":
+        return _build_prompt_advocacia(lead)
     # So profissoes que VENDEM site (design/web/branding -> key "design") podem
     # usar site como gancho. Pra trafego/automacao/ambos/marketing, site nao e o
     # servico: nao entra como sinal nem vira sugestao na abertura.

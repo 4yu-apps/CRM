@@ -143,7 +143,32 @@ _PITCH = {
         "Eu cuido das redes de negócio local, pra manter a marca ativa sem você "
         "ter que parar pra postar. Faz sentido a gente trocar uma ideia?"
     ),
+    "advocacia": (
+        "Atuo com assessoria jurídica a empresas, acompanhando o dia a dia "
+        "contratual e as questões que aparecem na operação. Se fizer sentido, "
+        "fico à disposição para uma conversa."
+    ),
 }
+
+
+def _abertura_advocacia(lead: Lead) -> str:
+    """Abertura da area de advocacia: sobria, informa disponibilidade e nao
+    vende. Le SO o `context` da IA (fato neutro) — nunca `exposure`, nunca
+    reputacao, nunca situacao cadastral. Ver a muralha em prompt.py."""
+    nome = lead.business_name or "a empresa"
+    sender = (getattr(lead, "sender_name", None) or "").strip()
+    intro = f"Me chamo {sender}, sou advogado. " if sender else "Sou advogado. "
+
+    ctx = ((getattr(lead, "ai_signals", None) or {}).get("context") or "").strip()
+    if ctx:
+        observacao = f"Encontrei a {nome} e vi que é uma {ctx}. "
+    else:
+        observacao = f"Encontrei a {nome} no Google. "
+
+    return (
+        f"Bom dia. {intro}{observacao}"
+        f"Caso ainda não tenham assessoria jurídica, fico à disposição."
+    )
 
 
 class MockDraftProvider:
@@ -152,6 +177,8 @@ class MockDraftProvider:
     def generate(self, lead: Lead) -> tuple[str, str]:
         b = lead_brief(lead)
         service = _brief_key(lead)
+        if service == "advocacia":
+            return _abertura_advocacia(lead), _PITCH["advocacia"]
         msg1 = _abertura(b, lead, service)
         msg2 = _PITCH.get(service, _PITCH["trafego"])
         return msg1, msg2
