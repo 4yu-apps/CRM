@@ -43,12 +43,28 @@ function throttleOk(): boolean {
   }
 }
 
+// No celular, web.whatsapp.com nao serve: o Android ate intercepta a URL e abre
+// o app, mas o iOS mostra a tela "acesse no navegador do seu computador" e o
+// fluxo morre ali. O wa.me e universal link nos dois: abre o app instalado, e
+// sem app cai numa pagina que ainda leva pra conversa.
+export function isMobile(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  if (/Android|iPhone|iPad|iPod/i.test(ua)) return true;
+  // iPadOS 13+ se apresenta como Macintosh; o toque desmente.
+  return /Macintosh/.test(ua) && (navigator.maxTouchPoints ?? 0) > 1;
+}
+
 export function waSend(phone?: string | null, text?: string): string | undefined {
   const d = (phone ?? "").replace(/\D/g, "");
   if (!d) return undefined;
   const num = d.startsWith("55") ? d : d.length >= 12 ? d : `55${d}`;
+  const corpo = text && text.trim() ? encodeURIComponent(text) : "";
+  if (isMobile()) {
+    return corpo ? `https://wa.me/${num}?text=${corpo}` : `https://wa.me/${num}`;
+  }
   const base = `https://web.whatsapp.com/send?phone=${num}`;
-  return text && text.trim() ? `${base}&text=${encodeURIComponent(text)}` : base;
+  return corpo ? `${base}&text=${corpo}` : base;
 }
 
 // Referencia da aba do WhatsApp que ESTE sistema abriu. Guardada no `window`
@@ -68,6 +84,12 @@ function waSlot(): { win: Window | null } {
 function openWeb(phone?: string | null, text?: string): boolean {
   const url = waSend(phone, text);
   if (!url) return false;
+  // No celular nao existe "reusar aba": abrir uma nova deixa uma aba vazia pra
+  // tras depois que o app assume. Navegar a propria aba e o comportamento certo.
+  if (isMobile()) {
+    window.location.href = url;
+    return true;
+  }
   const slot = waSlot();
   let win = slot.win;
   if (win && !win.closed) {
