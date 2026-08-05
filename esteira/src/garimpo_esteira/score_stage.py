@@ -99,6 +99,8 @@ def score_one(
         value, reason = suggest_value(
             result.service_target, lead.reviews_count, lead.rating,
             category=lead.category, stack=stack,
+            capital_social=lead.capital_social, socios_count=lead.socios_count,
+            porte=lead.porte,
         )
         fields["suggested_value"] = value
         fields["suggested_value_reason"] = reason
@@ -158,6 +160,8 @@ def rescore_no_status(
         value, reason = suggest_value(
             result.service_target, lead.reviews_count, lead.rating,
             category=lead.category, stack=stack,
+            capital_social=lead.capital_social, socios_count=lead.socios_count,
+            porte=lead.porte,
         )
         fields["suggested_value"] = value
         fields["suggested_value_reason"] = reason

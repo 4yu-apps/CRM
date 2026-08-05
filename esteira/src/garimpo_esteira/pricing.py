@@ -34,6 +34,11 @@ _MARKETING = [800, 1200, 1600, 2200]
 # Servico de PROJETO (valor unico): design/web. Site institucional/landing.
 # E-commerce custa mais (catalogo, carrinho, pagamento): multiplicador.
 _DESIGN_SITE = [1500, 2500, 4000, 6000]
+# Avenca mensal de ADVOCACIA. O porte NAO sai de avaliacoes no Maps: ninguem
+# avalia escritorio como avalia pizzaria, e uma empresa grande com poucas
+# avaliacoes cairia em "porte pequeno". Sai de capital social + porte da
+# Receita + numero de socios, que e o retrato real do tamanho da empresa.
+_ADVOCACIA = [1500, 2200, 3200, 4500]
 _ECOMMERCE_MULT = 1.6
 
 # Pistas de e-commerce (categoria do Maps ou stack do site).
@@ -47,6 +52,32 @@ def _tier(reviews_count: int | None) -> tuple[int, str]:
         if n < limit:
             return i, label
     return len(_TIERS) - 1, _TIERS[-1][1]
+
+
+def _tier_juridico(
+    capital_social: float | None, socios_count: int | None, porte: str | None
+) -> tuple[int, str]:
+    """Porte pelo retrato societario, nao pelo movimento no Maps."""
+    try:
+        cap = float(capital_social) if capital_social is not None else 0.0
+    except (TypeError, ValueError):
+        cap = 0.0
+    i = 0
+    if cap >= 1_000_000:
+        i = 3
+    elif cap >= 200_000:
+        i = 2
+    elif cap >= 50_000:
+        i = 1
+    try:
+        socios = int(socios_count) if socios_count is not None else 0
+    except (TypeError, ValueError):
+        socios = 0
+    if socios >= 3:
+        i = min(i + 1, 3)
+    if (porte or "").upper() in ("DEMAIS", "GRANDE"):
+        i = min(i + 1, 3)
+    return i, ("pequeno", "medio", "grande", "muito grande")[i]
 
 
 def _round100(v: float) -> int:
@@ -67,9 +98,28 @@ def suggest_value(
     *,
     category: str | None = None,
     stack: str | None = None,
+    capital_social: float | None = None,
+    socios_count: int | None = None,
+    porte: str | None = None,
 ) -> tuple[int, str]:
     """Retorna (valor_sugerido, motivo_em_pt). Mensal pra servicos recorrentes;
     valor de PROJETO (unico) pra design/web."""
+    # advocacia: avenca mensal, com porte lido do retrato societario. Vem ANTES
+    # de _tier() de proposito: aquela linha reusa o nome `porte` pro rotulo do
+    # Maps e sombrearia o parametro (porte da Receita) que este ramo precisa.
+    if service_target == "advocacia":
+        j, porte_j = _tier_juridico(capital_social, socios_count, porte)
+        value = _ADVOCACIA[j]
+        valor_fmt = f"{value:,}".replace(",", ".")
+        socios_txt = f", {socios_count} socios" if socios_count else ""
+        motivo = (
+            f"Empresa de porte {porte_j} (capital declarado{socios_txt}). "
+            f"Para assessoria juridica consultiva, uma avenca em torno de "
+            f"R$ {valor_fmt} por mes faz sentido. Confira a tabela de honorarios "
+            f"da sua seccional da OAB: cobrar abaixo do piso e aviltamento."
+        )
+        return value, motivo
+
     i, porte = _tier(reviews_count)
     avals = reviews_count or 0
     nota_txt = f", nota {rating}" if rating else ""

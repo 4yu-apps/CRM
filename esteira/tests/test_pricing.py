@@ -105,3 +105,36 @@ def test_score_stage_nao_sugere_valor_pra_descartado(tmp_path):
     score_one(lead, sink)
     saved = sink.get_lead(lid)
     assert saved.suggested_value is None
+
+
+# ---- advocacia: porte pelo retrato societario, nao por avaliacoes ----
+
+def test_advocacia_usa_capital_e_socios_nao_avaliacoes():
+    grande_sem_reviews, _ = suggest_value(
+        "advocacia", 5, capital_social=800000.0, socios_count=4)
+    pequeno_com_reviews, _ = suggest_value(
+        "advocacia", 900, capital_social=5000.0, socios_count=1)
+    assert grande_sem_reviews > pequeno_com_reviews
+
+
+def test_advocacia_porte_da_receita_conta():
+    sem, _ = suggest_value("advocacia", 10, capital_social=60000.0)
+    com, _ = suggest_value("advocacia", 10, capital_social=60000.0, porte="DEMAIS")
+    assert com > sem
+
+
+def test_advocacia_avisa_da_tabela_da_seccional():
+    _, motivo = suggest_value("advocacia", 10, capital_social=100000.0)
+    assert "seccional" in motivo.lower()
+    assert "aviltamento" in motivo.lower()
+
+
+def test_advocacia_fica_na_faixa_de_avenca():
+    for cap in (0.0, 50000.0, 300000.0, 2000000.0):
+        v, _ = suggest_value("advocacia", 20, capital_social=cap)
+        assert 1500 <= v <= 4500, (cap, v)
+
+
+def test_advocacia_sem_firmografia_nao_quebra():
+    v, motivo = suggest_value("advocacia", None)
+    assert v == 1500 and "avenca" in motivo.lower()
