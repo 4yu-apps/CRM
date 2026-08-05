@@ -79,6 +79,9 @@ export function OnboardingWizard() {
   const [legalAreas, setLegalAreas] = useState<string[]>([]);
   const [oabNumber, setOabNumber] = useState("");
   const [oabUf, setOabUf] = useState("");
+  // Como a copy chama a pessoa: advogado ou advogada. Escolha explicita —
+  // o sistema nao adivinha pelo primeiro nome.
+  const [professionalGender, setProfessionalGender] = useState<"f" | "m" | null>(null);
   const [niches, setNiches] = useState<string[]>([]);
   const [serviceTarget, setServiceTarget] = useState<ServiceTarget>("indefinido");
   const [state, setState] = useState("");
@@ -135,6 +138,7 @@ export function OnboardingWizard() {
         legal_areas: legalAreas,
         oab_number: oabNumber.trim() || null,
         oab_uf: oabUf.trim().toUpperCase() || null,
+        professional_gender: professionalGender,
         niches,
         default_service_target: serviceTarget,
         city: city.trim() || null,
@@ -159,7 +163,7 @@ export function OnboardingWizard() {
       toast.error(e instanceof Error ? e.message : "Erro ao salvar. Tenta de novo.");
       setSaving(false);
     }
-  }, [professions, legalAreas, oabNumber, oabUf, niches, serviceTarget, city, state, name, mode, repo, refreshProfile, router]);
+  }, [professions, legalAreas, oabNumber, oabUf, professionalGender, niches, serviceTarget, city, state, name, mode, repo, refreshProfile, router]);
 
   // Etapa 1 so avanca com profissao E nome (o nome entra na copy: "me chamo X").
   const canAdvance = step !== 0 || (professions.length > 0 && name.trim().length > 0);
@@ -345,6 +349,42 @@ export function OnboardingWizard() {
                     </label>
                     <p className="flex-1 text-[12px] leading-relaxed text-faint">
                       Assina o e-mail que eu rascunho. Sem isso, eu não invento número.
+                    </p>
+                  </div>
+
+                  <div className="mt-4 border-t border-border-2 pt-4">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-faint">
+                      Como eu te chamo na mensagem
+                    </span>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {([
+                        { value: "m" as const, label: "Advogado" },
+                        { value: "f" as const, label: "Advogada" },
+                      ]).map((opt) => {
+                        const on = professionalGender === opt.value;
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => setProfessionalGender(opt.value)}
+                            className={
+                              on
+                                ? "rounded-full bg-brand-50 px-4 py-1.5 text-[12.5px] font-semibold text-brand"
+                                : "rounded-full border border-border-2 bg-surface px-4 py-1.5 text-[12.5px] font-medium text-ink-2 transition-colors hover:border-brand hover:text-brand"
+                            }
+                          >
+                            {opt.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="mt-2 text-[12px] leading-relaxed text-faint">
+                      Vai assim na abertura e na assinatura do e-mail:{" "}
+                      <span className="text-ink-2">
+                        &ldquo;sou {professionalGender === "f" ? "advogada" : "advogado"}
+                        &rdquo;
+                      </span>
+                      .
                     </p>
                   </div>
                 </div>

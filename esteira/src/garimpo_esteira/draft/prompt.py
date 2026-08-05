@@ -175,13 +175,18 @@ _SELF_DESC = {
     "automacao": "trabalho com atendimento no WhatsApp pra negócio local",
     "design": "mexo com criação de site pra negócio local",
     "dev": "desenvolvo site e sistema pra negócio local",
-    "advocacia": "sou advogado",
+    # advocacia nao entra aqui: flexiona em genero, entao sai de advogado_noun().
     "indefinido": "trabalho com marketing pra negócio local",
 }
 
 
 def self_desc(lead: Lead) -> str:
-    return _SELF_DESC.get(_brief_key(lead), _SELF_DESC["indefinido"])
+    key = _brief_key(lead)
+    # advocacia flexiona pelo perfil (advogado/advogada); as outras areas usam
+    # verbo, que nao flexiona em genero.
+    if key == "advocacia":
+        return f"sou {advogado_noun(lead)}"
+    return _SELF_DESC.get(key, _SELF_DESC["indefinido"])
 
 # Categoria do negocio (a tag) -> o que faz sentido observar e perguntar. Da pro
 # modelo um norte do que e relevante naquele ramo (a pergunta honesta da msg1).
@@ -282,15 +287,17 @@ _MARKETING_ANGLE_BRIEF = {
 # avaliacoes. Por isso advocacia NAO reusa aquela cauda — ela monta do zero,
 # lendo um unico campo neutro (ai_signals.context) e mais nada.
 # ---------------------------------------------------------------------
-_ADVOCACIA_SYSTEM = (
-    "Voce escreve a PRIMEIRA mensagem de um ADVOGADO a uma empresa, no WhatsApp. "
+def _advocacia_system(noun: str) -> str:
+    return (
+    f"Voce escreve a PRIMEIRA mensagem de {'uma ADVOGADA' if noun == 'advogada' else 'um ADVOGADO'} "
+    "a uma empresa, no WhatsApp. "
     "Registro sobrio e institucional, portugues do Brasil com acentuacao correta, "
     "sem emoji, sem girias e sem informalidade excessiva. NUNCA invente dados.\n\n"
 
     "A mensagem NAO VENDE e NAO OFERECE nada. Ela apenas se apresenta e informa "
     "disponibilidade. Estrutura da msg1 (3 a 4 frases):\n"
     "1. Cumprimento formal e breve.\n"
-    "2. Quem fala: nome, que e advogado, e a area de atuacao.\n"
+    f"2. Quem fala: nome, que e {noun}, e a area de atuacao.\n"
     "3. UMA observacao neutra e publica sobre a empresa (tempo de casa, porte, "
     "numero de socios). Nunca um problema, nunca um diagnostico.\n"
     "4. Fecho se colocando a disposicao caso ainda nao tenham assessoria "
@@ -311,7 +318,7 @@ _ADVOCACIA_SYSTEM = (
     "- falar de site, Instagram, marketing ou presenca digital\n"
     "- a palavra 'oportunidade' e qualquer verbo de venda\n"
     "- travessao, lista de bullets, emoji\n"
-)
+    )
 
 
 # Como o advogado se apresenta, por AREA DE ATUACAO. Linguagem de leigo: o
@@ -334,6 +341,27 @@ _LEGAL_AREA_CUE = {
     "consumidor": "empresa que atende consumidor final no dia a dia",
     "lgpd": "empresa que coleta dados de cliente no digital",
 }
+
+
+# Flexao do substantivo da profissao. A copy chama a pessoa pelo que ela e, e
+# "Me chamo Helena, sou advogado" e erro de concordancia no nome da propria
+# dona da conta, logo na primeira mensagem a um cliente.
+#
+# A escolha e explicita no perfil (search_profile.professional_gender) — nunca
+# adivinhada pelo primeiro nome. Sem escolha, mantem o masculino, que era o
+# comportamento antes deste campo existir.
+def _is_feminino(lead: Lead) -> bool:
+    return (getattr(lead, "professional_gender", None) or "").strip().lower() == "f"
+
+
+def advogado_noun(lead: Lead) -> str:
+    """'advogada' | 'advogado' — para o meio da frase."""
+    return "advogada" if _is_feminino(lead) else "advogado"
+
+
+def advogado_title(lead: Lead) -> str:
+    """'Advogada' | 'Advogado' — para a assinatura do e-mail."""
+    return "Advogada" if _is_feminino(lead) else "Advogado"
 
 
 def legal_self_desc(lead: Lead) -> str:
@@ -378,10 +406,12 @@ def _build_prompt_advocacia(lead: Lead) -> str:
 
     sender = (getattr(lead, "sender_name", None) or "").strip()
     desc = legal_self_desc(lead)
+    noun = advogado_noun(lead)
     if sender:
-        ident = (f"Quem fala: {sender}, advogado. Apresente-se assim: "
-                 f"'me chamo {sender}, sou advogado e {desc}'. A palavra "
-                 f"'advogado' e OBRIGATORIA na apresentacao.\n")
+        ident = (f"Quem fala: {sender}, {noun}. Apresente-se assim: "
+                 f"'me chamo {sender}, sou {noun} e {desc}'. A palavra "
+                 f"'{noun}' e OBRIGATORIA na apresentacao, exatamente nessa "
+                 f"flexao.\n")
     else:
         ident = (f"Quem fala nao tem nome cadastrado: NAO invente nome nem numero "
                  f"de OAB. Apresente-se so pela atuacao: '{desc}'.\n")
@@ -390,7 +420,7 @@ def _build_prompt_advocacia(lead: Lead) -> str:
     cue_linha = f"O que a sua area costuma observar: {cue}.\n" if cue else ""
     cidade = lead.city or ""
     return (
-        f"{_ADVOCACIA_SYSTEM}\n"
+        f"{_advocacia_system(noun)}\n"
         f"{ident}"
         f"{_SERVICE_BRIEF['advocacia']}\n\n"
         f"Empresa: {lead.business_name or 'a empresa'}"
@@ -568,14 +598,16 @@ def build_prompt(lead: Lead) -> str:
 #
 # Vale a MESMA muralha: le so `ai_signals.context`.
 # ---------------------------------------------------------------------
-_EMAIL_SYSTEM = (
-    "Voce escreve um E-MAIL institucional de apresentacao EM NOME de um ADVOGADO. "
+def _email_system(title: str) -> str:
+    return (
+    f"Voce escreve um E-MAIL institucional de apresentacao EM NOME "
+    f"{'de uma ADVOGADA' if title == 'Advogada' else 'de um ADVOGADO'}. "
     "Registro formal, portugues do Brasil com acentuacao correta, sem emoji e sem "
     "informalidade. NUNCA invente dados.\n\n"
 
     "O e-mail NAO VENDE e NAO OFERECE: apresenta quem e, cita UM fato neutro e "
     "publico sobre a empresa, e se coloca a disposicao caso ainda nao tenham "
-    "assessoria juridica. Fecha com assinatura: nome, 'Advogado', e OAB/UF.\n\n"
+    f"assessoria juridica. Fecha com assinatura: nome, '{title}', e OAB/UF.\n\n"
 
     "O assunto e curto e descritivo, sem verbo de venda e sem promessa "
     "(ex.: 'Apresentacao profissional' ou 'Assessoria juridica empresarial').\n\n"
@@ -588,7 +620,7 @@ _EMAIL_SYSTEM = (
     "- urgencia, medo ou escassez\n"
     "- citar exito passado, numero de casos, ou comparar com outro profissional\n"
     "- pergunta-diagnostico\n"
-)
+    )
 
 
 def build_email_prompt(lead: Lead) -> str:
@@ -600,12 +632,13 @@ def build_email_prompt(lead: Lead) -> str:
     ctx = ((getattr(lead, "ai_signals", None) or {}).get("context") or "").strip()
     sender = (getattr(lead, "sender_name", None) or "").strip()
     oab = (getattr(lead, "oab", None) or "").strip()
+    title = advogado_title(lead)
 
     if sender:
-        assinatura = f"Assine como: {sender}, Advogado" + (f", OAB {oab}" if oab else "")
+        assinatura = f"Assine como: {sender}, {title}" + (f", OAB {oab}" if oab else "")
     else:
         assinatura = ("Nao ha nome cadastrado: NAO invente nome nem numero de OAB; "
-                      "assine apenas como 'Advogado'")
+                      f"assine apenas como '{title}'")
 
     linhas = [
         f"empresa: {lead.business_name or '-'}",
@@ -615,6 +648,6 @@ def build_email_prompt(lead: Lead) -> str:
         assinatura + ".",
     ]
     return (
-        f"{_EMAIL_SYSTEM}\n\nFATOS:\n" + "\n".join(linhas) +
+        f"{_email_system(title)}\n\nFATOS:\n" + "\n".join(linhas) +
         '\n\nResponda em JSON: {"assunto": "...", "corpo": "..."}'
     )

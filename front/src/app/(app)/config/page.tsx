@@ -145,6 +145,9 @@ export default function ConfigPage() {
   const [legalAreas, setLegalAreas] = useState<string[]>([]);
   const [oabNumber, setOabNumber] = useState("");
   const [oabUf, setOabUf] = useState("");
+  // Como a copy chama a pessoa: advogado ou advogada. Escolha explicita — o
+  // sistema nao adivinha pelo primeiro nome.
+  const [professionalGender, setProfessionalGender] = useState<"f" | "m" | null>(null);
 
   // Listas vindas do IBGE para os selects em cascata (estado -> cidade)
   const [estados, setEstados] = useState<UF[]>([]);
@@ -172,6 +175,7 @@ export default function ConfigPage() {
           setLegalAreas(profile.legal_areas ?? []);
           setOabNumber(profile.oab_number ?? "");
           setOabUf(profile.oab_uf ?? "");
+          setProfessionalGender(profile.professional_gender ?? null);
           setProfessions(
             profile.professions?.length
               ? profile.professions
@@ -296,6 +300,7 @@ export default function ConfigPage() {
         legal_areas: legalAreas,
         oab_number: oabNumber.trim() || null,
         oab_uf: oabUf.trim().toUpperCase() || null,
+        professional_gender: professionalGender,
       };
       await repo.saveProfile(input);
       setSavedAutopilot(autopilot);
@@ -618,6 +623,42 @@ export default function ConfigPage() {
                   </label>
                   <p className="flex-1 text-[12px] leading-relaxed text-faint">
                     Assina o e-mail que eu rascunho. Sem isso, eu não invento número.
+                  </p>
+                </div>
+
+                <div className="mt-4 border-t border-border-2 pt-4">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-faint">
+                    Como eu te chamo na mensagem
+                  </span>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {([
+                      { value: "m" as const, label: "Advogado" },
+                      { value: "f" as const, label: "Advogada" },
+                    ]).map((opt) => {
+                      const on = professionalGender === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setProfessionalGender(opt.value)}
+                          className={
+                            on
+                              ? "rounded-full bg-brand-50 px-4 py-1.5 text-[12.5px] font-semibold text-brand"
+                              : "rounded-full border border-border-2 bg-surface px-4 py-1.5 text-[12.5px] font-medium text-ink-2 transition-colors hover:border-brand hover:text-brand"
+                          }
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-2 text-[12px] leading-relaxed text-faint">
+                    Vai assim na abertura e na assinatura do e-mail:{" "}
+                    <span className="text-ink-2">
+                      &ldquo;sou {professionalGender === "f" ? "advogada" : "advogado"}
+                      &rdquo;
+                    </span>
+                    .
                   </p>
                 </div>
               </div>

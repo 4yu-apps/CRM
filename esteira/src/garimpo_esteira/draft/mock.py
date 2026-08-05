@@ -14,7 +14,15 @@ from __future__ import annotations
 
 from ..models import Lead
 from ..validation import is_present
-from .prompt import _brief_key, _marketing_angle, lead_brief, legal_self_desc, self_desc
+from .prompt import (
+    _brief_key,
+    _marketing_angle,
+    advogado_noun,
+    advogado_title,
+    lead_brief,
+    legal_self_desc,
+    self_desc,
+)
 
 # Categorias de alimentacao que pedem o angulo iFood (pergunta genuina de canal).
 _FOOD_KEYWORDS = (
@@ -158,10 +166,11 @@ def _abertura_advocacia(lead: Lead) -> str:
     nome = lead.business_name or "a empresa"
     sender = (getattr(lead, "sender_name", None) or "").strip()
     desc = legal_self_desc(lead)
-    # "advogado" e obrigatorio na apresentacao: identificar a profissao e o
-    # que a publicidade informativa exige.
-    intro = (f"Me chamo {sender}, sou advogado e {desc}. " if sender
-             else f"Sou advogado e {desc}. ")
+    # "advogado"/"advogada" e obrigatorio na apresentacao: identificar a
+    # profissao e o que a publicidade informativa exige. A flexao vem do perfil.
+    noun = advogado_noun(lead)
+    intro = (f"Me chamo {sender}, sou {noun} e {desc}. " if sender
+             else f"Sou {noun} e {desc}. ")
 
     ctx = ((getattr(lead, "ai_signals", None) or {}).get("context") or "").strip()
     if ctx:
@@ -198,8 +207,9 @@ class MockDraftProvider:
         ctx = ((getattr(lead, "ai_signals", None) or {}).get("context") or "").strip()
 
         observacao = f" Vi que a {nome} é uma {ctx}." if ctx else ""
-        assinatura = (f"{sender}\nAdvogado" + (f"\nOAB {oab}" if oab else "")
-                      if sender else "Advogado")
+        title = advogado_title(lead)
+        assinatura = (f"{sender}\n{title}" + (f"\nOAB {oab}" if oab else "")
+                      if sender else title)
         corpo = (
             f"Prezados,\n\n"
             f"Escrevo para me apresentar.{observacao} "

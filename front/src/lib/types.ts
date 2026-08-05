@@ -359,12 +359,15 @@ export interface SearchProfile {
   // Inscricao na OAB: assina o e-mail rascunhado da area de advocacia.
   oab_number?: string | null;
   oab_uf?: string | null;
+  // Flexao do substantivo da profissao na copy: "f" = advogada, "m" = advogado.
+  // Escolha da pessoa, nunca inferida pelo nome; null mantem o masculino.
+  professional_gender?: "f" | "m" | null;
   created_at: string;
   updated_at: string;
 }
 export type SearchProfileInput = Partial<Pick<SearchProfile,
   "niches" | "city" | "state" | "neighborhood" | "radius" | "default_service_target" | "autopilot" | "profession" | "professions" | "min_score" | "sender_name" |
-  "legal_areas" | "oab_number" | "oab_uf">>;
+  "legal_areas" | "oab_number" | "oab_uf" | "professional_gender">>;
 
 // Template de mensagem (#18).
 export type MessageTemplateKind = "abertura" | "follow_up" | "objecao" | "reativacao";
