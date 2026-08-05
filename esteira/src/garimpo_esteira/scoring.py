@@ -619,7 +619,11 @@ def _assessoria_points(lead: Lead, signals: dict[str, Any]) -> tuple[int, str] |
     if terms is False:
         faltas.append("sem termos de uso")
     if not faltas:
-        return 4, "site com politica e termos (ja tem assessoria)"
+        # Ter politica e termos NAO prova que passou por advogado: gerador
+        # online e IA produzem os dois em minutos, e o texto generico costuma
+        # nao cobrir o negocio de verdade. Entao pesa pouco menos que a
+        # ausencia, nao muito menos — a diferenca e de 5 pontos, nao de 20.
+        return 19, "site com politica e termos (pode ser modelo generico)"
     nota = ", ".join(faltas)
     if _sig(signals, "has_ecommerce") is True:
         return 30, f"vende online e {nota} (exposicao de consumo e LGPD)"
@@ -659,12 +663,13 @@ def _contato_juridico_points(lead: Lead) -> tuple[int, str]:
     so e-mail ja da pra abordar, e e o registro que cabe melhor na profissao."""
     tem_fone = is_present("phone", lead.phone)
     tem_email = is_present("email", lead.email)
-    if tem_fone and tem_email:
-        return 9, "tem telefone e e-mail (WhatsApp ou e-mail formal)"
     if tem_fone:
         return 7, "tem telefone (WhatsApp)"
     if tem_email:
-        return 5, "tem e-mail (aborda pelo e-mail formal)"
+        # So o e-mail custa 2 pontos, nao o criterio inteiro: da pra abordar,
+        # e o e-mail formal e ate mais adequado a profissao que o WhatsApp frio.
+        # Ficar sem nenhum dos dois e que zera.
+        return 5, "sem telefone, mas tem e-mail (aborda pelo e-mail formal)"
     return 0, "sem telefone e sem e-mail"
 
 

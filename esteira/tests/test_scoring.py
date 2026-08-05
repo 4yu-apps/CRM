@@ -481,14 +481,19 @@ def test_regressao_outras_areas_continuam_exigindo_telefone():
         assert r.reason["verdict"] == "sem telefone, nao da pra contatar no WhatsApp", prof
 
 
-def test_telefone_pontua_mais_que_email_na_advocacia():
+def test_so_email_custa_dois_pontos_nao_o_criterio_inteiro():
+    """Sem zap mas com e-mail perde 2 (7 -> 5); sem nenhum dos dois zera."""
     so_email = score_lead(
         _empresa_forte(phone=None, email="a@b.com.br"), {}, professions=["advocacia"])
     so_fone = score_lead(
         _empresa_forte(phone="43998887766", email=None), {}, professions=["advocacia"])
-    os_dois = score_lead(
-        _empresa_forte(phone="43998887766", email="a@b.com.br"), {}, professions=["advocacia"])
-    assert so_email.score < so_fone.score < os_dois.score
+    nenhum = score_lead(
+        _empresa_forte(phone=None, email=None), {}, professions=["advocacia"])
+
+    pontos = lambda r: {c["label"]: c["points"] for c in r.reason["advocacia"]["criteria"]}
+    assert pontos(so_fone)["Contato"] == 7
+    assert pontos(so_email)["Contato"] == 5
+    assert pontos(nenhum)["Contato"] == 0
 
 
 def test_resumo_do_mei_nao_se_contradiz():
@@ -597,3 +602,19 @@ def test_regressao_corte_das_outras_areas_nao_muda():
     r = score_lead(fraco, {}, professions=["trafego"])
     assert r.decision == "descartado"
     assert r.reason["threshold"] == 50
+
+
+def test_ter_politica_e_termos_penaliza_pouco():
+    """Politica e termos saem de gerador online ou de IA em minutos: ter os dois
+    nao prova que passou por advogado, entao a diferenca pra quem nao tem e de
+    5 pontos, nao de 20."""
+    tem = score_lead(_transportadora_sem_receita(),
+                     {"site": {"has_privacy_policy": True, "has_terms": True}},
+                     professions=["advocacia"])
+    nao_tem = score_lead(_transportadora_sem_receita(), _sem_receita_signals(),
+                         professions=["advocacia"])
+    p_tem = {c["label"]: c["points"] for c in tem.reason["advocacia"]["criteria"]}
+    p_nao = {c["label"]: c["points"] for c in nao_tem.reason["advocacia"]["criteria"]}
+    assert p_nao["Assessoria"] - p_tem["Assessoria"] == 5
+    # e quem TEM continua qualificando: ter modelo generico nao e motivo de corte
+    assert tem.decision == "qualificado"
