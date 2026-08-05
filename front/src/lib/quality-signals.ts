@@ -20,7 +20,12 @@ export type SignalFilter =
   | "baixo_engajamento"
   | "presenca_forte"
   | "gmb_incompleto"
-  | "empresa_nova";
+  | "empresa_nova"
+  | "situacao_irregular"
+  | "tem_socios"
+  | "fora_simples"
+  | "sem_politica"
+  | "reputacao_atrito";
 
 export const SIGNAL_FILTER_OPTIONS: { value: SignalFilter; label: string }[] = [
   { value: "", label: "Todos os sinais" },
@@ -38,6 +43,11 @@ export const SIGNAL_FILTER_OPTIONS: { value: SignalFilter; label: string }[] = [
   { value: "baixo_engajamento", label: "Marketing: baixo engajamento" },
   { value: "presenca_forte", label: "Marketing: presença forte (escalar)" },
   { value: "gmb_incompleto", label: "Marketing: Google incompleto" },
+  { value: "situacao_irregular", label: "Advocacia: empresa irregular" },
+  { value: "tem_socios", label: "Advocacia: 2+ sócios" },
+  { value: "fora_simples", label: "Advocacia: fora do Simples" },
+  { value: "sem_politica", label: "Advocacia: sem política de privacidade" },
+  { value: "reputacao_atrito", label: "Advocacia: reputação em atrito" },
 ];
 
 export function jaAnuncia(l: Lead): boolean {
@@ -137,6 +147,33 @@ export function gmbIncompleto(l: Lead): boolean {
   return !(l.opening_hours && temSite(l) && (l.reviews_count ?? 0) >= 20);
 }
 
+// --- Sinais da area de advocacia -------------------------------------------
+// Leem EMPRESA, nao presenca digital. "situacao irregular" e demanda de
+// regularizacao aqui, nao lead morto como nas outras areas.
+
+export function situacaoIrregular(l: Lead): boolean {
+  const s = (l.company_status ?? "").toUpperCase();
+  return !!s && s !== "ATIVA";
+}
+
+export function temSocios(l: Lead): boolean {
+  return typeof l.socios_count === "number" && l.socios_count >= 2;
+}
+
+export function foraDoSimples(l: Lead): boolean {
+  return l.site_signals?.simples === false;
+}
+
+/** So opina quando ha site: sem site, nao da pra saber se ha politica. */
+export function semPoliticaPrivacidade(l: Lead): boolean {
+  return temSite(l) && l.site_signals?.has_privacy_policy === false;
+}
+
+/** Nota baixa COM volume = atrito real com consumidor (sinal interno). */
+export function reputacaoEmAtrito(l: Lead): boolean {
+  return l.rating != null && l.rating < 4.0 && (l.reviews_count ?? 0) >= 30;
+}
+
 export function matchesSignal(l: Lead, f: SignalFilter): boolean {
   switch (f) {
     case "":
@@ -169,6 +206,16 @@ export function matchesSignal(l: Lead, f: SignalFilter): boolean {
       return gmbIncompleto(l);
     case "empresa_nova":
       return negocioNovo(l);
+    case "situacao_irregular":
+      return situacaoIrregular(l);
+    case "tem_socios":
+      return temSocios(l);
+    case "fora_simples":
+      return foraDoSimples(l);
+    case "sem_politica":
+      return semPoliticaPrivacidade(l);
+    case "reputacao_atrito":
+      return reputacaoEmAtrito(l);
     default:
       return false;
   }

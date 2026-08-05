@@ -74,6 +74,13 @@ export interface SiteSignals {
   has_title?: boolean;
   has_description?: boolean;
   og_image?: boolean;
+  // Assessoria juridica aparente (area de advocacia): a AUSENCIA e o sinal.
+  has_privacy_policy?: boolean;
+  has_terms?: boolean;
+  has_cnpj_footer?: boolean;
+  // CNAEs secundarios e QSA completo, da consulta de CNPJ (jsonb, sem coluna).
+  cnaes_sec?: string[];
+  socios?: { nome?: string | null; desde?: string | null }[];
   // performance real do PageSpeed (Google): nota 0-100 no celular + LCP
   perf_score?: number;
   perf_slow?: boolean;
@@ -114,6 +121,11 @@ export interface AISignals {
   maturity?: number;       // maturidade digital 1-5
   maturity_note?: string;  // 1 frase explicando a nota
   pain?: string;           // dor/gancho principal pra abordagem
+  // Area de advocacia: o pain se parte em dois. `exposure` e INTERNO (so a
+  // ficha mostra, pra priorizar); `context` e neutro e e o unico que a copy
+  // pode usar. Ver a muralha no spec da area.
+  exposure?: string;
+  context?: string;
 }
 
 // horario normalizado: dias da semana -> faixas [abre,fecha] em HHMM (24h).
@@ -167,6 +179,8 @@ export interface Lead {
   porte?: string | null;
   capital_social?: number | null;
   socios_count?: number | null;
+  // Natureza juridica (BrasilAPI): base do ICP de advocacia.
+  natureza_juridica?: string | null;
 
   score: number | null;
   score_reason: ScoreReason | null;
@@ -221,6 +235,9 @@ export interface Lead {
   // fluxo de aprovacao "ver -> editar -> aprovar".
   draft_msg1?: string | null;
   draft_msg2?: string | null;
+  // Rascunho de e-mail (area de advocacia): canal proprio, sem envio automatico.
+  draft_email_subject?: string | null;
+  draft_email_body?: string | null;
 
   // Sinais do site e taxa de correspondencia de contatos (enriquecedor).
   site_signals?: SiteSignals | null;

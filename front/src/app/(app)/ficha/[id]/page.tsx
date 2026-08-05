@@ -43,6 +43,7 @@ import { Skeleton } from "@/components/skeleton";
 import { googleSearchUrl, googleMapsUrl } from "@/lib/links";
 import { siteSignalChips, signalChipClass } from "@/lib/site-signals";
 import { marketingSignalChips } from "@/lib/marketing-signals";
+import { legalSignalChips } from "@/lib/legal-signals";
 import { openState } from "@/lib/business-hours";
 import { useCancelMeeting } from "@/hooks/use-cancel-meeting";
 import { SERVICE_META } from "@/lib/service";
@@ -287,6 +288,45 @@ function MarketingSignalsPanel({ lead }: { lead: Lead }) {
           </span>
         ))}
       </div>
+    </div>
+  );
+}
+
+// Painel JURIDICO: como um advogado le a empresa (natureza, socios, capital,
+// situacao, tempo de casa, assessoria aparente). Lidera quando a area do dono e
+// advocacia; o site vira coadjuvante.
+//
+// A EXPOSICAO juridica aparece SO aqui, marcada como interna. E o outro lado da
+// muralha: ela prioriza a fila e nunca entra na mensagem (ver o spec da area).
+function LegalSignalsPanel({ lead }: { lead: Lead }) {
+  const chips = legalSignalChips(lead);
+  const exposure = lead.ai_signals?.exposure?.trim();
+  if (chips.length === 0 && !exposure) return null;
+  return (
+    <div className="rounded-[14px] border border-border bg-surface-2 p-4">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-faint">Perfil jurídico</span>
+        {lead.updated_at && (
+          <span className="text-[11px] text-faint" title="Quando o robô conferiu por último">
+            verificado {fmtRelative(lead.updated_at)}
+          </span>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {chips.map((chip, i) => (
+          <span key={i} className={cn("rounded-full px-2.5 py-1 text-[12px]", signalChipClass(chip.variant))}>
+            {chip.label}
+          </span>
+        ))}
+      </div>
+      {exposure && (
+        <div className="mt-3 rounded-[10px] border border-amber-500/25 bg-amber-500/[0.07] px-3 py-2.5">
+          <div className="mb-0.5 text-[10.5px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">
+            Só para você, não use na abordagem
+          </div>
+          <p className="text-[12.5px] leading-relaxed text-ink-2">{exposure}</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -974,6 +1014,49 @@ export default function FichaPage() {
               <FollowupCard lead={lead} onSaved={load} />
             )}
 
+            {/* E-mail rascunhado (area de advocacia): canal proprio, registro
+                formal, com assinatura e OAB. Sem envio automatico — o humano
+                copia e manda, igual ao WhatsApp. */}
+            {lead.draft_email_body && (
+              <div>
+                <div className="mb-2 text-[12px] font-bold uppercase tracking-wider text-faint">
+                  E-mail rascunhado
+                </div>
+                <div className="flex flex-col gap-2.5">
+                  <div>
+                    <div className="mb-1 flex items-center justify-between">
+                      <span className="text-[11.5px] font-semibold text-faint">Assunto</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void navigator.clipboard.writeText(
+                            `${lead.draft_email_subject ?? ""}\n\n${lead.draft_email_body ?? ""}`,
+                          );
+                        }}
+                        className="flex items-center gap-1 text-[11.5px] font-semibold text-brand hover:underline"
+                      >
+                        <Copy size={12} /> Copiar e-mail
+                      </button>
+                    </div>
+                    <div className="rounded-[12px] border border-border-2 bg-surface-2 px-3.5 py-2.5 text-[13px] font-semibold text-ink">
+                      {lead.draft_email_subject || "(sem assunto)"}
+                    </div>
+                    <div className="mt-2 whitespace-pre-wrap rounded-[12px] border border-border-2 bg-surface-2 px-3.5 py-2.5 text-[13.5px] leading-relaxed text-ink-2">
+                      {lead.draft_email_body}
+                    </div>
+                  </div>
+                  {lead.email && (
+                    <a
+                      href={`mailto:${lead.email}?subject=${encodeURIComponent(lead.draft_email_subject ?? "")}&body=${encodeURIComponent(lead.draft_email_body ?? "")}`}
+                      className="flex items-center justify-center gap-2 rounded-[13px] border border-border-2 bg-card p-3 text-[13px] font-semibold text-ink-2 hover:bg-accent"
+                    >
+                      Abrir no e-mail para {lead.email}
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Abordagem escrita */}
             {(lead.draft_msg1 || lead.draft_msg2) && (
               <div>
@@ -1049,7 +1132,29 @@ export default function FichaPage() {
             factual. Largura cheia pra os fatos curtos respirarem em grade, em
             vez de espremidos numa coluna estreita virando tabela de traços. */}
         <div className="border-t border-border p-6 sm:p-7">
-          {lead.service_target === "marketing" ? (
+          {lead.service_target === "advocacia" ? (
+            <>
+              {/* Advocacia: o perfil jurídico lidera; o site vira coadjuvante
+                  (só interessa por política de privacidade e termos). */}
+              <div className="mb-5">
+                <LegalSignalsPanel lead={lead} />
+              </div>
+              {lead.site_signals && siteSignalChips(lead.site_signals).length > 0 && (
+                <details className="mb-5 rounded-[14px] border border-border bg-surface-2 p-4">
+                  <summary className="cursor-pointer text-[11px] font-bold uppercase tracking-wider text-faint">
+                    Diagnóstico do site (opcional)
+                  </summary>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {siteSignalChips(lead.site_signals).map((chip, i) => (
+                      <span key={i} className={cn("rounded-full px-2.5 py-1 text-[12px]", signalChipClass(chip.variant))}>
+                        {chip.label}
+                      </span>
+                    ))}
+                  </div>
+                </details>
+              )}
+            </>
+          ) : lead.service_target === "marketing" ? (
             <>
               {/* Marketing: presença digital lidera; o site vira coadjuvante
                   (recolhido), aparece só se quiserem espiar. */}
