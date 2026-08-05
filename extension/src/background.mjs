@@ -140,10 +140,13 @@ function waUrl(phone, text) {
 // SW, morre com o navegador).
 let waTabId = null;
 
-function lembrarWaTab(id) {
+async function lembrarWaTab(id) {
   waTabId = id ?? null;
   try {
-    chrome.storage.session.set({ waTabId: waTabId });
+    // AWAIT obrigatorio: sem ele a escrita fica pendente e o service worker do
+    // MV3 pode ser desligado antes de gravar. Ai o proximo clique nao lembra a
+    // aba e abre outra — era exatamente o empilhamento que voltou.
+    await chrome.storage.session.set({ waTabId: waTabId });
   } catch {
     /* storage.session indisponivel: fica so em memoria */
   }
@@ -180,7 +183,7 @@ async function acharWaTab() {
     try {
       return await chrome.tabs.get(waTabId);
     } catch {
-      lembrarWaTab(null); // foi fechada
+      await lembrarWaTab(null); // foi fechada
     }
   }
   return null;
@@ -194,22 +197,22 @@ async function openWhatsApp(phone, text) {
     // nenhuma aba do WhatsApp: abre UMA e guarda a referencia, pra o proximo
     // clique reusar mesmo se a busca por url estiver cega.
     const nova = await chrome.tabs.create({ url });
-    lembrarWaTab(nova?.id);
+    await lembrarWaTab(nova?.id);
     return;
   }
-  lembrarWaTab(tab.id);
+  await lembrarWaTab(tab.id);
   // foca a aba existente (reusa, nunca abre nova).
   if (tab.windowId != null) chrome.windows.update(tab.windowId, { focused: true });
   chrome.tabs.update(tab.id, { active: true });
 
   // 1a tentativa: abrir a conversa DIRIGINDO A UI (wa-open), sem reload. Ele
   // responde dentro de um orcamento curto; qualquer falha vira navegacao.
-  chrome.tabs.sendMessage(tab.id, { type: "garimpo_switch_chat", phone, text }, (resp) => {
-    if (chrome.runtime.lastError || !resp || !resp.ok) {
-      chrome.tabs.update(tab.id, { url }); // fallback: navega (recarrega)
-    }
+  const abriuSemReload = await new Promise((resolve) => {
+    chrome.tabs.sendMessage(tab.id, { type: "garimpo_switch_chat", phone, text }, (resp) => {
+      resolve(!chrome.runtime.lastError && !!resp && !!resp.ok);
+    });
   });
-  return;
+  if (!abriuSemReload) await chrome.tabs.update(tab.id, { url }); // fallback: navega
 }
 
 // aba fechada pelo usuario: esquece a referencia (senao tabs.get falha sempre).
@@ -218,9 +221,17 @@ chrome.tabs.onRemoved.addListener((id) => {
 });
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  if (msg && msg.type === "garimpo_open_whatsapp") {
-    openWhatsApp(msg.phone, msg.text);
-    if (sendResponse) sendResponse({ ok: true });
-  }
-  return false;
+  if (!msg || msg.type !== "garimpo_open_whatsapp") return false;
+  // Responder ANTES de terminar (com return false) libera o Chrome a desligar o
+  // service worker no meio do await. Mantem o canal aberto ate acabar.
+  openWhatsApp(msg.phone, msg.text)
+    .catch(() => {})
+    .finally(() => {
+      try {
+        sendResponse({ ok: true });
+      } catch {
+        /* canal ja fechado */
+      }
+    });
+  return true;
 });

@@ -266,10 +266,10 @@
     return text && String(text).trim() ? `${base}&text=${encodeURIComponent(text)}` : base;
   }
   var waTabId = null;
-  function lembrarWaTab(id) {
+  async function lembrarWaTab(id) {
     waTabId = id ?? null;
     try {
-      chrome.storage.session.set({ waTabId });
+      await chrome.storage.session.set({ waTabId });
     } catch {
     }
   }
@@ -296,7 +296,7 @@
       try {
         return await chrome.tabs.get(waTabId);
       } catch {
-        lembrarWaTab(null);
+        await lembrarWaTab(null);
       }
     }
     return null;
@@ -307,27 +307,31 @@
     const tab = await acharWaTab();
     if (!tab || tab.id == null) {
       const nova = await chrome.tabs.create({ url });
-      lembrarWaTab(nova?.id);
+      await lembrarWaTab(nova?.id);
       return;
     }
-    lembrarWaTab(tab.id);
+    await lembrarWaTab(tab.id);
     if (tab.windowId != null) chrome.windows.update(tab.windowId, { focused: true });
     chrome.tabs.update(tab.id, { active: true });
-    chrome.tabs.sendMessage(tab.id, { type: "garimpo_switch_chat", phone, text }, (resp) => {
-      if (chrome.runtime.lastError || !resp || !resp.ok) {
-        chrome.tabs.update(tab.id, { url });
-      }
+    const abriuSemReload = await new Promise((resolve) => {
+      chrome.tabs.sendMessage(tab.id, { type: "garimpo_switch_chat", phone, text }, (resp) => {
+        resolve(!chrome.runtime.lastError && !!resp && !!resp.ok);
+      });
     });
-    return;
+    if (!abriuSemReload) await chrome.tabs.update(tab.id, { url });
   }
   chrome.tabs.onRemoved.addListener((id) => {
     if (id === waTabId) lembrarWaTab(null);
   });
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-    if (msg && msg.type === "garimpo_open_whatsapp") {
-      openWhatsApp(msg.phone, msg.text);
-      if (sendResponse) sendResponse({ ok: true });
-    }
-    return false;
+    if (!msg || msg.type !== "garimpo_open_whatsapp") return false;
+    openWhatsApp(msg.phone, msg.text).catch(() => {
+    }).finally(() => {
+      try {
+        sendResponse({ ok: true });
+      } catch {
+      }
+    });
+    return true;
   });
 })();
