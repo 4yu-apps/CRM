@@ -74,9 +74,11 @@ export function OnboardingWizard() {
 
   // Campos coletados no fluxo.
   const [professions, setProfessions] = useState<string[]>([]);
-  // Area de advocacia: as areas de atuacao pesam o score. A OAB (que assina
-  // o e-mail) fica pra Configuracao, pois so importa quando ha rascunho.
+  // Area de advocacia: as areas de atuacao pesam o score e definem como o
+  // advogado se apresenta na copy; a OAB assina o e-mail rascunhado.
   const [legalAreas, setLegalAreas] = useState<string[]>([]);
+  const [oabNumber, setOabNumber] = useState("");
+  const [oabUf, setOabUf] = useState("");
   const [niches, setNiches] = useState<string[]>([]);
   const [serviceTarget, setServiceTarget] = useState<ServiceTarget>("indefinido");
   const [state, setState] = useState("");
@@ -131,6 +133,8 @@ export function OnboardingWizard() {
         professions,
         profession: professions[0] ?? null,
         legal_areas: legalAreas,
+        oab_number: oabNumber.trim() || null,
+        oab_uf: oabUf.trim().toUpperCase() || null,
         niches,
         default_service_target: serviceTarget,
         city: city.trim() || null,
@@ -155,7 +159,7 @@ export function OnboardingWizard() {
       toast.error(e instanceof Error ? e.message : "Erro ao salvar. Tenta de novo.");
       setSaving(false);
     }
-  }, [professions, legalAreas, niches, serviceTarget, city, state, name, mode, repo, refreshProfile, router]);
+  }, [professions, legalAreas, oabNumber, oabUf, niches, serviceTarget, city, state, name, mode, repo, refreshProfile, router]);
 
   // Etapa 1 so avanca com profissao E nome (o nome entra na copy: "me chamo X").
   const canAdvance = step !== 0 || (professions.length > 0 && name.trim().length > 0);
@@ -312,6 +316,36 @@ export function OnboardingWizard() {
                         </button>
                       );
                     })}
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap items-end gap-3">
+                    <label className="flex flex-col gap-1">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-faint">
+                        Inscrição na OAB
+                      </span>
+                      <input
+                        value={oabNumber}
+                        onChange={(e) => setOabNumber(e.target.value)}
+                        placeholder="123456"
+                        inputMode="numeric"
+                        className="w-36 rounded-[10px] border border-border-2 bg-surface px-3 py-2 text-[13px] text-ink outline-none focus:border-brand"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-faint">
+                        Seccional
+                      </span>
+                      <input
+                        value={oabUf}
+                        onChange={(e) => setOabUf(e.target.value.toUpperCase().slice(0, 2))}
+                        placeholder="PR"
+                        maxLength={2}
+                        className="w-20 rounded-[10px] border border-border-2 bg-surface px-3 py-2 text-[13px] uppercase text-ink outline-none focus:border-brand"
+                      />
+                    </label>
+                    <p className="flex-1 text-[12px] leading-relaxed text-faint">
+                      Assina o e-mail que eu rascunho. Sem isso, eu não invento número.
+                    </p>
                   </div>
                 </div>
               )}
