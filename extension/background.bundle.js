@@ -208,7 +208,6 @@
   }
   function reinjectBridges() {
     reinjectInto(CRM_URLS, "crm-bridge.bundle.js");
-    reinjectInto(["https://web.whatsapp.com/*"], "wa-relay.bundle.js");
   }
   chrome.runtime.onInstalled.addListener(reinjectBridges);
   chrome.runtime.onStartup.addListener(reinjectBridges);
@@ -311,13 +310,8 @@
       return;
     }
     lembrarWaTab(tab.id);
-    chrome.tabs.update(tab.id, { active: true });
     if (tab.windowId != null) chrome.windows.update(tab.windowId, { focused: true });
-    chrome.tabs.sendMessage(tab.id, { type: "garimpo_switch_chat", phone, text }, (resp) => {
-      if (chrome.runtime.lastError || !resp || !resp.ok) {
-        chrome.tabs.update(tab.id, { url });
-      }
-    });
+    chrome.tabs.update(tab.id, { active: true, url });
   }
   chrome.tabs.onRemoved.addListener((id) => {
     if (id === waTabId) lembrarWaTab(null);
