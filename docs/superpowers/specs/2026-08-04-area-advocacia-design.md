@@ -66,14 +66,16 @@ Nenhuma requisição HTTP nova. Tudo abaixo já é baixado hoje e jogado fora.
 
 **`sources/cnpj.py`** (mesmo JSON da BrasilAPI/ReceitaWS):
 
-| Campo | Para que serve |
-|---|---|
-| `natureza_juridica` | LTDA/SA/EI/MEI — o filtro nº 1 |
-| `opcao_pelo_mei` | MEI corta: é pessoa com CNPJ, não contrata advogado |
-| `opcao_pelo_simples` | fora do Simples = demanda tributária real |
-| `cnaes_secundarios` | risco por atividade (transporte, construção) |
-| QSA completo (nome, data de entrada) | societário, sucessão, quem decide |
-| matriz/filial | empresa estruturada |
+| Campo | Estado | Para que serve |
+|---|---|---|
+| `natureza_juridica` | **novo** | LTDA/SA/EI/MEI — o filtro nº 1 |
+| `cnaes_secundarios` | **novo** | risco por atividade (transporte, construção) |
+| QSA completo (nome, data de entrada) | **novo** (hoje só `len(qsa)`) | societário, sucessão, quem decide |
+| `opcao_pelo_simples` | já coletado (`cnpj.py:127-135`, cai em `site_signals.simples`) | fora do Simples = demanda tributária real |
+| `opcao_pelo_mei` | já coletado (`site_signals.mei`) | MEI corta: é pessoa com CNPJ, não contrata advogado |
+
+> Correção em relação à primeira versão deste spec: `opcao_pelo_simples` e
+> `opcao_pelo_mei` **já são extraídos** hoje. Só os três primeiros são novos.
 
 **`sources/website.py`** — três regex no HTML que já é baixado e analisado para
 outras vinte flags: `has_privacy_policy`, `has_terms`, `has_cnpj_footer`. É o
