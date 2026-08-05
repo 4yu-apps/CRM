@@ -20,13 +20,14 @@ import {
   ArrowsDownUp,
 } from "@phosphor-icons/react";
 import { useLeads } from "@/hooks/use-leads";
+import { useAuth } from "@/lib/auth";
 import { STATUS_META, STATUS_ORDER, TONE_CLASSES } from "@/lib/state-machine";
 import { SERVICE_META } from "@/lib/service";
 import { fmtRelative } from "@/lib/format";
 import type { Lead, LeadStatus, LeadEditable } from "@/lib/types";
 import { RAMOS_DISPONIVEIS } from "@/lib/ramos";
 import { Dropdown, type DropdownOption } from "@/components/dropdown";
-import { matchesSignal, SIGNAL_FILTER_OPTIONS, type SignalFilter } from "@/lib/quality-signals";
+import { matchesSignal, signalFilterOptions, type SignalFilter } from "@/lib/quality-signals";
 import { cn } from "@/lib/utils";
 import { openWhatsApp } from "@/lib/whatsapp";
 import { ListSkeleton } from "@/components/skeleton";
@@ -269,8 +270,14 @@ export default function ContatosPage() {
   const router = useRouter();
   const { leads, loading, error, refresh, repo } = useLeads();
 
-  // Profissao primaria do dono: define a coluna-sinal da tabela.
-  const [profession, setProfession] = useState<string | null>(null);
+  // Profissao do dono: define a coluna-sinal da tabela e quais filtros de sinal
+  // fazem sentido. Vem do contexto de auth (uma busca so pro app inteiro).
+  const { profile } = useAuth();
+  const profession = profile?.professions?.[0] ?? profile?.profession ?? null;
+  const sinalOptions = useMemo(
+    () => signalFilterOptions(profile?.professions ?? (profile?.profession ? [profile.profession] : [])),
+    [profile],
+  );
 
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<LeadStatus | "">("");
@@ -333,20 +340,6 @@ export default function ContatosPage() {
   }, [leads, q, statusFilter, ramoFilter, sinalFilter, tagFilter, showArchived, sortCol, sortDir, profession]);
 
   // Carrega o perfil uma vez pra saber a profissao (coluna-sinal da tabela).
-  useEffect(() => {
-    let alive = true;
-    void (async () => {
-      try {
-        const p = await repo.getProfile();
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        if (alive) setProfession(p?.professions?.[0] ?? p?.profession ?? null);
-      } catch {
-        /* perfil ausente nao quebra a tela; cai no default "Ja anuncia?" */
-      }
-    })();
-    return () => { alive = false; };
-  }, [repo]);
-
   const signalCol = useMemo(() => signalColumnFor(profession), [profession]);
 
   // tags distintas pro filtro (#20)
@@ -652,7 +645,7 @@ export default function ContatosPage() {
             <Dropdown
               value={sinalFilter}
               onChange={(v) => { setSinalFilter(v as SignalFilter); setPage(1); }}
-              options={SIGNAL_FILTER_OPTIONS}
+              options={sinalOptions}
               ariaLabel="Filtrar por sinal de qualidade"
               className="min-w-[170px]"
             />

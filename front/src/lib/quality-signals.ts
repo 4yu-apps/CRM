@@ -27,28 +27,63 @@ export type SignalFilter =
   | "sem_politica"
   | "reputacao_atrito";
 
-export const SIGNAL_FILTER_OPTIONS: { value: SignalFilter; label: string }[] = [
-  { value: "", label: "Todos os sinais" },
-  { value: "empresa_nova", label: "Negócio novo (aberto há pouco)" },
-  { value: "ja_anuncia", label: "Tráfego: já anuncia" },
-  { value: "nao_anuncia", label: "Tráfego: tem site, não anuncia" },
-  { value: "sem_site", label: "Design: sem site" },
-  { value: "site_lento", label: "Design: site lento" },
-  { value: "sem_chatbot", label: "Automação: site sem chat" },
-  { value: "sem_agendamento", label: "Automação: sem agendamento online" },
-  { value: "tem_loja", label: "Automação: tem loja online" },
-  { value: "sem_instagram", label: "Marketing: sem Instagram" },
-  { value: "ig_parado", label: "Marketing: Instagram parado" },
-  { value: "sem_post_recorrente", label: "Marketing: sem post recorrente" },
-  { value: "baixo_engajamento", label: "Marketing: baixo engajamento" },
-  { value: "presenca_forte", label: "Marketing: presença forte (escalar)" },
-  { value: "gmb_incompleto", label: "Marketing: Google incompleto" },
-  { value: "situacao_irregular", label: "Advocacia: empresa irregular" },
-  { value: "tem_socios", label: "Advocacia: 2+ sócios" },
-  { value: "fora_simples", label: "Advocacia: fora do Simples" },
-  { value: "sem_politica", label: "Advocacia: sem política de privacidade" },
-  { value: "reputacao_atrito", label: "Advocacia: reputação em atrito" },
+// Cada filtro pertence a uma LENTE. `null` = serve pra todo mundo.
+// O gestor de trafego nao precisa ver "sem politica de privacidade" na lista, e
+// o advogado nao precisa de "Instagram parado": sao ~20 opcoes num select, e a
+// maioria e ruido pra quem esta olhando.
+type FilterOption = { value: SignalFilter; label: string; lens: string | null };
+
+const ALL_SIGNAL_FILTERS: FilterOption[] = [
+  { value: "", label: "Todos os sinais", lens: null },
+  { value: "empresa_nova", label: "Negócio novo (aberto há pouco)", lens: null },
+  { value: "ja_anuncia", label: "Tráfego: já anuncia", lens: "trafego" },
+  { value: "nao_anuncia", label: "Tráfego: tem site, não anuncia", lens: "trafego" },
+  { value: "sem_site", label: "Design: sem site", lens: "design" },
+  { value: "site_lento", label: "Design: site lento", lens: "design" },
+  { value: "sem_chatbot", label: "Automação: site sem chat", lens: "automacao" },
+  { value: "sem_agendamento", label: "Automação: sem agendamento online", lens: "automacao" },
+  { value: "tem_loja", label: "Automação: tem loja online", lens: "automacao" },
+  { value: "sem_instagram", label: "Marketing: sem Instagram", lens: "marketing" },
+  { value: "ig_parado", label: "Marketing: Instagram parado", lens: "marketing" },
+  { value: "sem_post_recorrente", label: "Marketing: sem post recorrente", lens: "marketing" },
+  { value: "baixo_engajamento", label: "Marketing: baixo engajamento", lens: "marketing" },
+  { value: "presenca_forte", label: "Marketing: presença forte (escalar)", lens: "marketing" },
+  { value: "gmb_incompleto", label: "Marketing: Google incompleto", lens: "marketing" },
+  { value: "situacao_irregular", label: "Advocacia: empresa irregular", lens: "advocacia" },
+  { value: "tem_socios", label: "Advocacia: 2+ sócios", lens: "advocacia" },
+  { value: "fora_simples", label: "Advocacia: fora do Simples", lens: "advocacia" },
+  { value: "sem_politica", label: "Advocacia: sem política de privacidade", lens: "advocacia" },
+  { value: "reputacao_atrito", label: "Advocacia: reputação em atrito", lens: "advocacia" },
 ];
+
+// Profissao do dono -> lentes que ele enxerga. Espelha scoring._LENS na esteira.
+const LENSES_BY_PROFESSION: Record<string, string[]> = {
+  trafego: ["trafego"],
+  automacao: ["automacao"],
+  ambos: ["trafego", "automacao"],
+  design: ["design"],
+  web: ["design"],
+  branding: ["design"],
+  marketing: ["marketing"],
+  advocacia: ["advocacia"],
+};
+
+/** Lista completa (todas as lentes). Use signalFilterOptions quando souber a
+ *  profissao do dono. */
+export const SIGNAL_FILTER_OPTIONS: { value: SignalFilter; label: string }[] =
+  ALL_SIGNAL_FILTERS;
+
+/** Filtros que fazem sentido pra quem esta olhando. Sem profissao conhecida,
+ *  devolve tudo — mesmo comportamento de antes, sem regressao. */
+export function signalFilterOptions(
+  professions: string[] | null | undefined,
+): { value: SignalFilter; label: string }[] {
+  const profs = (professions ?? []).filter(Boolean);
+  if (profs.length === 0) return ALL_SIGNAL_FILTERS;
+  const lenses = new Set(profs.flatMap((p) => LENSES_BY_PROFESSION[p] ?? []));
+  if (lenses.size === 0) return ALL_SIGNAL_FILTERS;
+  return ALL_SIGNAL_FILTERS.filter((f) => f.lens === null || lenses.has(f.lens));
+}
 
 export function jaAnuncia(l: Lead): boolean {
   if (l.ads_active === true) return true;

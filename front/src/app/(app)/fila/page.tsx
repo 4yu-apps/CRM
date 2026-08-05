@@ -34,6 +34,7 @@ import {
   IdentificationCard,
 } from "@phosphor-icons/react";
 import { useLeads } from "@/hooks/use-leads";
+import { useAuth } from "@/lib/auth";
 import { SERVICE_META } from "@/lib/service";
 import { fmtPhone, fmtCnpj } from "@/lib/format";
 import type { Lead } from "@/lib/types";
@@ -44,7 +45,7 @@ import { promptFollowupSuggestion } from "@/lib/followup-prompt";
 import { googleSearchUrl, googleMapsUrl, metaAdsUrl } from "@/lib/links";
 import { siteSignalChips, signalChipClass } from "@/lib/site-signals";
 import { openState } from "@/lib/business-hours";
-import { matchesSignal, negocioNovoChip, SIGNAL_FILTER_OPTIONS, type SignalFilter } from "@/lib/quality-signals";
+import { matchesSignal, negocioNovoChip, signalFilterOptions, type SignalFilter } from "@/lib/quality-signals";
 import { Skeleton } from "@/components/skeleton";
 import { recordSend, sentToday, overSoftLimit } from "@/lib/send-guard";
 
@@ -193,6 +194,13 @@ function sortQueue(leads: Lead[], key: SortKey): Lead[] {
 
 export default function FilaPage() {
   const { leads, loading, repo, refresh } = useLeads();
+  // So os filtros de sinal da area do dono: a lista inteira tem ~20 opcoes e a
+  // maioria e ruido pra quem esta olhando.
+  const { profile } = useAuth();
+  const sinalOptions = useMemo(
+    () => signalFilterOptions(profile?.professions ?? (profile?.profession ? [profile.profession] : [])),
+    [profile],
+  );
 
   const [sortBy, setSortBy] = useState<SortKey>("recomendados");
   const [ramo, setRamo] = useState("todos");
@@ -516,7 +524,7 @@ export default function FilaPage() {
             <Dropdown
               value={sinal}
               onChange={(v) => setSinal(v as SignalFilter)}
-              options={SIGNAL_FILTER_OPTIONS}
+              options={sinalOptions}
               ariaLabel="Filtrar por sinal de qualidade"
               align="end"
               className="w-[180px]"
