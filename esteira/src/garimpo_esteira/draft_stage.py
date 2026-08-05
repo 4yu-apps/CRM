@@ -16,7 +16,7 @@ from .sink.base import LeadSink
 def draft_one(
     lead, provider: DraftProvider, sink: LeadSink, profession: str | None = None,
     reviews_source=None, sender_name: str | None = None, oab: str | None = None,
-    legal_areas: list[str] | None = None,
+    legal_areas: list[str] | None = None, professional_gender: str | None = None,
 ) -> tuple[str, str] | None:
     if lead.opt_out:
         return None  # LGPD: nao rascunha contato pra quem pediu opt-out
@@ -29,6 +29,9 @@ def draft_one(
     if legal_areas:
         # areas de atuacao: definem COMO o advogado se apresenta na copy
         setattr(lead, "legal_areas", legal_areas)
+    if professional_gender:
+        # flexao de "advogado/advogada" na mensagem e na assinatura
+        setattr(lead, "professional_gender", professional_gender)
     if reviews_source is not None:
         try:
             for f in reviews_source.enrich(lead):
@@ -68,6 +71,8 @@ def redraft_batch(
     sink: LeadSink, provider: DraftProvider, *, batch: int = 30,
     owner_id: str | None = None, profession: str | None = None,
     run_start: str | None = None, delay: float = 0.0,
+    sender_name: str | None = None, oab: str | None = None,
+    legal_areas: list[str] | None = None, professional_gender: str | None = None,
 ) -> int:
     """Re-rascunha leads em rascunho_pronto em lotes, sem alterar o status.
 
@@ -93,7 +98,11 @@ def redraft_batch(
             break
         for i, lead in enumerate(pend):
             try:
-                result = draft_one(lead, provider, sink, profession)
+                result = draft_one(
+                    lead, provider, sink, profession,
+                    sender_name=sender_name, oab=oab, legal_areas=legal_areas,
+                    professional_gender=professional_gender,
+                )
                 if result is None:
                     # opt_out: carimba draft_generated_at para tirar da fila
                     sink.update_lead_fields(lead.id, {"draft_generated_at": run_start})
@@ -110,13 +119,20 @@ def draft_batch(
     sink: LeadSink, provider: DraftProvider, *, batch: int = 20, status="qualificado",
     owner_id: str | None = None, profession: str | None = None,
     reviews_source=None, sender_name: str | None = None,
+    oab: str | None = None, legal_areas: list[str] | None = None,
+    professional_gender: str | None = None,
 ) -> list[tuple[str, tuple[str, str]]]:
+    """oab e legal_areas nao sao opcionais de verdade na area de advocacia: sem
+    eles a copy cai no generico e o e-mail sai sem a assinatura da OAB. Ficam
+    com default None so pra nao quebrar quem chama pelas outras areas."""
     leads = sink.fetch_by_status(status, batch, owner_id)
     out: list[tuple[str, tuple[str, str]]] = []
     for lead in leads:
         result = draft_one(
             lead, provider, sink, profession,
             reviews_source=reviews_source, sender_name=sender_name,
+            oab=oab, legal_areas=legal_areas,
+            professional_gender=professional_gender,
         )
         if result:
             out.append((lead.id, result))

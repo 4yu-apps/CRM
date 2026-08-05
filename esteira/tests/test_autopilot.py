@@ -291,3 +291,84 @@ def test_autopilot_sem_coordenadas_coverage_sem_lat_lng(tmp_path):
     assert cov[0]["center_lat"] is None
     assert cov[0]["center_lng"] is None
     assert cov[0]["pct"] == pytest.approx(10.0)  # pct calculado pelo inserted mesmo sem coords
+
+
+# ------------------------------------------------------------------
+# Area de advocacia: o autopilot e o drain precisam levar as areas
+# juridicas e a OAB ate a copy. Sem isso o mesmo lead saia com score
+# menor, apresentacao generica e e-mail SEM a assinatura da OAB — que
+# e justamente o que a publicidade informativa exige.
+# ------------------------------------------------------------------
+
+def _perfil_advogada(sink, owner="owner-adv", **extra):
+    sink.upsert_profile(
+        owner, niches=["transportadora"], city="Londrina", state="PR",
+        profession="advocacia", professions=["advocacia"],
+        legal_areas=["trabalhista", "societario"],
+        oab_number="148233", oab_uf="PR", sender_name="Helena Costa",
+        **extra,
+    )
+
+
+def _lead_juridico(lead_id: str, owner: str) -> Lead:
+    """Empresa ja enriquecida (a firmografia vem da Receita na cascata real).
+    Sociedade com socios, capital e tempo de casa: pontua na lente de advocacia."""
+    return Lead(
+        id=lead_id, owner_id=owner, status="bruto",
+        business_name="Transportes Andrade", phone="43998887766",
+        category="Transportadora",
+        natureza_juridica="206-2 - Sociedade Empresaria Limitada",
+        socios_count=3, capital_social=800000.0, company_status="ATIVA",
+        opened_on="2014-03-10",
+    )
+
+
+def test_autopilot_leva_areas_juridicas_e_oab_ate_a_copy(tmp_path):
+    sink = _sink(tmp_path)
+    _perfil_advogada(sink, autopilot=True)
+    sink.insert_lead(_lead_juridico("a1", "owner-adv"))
+
+    # FakeMaps vazio: o teste olha o pipeline sobre o lead ja na base, nao a
+    # descoberta (que devolveria negocio cru, sem firmografia da Receita).
+    run_autopilot(sink, FakeMaps([]), MockDraftProvider(), [], batch=20)
+
+    lead = sink.get_lead("a1")
+    # a area de atuacao chega na apresentacao (nao o generico "a empresas")
+    assert "trabalhista" in (lead.draft_msg1 or "")
+    # a OAB assina o e-mail
+    assert "148233/PR" in (lead.draft_email_body or "")
+
+
+def test_drain_leva_areas_juridicas_e_oab_ate_a_copy(tmp_path):
+    """O drain e o caminho de quem NAO tem autopilot: captura da extensao e
+    leads parados. Perdia os mesmos campos que o autopilot."""
+    sink = _sink(tmp_path)
+    _perfil_advogada(sink, owner="owner-drain", autopilot=False)
+    sink.insert_lead(_lead_juridico("d1", "owner-drain"))
+
+    run_drain(sink, [], MockDraftProvider(), batch=20)
+
+    lead = sink.get_lead("d1")
+    assert "trabalhista" in (lead.draft_msg1 or "")
+    assert "148233/PR" in (lead.draft_email_body or "")
+
+
+def test_areas_juridicas_pesam_o_score_no_autopilot(tmp_path):
+    """As legal_areas multiplicam os criterios da area (scoring._AREA_WEIGHTS).
+    Sem elas o mesmo lead pontua menos."""
+    com = _sink(tmp_path / "com")
+    _perfil_advogada(com, owner="o1", autopilot=True)
+    com.insert_lead(_lead_juridico("x1", "o1"))
+    run_autopilot(com, FakeMaps([]), MockDraftProvider(), [], batch=20)
+
+    sem = _sink(tmp_path / "sem")
+    sem.upsert_profile(
+        "o1", niches=["transportadora"], city="Londrina", state="PR",
+        profession="advocacia", professions=["advocacia"], autopilot=True,
+    )
+    sem.insert_lead(_lead_juridico("x1", "o1"))
+    run_autopilot(sem, FakeMaps([]), MockDraftProvider(), [], batch=20)
+
+    score_com = com.get_lead("x1").score
+    score_sem = sem.get_lead("x1").score
+    assert score_com > score_sem, (score_com, score_sem)

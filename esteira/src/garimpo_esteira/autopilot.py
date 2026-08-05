@@ -29,6 +29,7 @@ DEFAULT_NICHE_POOL = [
 from .discovery import result_to_lead
 from .draft.base import DraftProvider
 from .draft_stage import draft_batch
+from .owner_profile import fetch_profile, read_profile
 from .pipeline_stream import run_pipeline_streaming
 from .score_stage import score_batch
 from .sink.base import LeadSink
@@ -103,10 +104,14 @@ def run_autopilot(
             continue
         city, state = prof.get("city"), prof.get("state")
         neighborhood = prof.get("neighborhood")
-        profession = prof.get("profession")  # define a lente do score e a copy
-        professions = list(prof.get("professions") or ([profession] if profession else []))
-        min_score = int(prof.get("min_score") or 0)  # #19 piso de score por dono
-        sender_name = prof.get("sender_name")
+        # tudo que a esteira precisa do dono num lugar so: profissao (lente do
+        # score e da copy), areas juridicas (sub-pesos + como o advogado se
+        # apresenta), OAB (assina o e-mail) e o piso de score (#19).
+        settings = read_profile(prof)
+        profession = settings.profession
+        professions = settings.professions
+        min_score = settings.min_score
+        sender_name = settings.sender_name
         rkey = region_key(city, state)
         covered = (
             {(rk, slug(nn)) for rk, nn in sink.fetch_covered_keys(owner)}
@@ -187,12 +192,17 @@ def run_autopilot(
                 profession=profession, professions=professions,
                 min_score=min_score, reviews_source=reviews_source, workers=workers,
                 sender_name=sender_name, ai_reader=ai_reader,
+                legal_areas=settings.legal_areas, oab=settings.oab,
+                professional_gender=settings.professional_gender,
             )
             score_batch(sink, batch=batch, owner_id=owner, profession=profession,
-                        professions=professions, min_score=min_score)
+                        professions=professions, min_score=min_score,
+                        legal_areas=settings.legal_areas)
             draft_batch(
                 sink, provider, batch=batch, owner_id=owner, profession=profession,
                 reviews_source=reviews_source, sender_name=sender_name,
+                oab=settings.oab, legal_areas=settings.legal_areas,
+                professional_gender=settings.professional_gender,
             )
         except Exception:
             pass
@@ -224,24 +234,29 @@ def run_drain(
         return []
     summary: list[dict] = []
     for owner in sink.fetch_pending_owners():
-        prof = (sink.fetch_profile(owner) or {}) if hasattr(sink, "fetch_profile") else {}
-        profession = prof.get("profession")
-        professions = list(prof.get("professions") or ([profession] if profession else []))
-        min_score = int(prof.get("min_score") or 0)
-        sender_name = prof.get("sender_name")
+        settings = fetch_profile(sink, owner)
+        profession = settings.profession
+        professions = settings.professions
+        min_score = settings.min_score
+        sender_name = settings.sender_name
         try:
             counts = run_pipeline_streaming(
                 sink, sources, provider, batch=batch, delay=delay, owner_id=owner,
                 profession=profession, professions=professions, min_score=min_score,
                 reviews_source=reviews_source, workers=workers,
                 sender_name=sender_name, ai_reader=ai_reader,
+                legal_areas=settings.legal_areas, oab=settings.oab,
+                professional_gender=settings.professional_gender,
             )
             # mop-up: termina quem ficou em enriquecido/qualificado de runs anteriores
             score_batch(sink, batch=batch, owner_id=owner, profession=profession,
-                        professions=professions, min_score=min_score)
+                        professions=professions, min_score=min_score,
+                        legal_areas=settings.legal_areas)
             draft_batch(
                 sink, provider, batch=batch, owner_id=owner, profession=profession,
                 reviews_source=reviews_source, sender_name=sender_name,
+                oab=settings.oab, legal_areas=settings.legal_areas,
+                professional_gender=settings.professional_gender,
             )
             summary.append({"owner_id": owner, **counts})
         except Exception:

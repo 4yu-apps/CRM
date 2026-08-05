@@ -20,6 +20,7 @@ from .config import FIXTURES_DIR, Config, build_ai_reader, build_maps_source, bu
 from .discovery import discover
 from .draft_stage import draft_batch, redraft_batch
 from .models import Lead
+from .owner_profile import OwnerProfile, fetch_profile
 from .pipeline_stream import run_pipeline_streaming
 from .score_stage import rescore_no_status, score_batch
 from .validation import is_present
@@ -111,8 +112,18 @@ def cmd_draft(cfg: Config) -> int:
     sink = build_sink(cfg)
     provider = build_provider(cfg)
     reviews_source = build_reviews_source(cfg)
+    # GARIMPO_OWNER escopa a um dono e carrega o perfil dele (profissao, areas
+    # juridicas, OAB). Sem ele o comando varre todos os donos e nao ha um perfil
+    # unico pra aplicar — a copy sai no registro neutro.
+    owner = os.getenv("GARIMPO_OWNER") or None
+    prof = fetch_profile(sink, owner)
     print(f"draft · sink={cfg.sink} llm={cfg.llm} ({provider.model}) batch={cfg.batch}")
-    results = draft_batch(sink, provider, batch=cfg.batch, reviews_source=reviews_source)
+    results = draft_batch(
+        sink, provider, batch=cfg.batch, reviews_source=reviews_source,
+        owner_id=owner, profession=prof.profession, sender_name=prof.sender_name,
+        oab=prof.oab, legal_areas=prof.legal_areas,
+        professional_gender=prof.professional_gender,
+    )
     if not results:
         print("  nada para rascunhar (status=qualificado vazio)")
         return 0
@@ -126,8 +137,15 @@ def cmd_draft(cfg: Config) -> int:
 def cmd_redraft(cfg: Config) -> int:
     sink = build_sink(cfg)
     provider = build_provider(cfg)
+    owner = os.getenv("GARIMPO_OWNER") or None
+    prof = fetch_profile(sink, owner)
     print(f"redraft · sink={cfg.sink} llm={cfg.llm} ({provider.model}) batch={cfg.batch}")
-    total = redraft_batch(sink, provider, batch=cfg.batch, delay=cfg.delay)
+    total = redraft_batch(
+        sink, provider, batch=cfg.batch, delay=cfg.delay, owner_id=owner,
+        profession=prof.profession, sender_name=prof.sender_name,
+        oab=prof.oab, legal_areas=prof.legal_areas,
+        professional_gender=prof.professional_gender,
+    )
     if not total:
         print("  nada para re-rascunhar (sem rascunho_pronto pendente)")
         return 0
@@ -203,23 +221,13 @@ def cmd_search(
     reviews_source = build_reviews_source(cfg)
     term = search_term(niche, city, state, neighborhood)
 
-    profession = None
-    professions: list[str] = []
-    legal_areas: list[str] = []
-    oab = None
-    min_score = 0
-    sender_name = None
-    if hasattr(sink, "fetch_profile"):
-        try:
-            prof = sink.fetch_profile(owner_id) or {}
-            profession = prof.get("profession")
-            professions = list(prof.get("professions") or ([profession] if profession else []))
-            legal_areas = list(prof.get("legal_areas") or [])
-            oab = _oab_label(prof)
-            min_score = int(prof.get("min_score") or 0)
-            sender_name = prof.get("sender_name")
-        except Exception:
-            profession = None
+    settings = fetch_profile(sink, owner_id)
+    profession = settings.profession
+    professions = settings.professions
+    legal_areas = settings.legal_areas
+    oab = settings.oab
+    min_score = settings.min_score
+    sender_name = settings.sender_name
 
     print(f"search · owner={owner_id[:8]} term={term!r} prof={','.join(professions) or '-'}")
     res = discover(sink, maps, [term], owner_id)
@@ -238,6 +246,7 @@ def cmd_search(
         profession=profession, professions=professions,
         min_score=min_score, reviews_source=reviews_source,
         sender_name=sender_name, legal_areas=legal_areas, oab=oab,
+        professional_gender=settings.professional_gender,
         workers=workers, ai_reader=build_ai_reader(cfg),
     )
 
@@ -261,16 +270,6 @@ def cmd_search(
         pass
     _print_counts(sink)
     return 0
-
-
-def _oab_label(prof: dict) -> str | None:
-    """"123456" + "PR" -> "123456/PR". Assina o e-mail da area de advocacia.
-    Sem numero, devolve None (o prompt entao proibe inventar)."""
-    num = (prof.get("oab_number") or "").strip()
-    if not num:
-        return None
-    uf = (prof.get("oab_uf") or "").strip().upper()
-    return f"{num}/{uf}" if uf else num
 
 
 def _ads_from_prov(prov: list[dict]) -> bool | None:
@@ -368,11 +367,11 @@ def cmd_reprocess(cfg: Config) -> int:
         print("  nada pra reprocessar")
         return 0
 
-    profiles: dict[str, dict] = {}
+    profiles: dict[str, OwnerProfile] = {}
 
-    def _profile(owner: str) -> dict:
+    def _profile(owner: str) -> OwnerProfile:
         if owner not in profiles:
-            profiles[owner] = (sink.fetch_profile(owner) or {}) if hasattr(sink, "fetch_profile") else {}
+            profiles[owner] = fetch_profile(sink, owner)
         return profiles[owner]
 
     now_iso = datetime.now(timezone.utc).isoformat()
@@ -383,21 +382,18 @@ def cmd_reprocess(cfg: Config) -> int:
             enrich_lead(lead, sources, sink, advance_status=False)
             prov = sink.fetch_provenance(lead.id)
             prof = _profile(lead.owner_id or "")
-            profession = prof.get("profession")
-            professions = list(prof.get("professions") or ([profession] if profession else []))
-            min_score = int(prof.get("min_score") or 0)
+            profession = prof.profession
             res = rescore_no_status(
-                lead, sink, profession=profession, min_score=min_score,
-                professions=professions, prov=prov,
-                legal_areas=list(prof.get("legal_areas") or []),
+                lead, sink, profession=profession, min_score=prof.min_score,
+                professions=prof.professions, prov=prov,
+                legal_areas=prof.legal_areas,
                 extra_fields={"reprocessed_at": now_iso},
             )
             if res.decision == "qualificado":
                 qualif += 1
             # Leitura da IA: lê os dados já guardados (não re-baixa) e grava
             # ai_signals + hours_struct (horário normalizado pro "aberto agora?").
-            apply_ai(ai_reader, lead, sink, profession,
-                     list(prof.get("legal_areas") or []))
+            apply_ai(ai_reader, lead, sink, profession, prof.legal_areas)
             print(f"  {lead.id}: score={res.score} {res.decision} alvo={res.service_target}")
         except Exception as e:
             # carimba mesmo no erro pra a onda avancar; como a ordem e

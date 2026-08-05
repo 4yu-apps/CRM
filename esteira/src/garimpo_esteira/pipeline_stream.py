@@ -29,6 +29,7 @@ def process_one_lead(
     profession: str | None = None, min_score: int = 0, reviews_source=None,
     professions: list[str] | None = None, sender_name: str | None = None,
     ai_reader=None, legal_areas: list[str] | None = None, oab: str | None = None,
+    professional_gender: str | None = None,
 ) -> dict:
     """Roda enrich -> score -> draft para UM lead. Retorna o que aconteceu:
     {"enriched": bool, "discarded": bool, "drafted": bool}."""
@@ -41,7 +42,7 @@ def process_one_lead(
         if draft_one(
             lead, provider, sink, profession,
             reviews_source=reviews_source, sender_name=sender_name, oab=oab,
-            legal_areas=legal_areas,
+            legal_areas=legal_areas, professional_gender=professional_gender,
         ):
             drafted = True  # -> rascunho_pronto (entra na fila agora)
     return {
@@ -58,6 +59,7 @@ def run_pipeline_streaming(
     status: LeadStatus = "bruto", workers: int = 1, professions: list[str] | None = None,
     sender_name: str | None = None, ai_reader=None,
     legal_areas: list[str] | None = None, oab: str | None = None,
+    professional_gender: str | None = None,
 ) -> dict:
     """Busca leads 'bruto' (ordem de descoberta: created_at.asc) e processa cada
     um por inteiro, com try/except POR LEAD. Acumula as contagens e emite no fim
@@ -79,6 +81,7 @@ def run_pipeline_streaming(
             profession=profession, min_score=min_score, reviews_source=reviews_source,
             professions=professions, sender_name=sender_name, ai_reader=ai_reader,
             legal_areas=legal_areas, oab=oab,
+            professional_gender=professional_gender,
         )
 
     def _tally(r) -> None:

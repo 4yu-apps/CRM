@@ -424,10 +424,10 @@ def test_mock_gera_email_so_pra_advocacia():
 
 
 def test_oab_label_monta_numero_barra_uf():
-    from garimpo_esteira.run import _oab_label
-    assert _oab_label({"oab_number": "123456", "oab_uf": "pr"}) == "123456/PR"
-    assert _oab_label({"oab_number": "123456"}) == "123456"
-    assert _oab_label({}) is None
+    from garimpo_esteira.owner_profile import oab_label
+    assert oab_label({"oab_number": "123456", "oab_uf": "pr"}) == "123456/PR"
+    assert oab_label({"oab_number": "123456"}) == "123456"
+    assert oab_label({}) is None
 
 
 # ------------------------------------------------------------------
@@ -513,3 +513,58 @@ def test_muralha_travada_nenhum_campo_sensivel_vaza():
     for saida in saidas:
         for nome, sentinela in sentinelas.items():
             assert sentinela not in saida, nome
+
+
+# ------------------------------------------------------------------
+# Flexao de genero: "Me chamo Helena, sou advogado" era erro de
+# concordancia no nome da propria dona da conta, na PRIMEIRA mensagem
+# a um cliente. A escolha vem do perfil, nunca do primeiro nome.
+# ------------------------------------------------------------------
+
+def _lead_advogada(**kw):
+    lead = _lead_adv(**kw)
+    setattr(lead, "profession", "advocacia")
+    setattr(lead, "sender_name", "Helena Costa")
+    setattr(lead, "oab", "148233/PR")
+    setattr(lead, "legal_areas", ["trabalhista"])
+    return lead
+
+
+def test_copy_no_feminino_quando_o_perfil_diz_feminino():
+    from garimpo_esteira.draft.mock import MockDraftProvider
+
+    lead = _lead_advogada()
+    setattr(lead, "professional_gender", "f")
+    msg1, _ = MockDraftProvider().generate(lead)
+    _, corpo = MockDraftProvider().generate_email(lead)
+
+    assert "sou advogada" in msg1
+    assert "sou advogado " not in msg1  # nao sobrou o masculino em lugar nenhum
+    assert "Advogada" in corpo
+    assert "\nAdvogado\n" not in corpo
+
+
+def test_copy_no_masculino_por_padrao_quando_nao_escolheram():
+    """Perfil sem escolha mantem o masculino: e o comportamento que existia
+    antes do campo, entao ninguem muda de copy sem pedir."""
+    from garimpo_esteira.draft.mock import MockDraftProvider
+
+    lead = _lead_advogada()  # sem professional_gender
+    msg1, _ = MockDraftProvider().generate(lead)
+    _, corpo = MockDraftProvider().generate_email(lead)
+
+    assert "sou advogado" in msg1
+    assert "Advogado" in corpo
+
+
+def test_prompt_da_ia_carrega_a_flexao_escolhida():
+    """A IA nao pode escolher o genero sozinha: o prompt manda a flexao."""
+    lead = _lead_advogada()
+    setattr(lead, "professional_gender", "f")
+    p = build_prompt(lead)
+    assert "advogada" in p
+    assert "ADVOGADA" in p
+
+    from garimpo_esteira.draft.prompt import build_email_prompt
+    e = build_email_prompt(lead)
+    assert "Advogada" in e
