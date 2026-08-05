@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -244,6 +244,23 @@ export default function ConfigPage() {
   const removeNiche = useCallback((ramo: string) => {
     setNiches((prev) => prev.filter((n) => n !== ramo));
   }, []);
+
+  // Marcar tudo e tirar um ou dois e mais rapido do que clicar 30 chips: quem
+  // presta servico pra negocio local costuma atender quase todos os ramos, e a
+  // excecao e curta (o advogado nao atende advogado, por exemplo).
+  const addAllNiches = useCallback(() => {
+    setNiches((prev) => {
+      const jaTem = new Set(prev.map((n) => n.toLowerCase()));
+      return [...prev, ...RAMOS_DISPONIVEIS.filter((r) => !jaTem.has(r.toLowerCase()))];
+    });
+  }, []);
+
+  const clearNiches = useCallback(() => setNiches([]), []);
+
+  const faltamRamos = useMemo<string[]>(() => {
+    const jaTem = new Set(niches.map((n) => n.toLowerCase()));
+    return RAMOS_DISPONIVEIS.filter((r) => !jaTem.has(r.toLowerCase()));
+  }, [niches]);
 
   // Derivar o servico-alvo a partir do conjunto de profissoes selecionadas.
   function deriveServiceTarget(selected: string[]): ServiceTarget {
@@ -693,6 +710,31 @@ export default function ConfigPage() {
           sub="Vou priorizar esses tipos de negócio na busca automática."
           icon={<Storefront size={20} />}
         >
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={addAllNiches}
+              disabled={faltamRamos.length === 0}
+              className="rounded-full border border-brand/40 bg-brand-50 px-3 py-1.5 text-[12.5px] font-semibold text-brand transition-colors hover:bg-brand-100 disabled:opacity-40"
+            >
+              Selecionar todos
+            </button>
+            {niches.length > 0 && (
+              <button
+                type="button"
+                onClick={clearNiches}
+                className="rounded-full border border-border-2 bg-surface px-3 py-1.5 text-[12.5px] font-medium text-ink-2 transition-colors hover:border-brand hover:text-brand"
+              >
+                Limpar
+              </button>
+            )}
+            <span className="text-[12px] text-faint">
+              {niches.length === 0
+                ? "Nenhum ramo escolhido: eu busco em todos."
+                : `${niches.length} de ${RAMOS_DISPONIVEIS.length} ramos`}
+            </span>
+          </div>
+
           {/* Chips selecionados */}
           {niches.length > 0 && (
             <div className="mb-4 flex flex-wrap gap-2">
@@ -719,7 +761,7 @@ export default function ConfigPage() {
           <div>
             <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-faint">Ramos disponíveis</div>
             <div className="flex flex-wrap gap-2">
-              {RAMOS_DISPONIVEIS.filter((r) => !niches.map((n) => n.toLowerCase()).includes(r.toLowerCase())).map((r) => (
+              {faltamRamos.map((r) => (
                 <button
                   key={r}
                   type="button"
@@ -729,7 +771,7 @@ export default function ConfigPage() {
                   + {r}
                 </button>
               ))}
-              {RAMOS_DISPONIVEIS.filter((r) => !niches.map((n) => n.toLowerCase()).includes(r.toLowerCase())).length === 0 && (
+              {faltamRamos.length === 0 && (
                 <span className="text-[13px] text-faint">Você já selecionou todos.</span>
               )}
             </div>

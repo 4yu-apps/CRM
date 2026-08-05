@@ -96,6 +96,19 @@ export function MultiRamoDropdown({ selected, options, onToggle, ariaLabel = "Ra
     setOpen(false);
   }, [selected, onToggle]);
 
+  // Marcar tudo e tirar uma ou duas excecoes e mais rapido do que clicar 30
+  // ramos: quem presta servico pra negocio local costuma atender quase todos, e
+  // a excecao e curta (o advogado nao atende advogado). Com busca ativa, marca
+  // so o que esta filtrado.
+  const faltamNaLista = useMemo(
+    () => visible.filter((o) => !selected.includes(o)),
+    [visible, selected],
+  );
+
+  const handleSelectAll = useCallback(() => {
+    faltamNaLista.forEach((r) => onToggle(r));
+  }, [faltamNaLista, onToggle]);
+
   // Lista navegavel: indice 0 = "Qualquer ramo", indices 1..N = opcoes visiveis.
   const navCount = visible.length + 1;
 
@@ -226,6 +239,30 @@ export function MultiRamoDropdown({ selected, options, onToggle, ariaLabel = "Ra
                   placeholder="Buscar ramo..."
                   className="w-full rounded-lg border border-border-2 bg-surface-2 py-2 pl-9 pr-3 text-[13px] text-ink outline-none focus:border-brand"
                 />
+              </div>
+
+              {/* Acoes em massa */}
+              <div className="flex flex-none items-center gap-2 border-b border-border px-2 py-1.5">
+                <button
+                  type="button"
+                  onClick={handleSelectAll}
+                  disabled={faltamNaLista.length === 0}
+                  className="rounded-full border border-brand/40 bg-brand-50 px-2.5 py-1 text-[12px] font-semibold text-brand transition-colors hover:bg-brand-100 disabled:opacity-40"
+                >
+                  {query.trim() ? `Marcar os ${faltamNaLista.length} filtrados` : "Selecionar todos"}
+                </button>
+                {selected.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => selected.forEach((r) => onToggle(r))}
+                    className="rounded-full border border-border-2 bg-surface px-2.5 py-1 text-[12px] font-medium text-ink-2 transition-colors hover:border-brand hover:text-brand"
+                  >
+                    Limpar
+                  </button>
+                )}
+                <span className="ml-auto text-[11.5px] text-faint">
+                  {selected.length}/{options.length}
+                </span>
               </div>
 
               {/* Lista */}
