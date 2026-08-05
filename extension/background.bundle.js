@@ -265,24 +265,63 @@
     const base = `https://web.whatsapp.com/send?phone=${num}`;
     return text && String(text).trim() ? `${base}&text=${encodeURIComponent(text)}` : base;
   }
-  function openWhatsApp(phone, text) {
+  var waTabId = null;
+  function lembrarWaTab(id) {
+    waTabId = id ?? null;
+    try {
+      chrome.storage.session.set({ waTabId });
+    } catch {
+    }
+  }
+  async function acharWaTab() {
+    try {
+      const porUrl = await chrome.tabs.query({ url: "https://web.whatsapp.com/*" });
+      if (porUrl && porUrl.length) return porUrl[0];
+    } catch {
+    }
+    try {
+      const todas = await chrome.tabs.query({});
+      const wa = (todas || []).find((t) => String(t.url || t.pendingUrl || "").includes("web.whatsapp.com"));
+      if (wa) return wa;
+    } catch {
+    }
+    if (waTabId == null) {
+      try {
+        const { waTabId: salvo } = await chrome.storage.session.get("waTabId");
+        if (salvo != null) waTabId = salvo;
+      } catch {
+      }
+    }
+    if (waTabId != null) {
+      try {
+        return await chrome.tabs.get(waTabId);
+      } catch {
+        lembrarWaTab(null);
+      }
+    }
+    return null;
+  }
+  async function openWhatsApp(phone, text) {
     const url = waUrl(phone, text);
     if (!url) return;
-    chrome.tabs.query({ url: "https://web.whatsapp.com/*" }, (tabs) => {
-      if (!tabs || tabs.length === 0) {
-        chrome.tabs.create({ url });
-        return;
+    const tab = await acharWaTab();
+    if (!tab || tab.id == null) {
+      const nova = await chrome.tabs.create({ url });
+      lembrarWaTab(nova?.id);
+      return;
+    }
+    lembrarWaTab(tab.id);
+    chrome.tabs.update(tab.id, { active: true });
+    if (tab.windowId != null) chrome.windows.update(tab.windowId, { focused: true });
+    chrome.tabs.sendMessage(tab.id, { type: "garimpo_switch_chat", phone, text }, (resp) => {
+      if (chrome.runtime.lastError || !resp || !resp.ok) {
+        chrome.tabs.update(tab.id, { url });
       }
-      const tab = tabs[0];
-      chrome.tabs.update(tab.id, { active: true });
-      if (tab.windowId != null) chrome.windows.update(tab.windowId, { focused: true });
-      chrome.tabs.sendMessage(tab.id, { type: "garimpo_switch_chat", phone, text }, (resp) => {
-        if (chrome.runtime.lastError || !resp || !resp.ok) {
-          chrome.tabs.update(tab.id, { url });
-        }
-      });
     });
   }
+  chrome.tabs.onRemoved.addListener((id) => {
+    if (id === waTabId) lembrarWaTab(null);
+  });
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     if (msg && msg.type === "garimpo_open_whatsapp") {
       openWhatsApp(msg.phone, msg.text);

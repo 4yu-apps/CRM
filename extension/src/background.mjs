@@ -135,28 +135,85 @@ function waUrl(phone, text) {
   return text && String(text).trim() ? `${base}&text=${encodeURIComponent(text)}` : base;
 }
 
-function openWhatsApp(phone, text) {
+// Ultima aba do WhatsApp que NOS abrimos. O service worker do MV3 morre por
+// ociosidade, entao isto tambem vai pro storage.session (sobrevive ao ciclo do
+// SW, morre com o navegador).
+let waTabId = null;
+
+function lembrarWaTab(id) {
+  waTabId = id ?? null;
+  try {
+    chrome.storage.session.set({ waTabId: waTabId });
+  } catch {
+    /* storage.session indisponivel: fica so em memoria */
+  }
+}
+
+async function acharWaTab() {
+  // 1) filtro por URL: o caminho normal.
+  try {
+    const porUrl = await chrome.tabs.query({ url: "https://web.whatsapp.com/*" });
+    if (porUrl && porUrl.length) return porUrl[0];
+  } catch {
+    /* sem acesso ao host: cai nos proximos */
+  }
+  // 2) varredura de TODAS as abas. O filtro por URL volta VAZIO quando o acesso
+  // ao site esta restrito ("ao clicar") — mas a permissao "tabs" ainda expoe a
+  // url, entao a varredura acha. Sem isso, cada clique empilhava uma aba nova.
+  try {
+    const todas = await chrome.tabs.query({});
+    const wa = (todas || []).find((t) => String(t.url || t.pendingUrl || "").includes("web.whatsapp.com"));
+    if (wa) return wa;
+  } catch {
+    /* segue */
+  }
+  // 3) a aba que nos mesmos abrimos, mesmo que a url venha vazia pra nos.
+  if (waTabId == null) {
+    try {
+      const { waTabId: salvo } = await chrome.storage.session.get("waTabId");
+      if (salvo != null) waTabId = salvo;
+    } catch {
+      /* segue */
+    }
+  }
+  if (waTabId != null) {
+    try {
+      return await chrome.tabs.get(waTabId);
+    } catch {
+      lembrarWaTab(null); // foi fechada
+    }
+  }
+  return null;
+}
+
+async function openWhatsApp(phone, text) {
   const url = waUrl(phone, text);
   if (!url) return;
-  chrome.tabs.query({ url: "https://web.whatsapp.com/*" }, (tabs) => {
-    if (!tabs || tabs.length === 0) {
-      // nenhuma aba do WhatsApp aberta: abre uma (unica)
-      chrome.tabs.create({ url });
-      return;
+  const tab = await acharWaTab();
+  if (!tab || tab.id == null) {
+    // nenhuma aba do WhatsApp: abre UMA e guarda a referencia, pra o proximo
+    // clique reusar mesmo se a busca por url estiver cega.
+    const nova = await chrome.tabs.create({ url });
+    lembrarWaTab(nova?.id);
+    return;
+  }
+  lembrarWaTab(tab.id);
+  // foca a aba existente (reusa, nunca abre nova)
+  chrome.tabs.update(tab.id, { active: true });
+  if (tab.windowId != null) chrome.windows.update(tab.windowId, { focused: true });
+  // 1a tentativa: trocar a conversa SEM reload (wa-js, via relay no content script)
+  chrome.tabs.sendMessage(tab.id, { type: "garimpo_switch_chat", phone, text }, (resp) => {
+    // fallback: relay ausente, wa-js nao pronto ou nao conseguiu -> navega (reload)
+    if (chrome.runtime.lastError || !resp || !resp.ok) {
+      chrome.tabs.update(tab.id, { url });
     }
-    const tab = tabs[0];
-    // foca a aba existente (reusa, nunca abre nova)
-    chrome.tabs.update(tab.id, { active: true });
-    if (tab.windowId != null) chrome.windows.update(tab.windowId, { focused: true });
-    // 1a tentativa: trocar a conversa SEM reload (wa-js, via relay no content script)
-    chrome.tabs.sendMessage(tab.id, { type: "garimpo_switch_chat", phone, text }, (resp) => {
-      // fallback: relay ausente, wa-js nao pronto ou nao conseguiu -> navega (reload)
-      if (chrome.runtime.lastError || !resp || !resp.ok) {
-        chrome.tabs.update(tab.id, { url });
-      }
-    });
   });
 }
+
+// aba fechada pelo usuario: esquece a referencia (senao tabs.get falha sempre).
+chrome.tabs.onRemoved.addListener((id) => {
+  if (id === waTabId) lembrarWaTab(null);
+});
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg && msg.type === "garimpo_open_whatsapp") {

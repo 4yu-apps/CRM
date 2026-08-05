@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "4YU CRM (WhatsApp e Maps)",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Card lateral read-only no WhatsApp Web e captacao de leads direto do Google Maps. Nunca envia.",
   "icons": {
     "16": "icons/icon-16.png",
@@ -9,7 +9,13 @@
     "48": "icons/icon-48.png",
     "128": "icons/icon-128.png"
   },
-  "permissions": ["storage", "tabs", "notifications", "alarms", "scripting"],
+  "permissions": [
+    "storage",
+    "tabs",
+    "notifications",
+    "alarms",
+    "scripting"
+  ],
   "host_permissions": [
     "https://web.whatsapp.com/*",
     "https://www.google.com/maps/*",
@@ -17,22 +23,39 @@
     "https://*.supabase.co/*",
     "https://crm.4yumkt.com.br/*"
   ],
-  "background": { "service_worker": "background.bundle.js" },
+  "background": {
+    "service_worker": "background.bundle.js"
+  },
   "content_scripts": [
     {
-      "matches": ["https://web.whatsapp.com/*"],
-      "js": ["content.bundle.js"],
-      "css": ["src/content/panel.css"],
+      "matches": [
+        "https://web.whatsapp.com/*"
+      ],
+      "js": [
+        "content.bundle.js"
+      ],
+      "css": [
+        "src/content/panel.css"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://web.whatsapp.com/*"],
-      "js": ["wa-relay.bundle.js"],
+      "matches": [
+        "https://web.whatsapp.com/*"
+      ],
+      "js": [
+        "wa-relay.bundle.js"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://web.whatsapp.com/*"],
-      "js": ["wa-js.bundle.js", "wa-glue.bundle.js"],
+      "matches": [
+        "https://web.whatsapp.com/*"
+      ],
+      "js": [
+        "wa-js.bundle.js",
+        "wa-glue.bundle.js"
+      ],
       "world": "MAIN",
       "run_at": "document_idle"
     },
@@ -41,8 +64,12 @@
         "https://www.google.com/maps/*",
         "https://google.com/maps/*"
       ],
-      "js": ["maps.bundle.js"],
-      "css": ["src/content/panel.css"],
+      "js": [
+        "maps.bundle.js"
+      ],
+      "css": [
+        "src/content/panel.css"
+      ],
       "run_at": "document_idle"
     },
     {
@@ -51,14 +78,20 @@
         "https://*.vercel.app/*",
         "http://localhost/*"
       ],
-      "js": ["crm-bridge.bundle.js"],
+      "js": [
+        "crm-bridge.bundle.js"
+      ],
       "run_at": "document_idle"
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["icons/*.png"],
-      "matches": ["https://web.whatsapp.com/*"]
+      "resources": [
+        "icons/*.png"
+      ],
+      "matches": [
+        "https://web.whatsapp.com/*"
+      ]
     }
   ],
   "options_page": "src/options/options.html",
