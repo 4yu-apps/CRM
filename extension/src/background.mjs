@@ -52,6 +52,7 @@ function reinjectInto(urls, file) {
 }
 function reinjectBridges() {
   reinjectInto(CRM_URLS, "crm-bridge.bundle.js");
+  reinjectInto(["https://web.whatsapp.com/*"], "wa-open.bundle.js");
 }
 chrome.runtime.onInstalled.addListener(reinjectBridges);
 chrome.runtime.onStartup.addListener(reinjectBridges);
@@ -197,14 +198,18 @@ async function openWhatsApp(phone, text) {
     return;
   }
   lembrarWaTab(tab.id);
-  // foca a aba existente (reusa, nunca abre nova) e navega ELA pra conversa.
-  // Antes havia uma 1a tentativa de trocar a conversa SEM reload, via wa-js
-  // (WPPConnect) injetado na pagina. O wa-js foi REMOVIDO: ele remenda os
-  // modulos internos do WhatsApp e, quando o WhatsApp muda, quebra o envio de
-  // mensagem do proprio usuario ("MsgStore/MsgCollection not found"). Navegar
-  // custa um reload e nao toca em nada por dentro.
+  // foca a aba existente (reusa, nunca abre nova).
   if (tab.windowId != null) chrome.windows.update(tab.windowId, { focused: true });
-  chrome.tabs.update(tab.id, { active: true, url });
+  chrome.tabs.update(tab.id, { active: true });
+
+  // 1a tentativa: abrir a conversa DIRIGINDO A UI (wa-open), sem reload. Ele
+  // responde dentro de um orcamento curto; qualquer falha vira navegacao.
+  chrome.tabs.sendMessage(tab.id, { type: "garimpo_switch_chat", phone, text }, (resp) => {
+    if (chrome.runtime.lastError || !resp || !resp.ok) {
+      chrome.tabs.update(tab.id, { url }); // fallback: navega (recarrega)
+    }
+  });
+  return;
 }
 
 // aba fechada pelo usuario: esquece a referencia (senao tabs.get falha sempre).

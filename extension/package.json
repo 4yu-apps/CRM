@@ -6,7 +6,7 @@
   "description": "Extensao Chrome MV3 read-only sobre o WhatsApp Web (Garimpo).",
   "scripts": {
     "test": "node --test",
-    "build": "esbuild src/content/main.mjs --bundle --format=iife --outfile=content.bundle.js --target=chrome110 && esbuild src/content/maps.mjs --bundle --format=iife --outfile=maps.bundle.js --target=chrome110 && esbuild src/content/crm-bridge.mjs --bundle --format=iife --outfile=crm-bridge.bundle.js --target=chrome110 && esbuild src/background.mjs --bundle --format=iife --outfile=background.bundle.js --target=chrome110&& esbuild src/content/wa-glue.mjs --bundle --format=iife --outfile=wa-glue.bundle.js --target=chrome111",
+    "build": "esbuild src/content/main.mjs --bundle --format=iife --outfile=content.bundle.js --target=chrome110 && esbuild src/content/maps.mjs --bundle --format=iife --outfile=maps.bundle.js --target=chrome110 && esbuild src/content/crm-bridge.mjs --bundle --format=iife --outfile=crm-bridge.bundle.js --target=chrome110 && esbuild src/background.mjs --bundle --format=iife --outfile=background.bundle.js --target=chrome110&& esbuild src/content/wa-glue.mjs --bundle --format=iife --outfile=wa-glue.bundle.js --target=chrome111 && esbuild src/content/wa-open.mjs --bundle --format=iife --outfile=wa-open.bundle.js --target=chrome110",
     "zip": "npm run build && python3 scripts/make-zip.py"
   },
   "devDependencies": {
