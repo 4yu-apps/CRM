@@ -542,9 +542,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     );
   };
 
-  // Sidebar com grupos e rotulos de secao.
+  // Sidebar com grupos e rotulos de secao. Rola sozinha: em notebook de tela
+  // baixa a lista nao cabe inteira, e sem isso os ultimos itens ficavam
+  // cortados (o pai e h-screen overflow-hidden) e so apareciam com zoom out.
   const nav = (extra?: string) => (
-    <nav className={cn("flex flex-col gap-0.5", extra)}>
+    <nav className={cn("sidebar-scroll min-h-0 flex-1 overflow-y-auto flex flex-col gap-0.5", extra)}>
       {navGroups.map((group, gi) => (
         <div key={gi}>
           {group.label && !collapsed && (
@@ -571,7 +573,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           collapsed ? "w-[76px] px-2.5" : "w-[250px] px-3.5",
         )}
       >
-        <div className={cn("flex items-center pb-5.5", collapsed ? "flex-col gap-2.5" : "justify-between px-1")}>
+        <div className={cn("flex flex-none items-center pb-5.5", collapsed ? "flex-col gap-2.5" : "justify-between px-1")}>
           {!collapsed && (
             <span className="inline-flex items-center gap-2.5">
               <Image src="/4yu-icon.png" alt="4YU CRM" width={38} height={38} priority className="size-8 object-contain" />
@@ -594,7 +596,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         {nav()}
 
-        <div className="mt-auto flex flex-col gap-3">
+        <div className="mt-auto flex flex-none flex-col gap-3 pt-3">
           {collapsed ? (
             <button
               type="button"
