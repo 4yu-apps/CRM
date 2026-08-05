@@ -235,3 +235,62 @@ def test_sem_situacao_nao_emite_company_status():
     src = CnpjSource(fetch=lambda c: data.get(c))
     findings = src.enrich(_lead(cnpj="11.222.333/0001-44"))
     assert all(f.field_name != "company_status" for f in findings)
+
+
+# ------------------------------------------------------------------
+# Paridade do ReceitaWS: o QSA e o regime ja vinham na resposta e eram
+# descartados. Sao o que sustenta a leitura juridica (quem decide,
+# sucessao, demanda tributaria).
+# ------------------------------------------------------------------
+
+def _receitaws_payload():
+    return {
+        "status": "OK",
+        "nome": "TRANSPORTES ANDRADE LTDA",
+        "telefone": "(43) 3344-5566",
+        "email": "contato@andrade.com.br",
+        "abertura": "10/03/2014",
+        "situacao": "ATIVA",
+        "atividade_principal": [{"text": "Transporte rodoviario de carga"}],
+        "atividades_secundarias": [
+            {"text": "Armazenamento de mercadorias"},
+            {"text": "Locacao de caminhoes"},
+        ],
+        "simples": {"optante": False},
+        "qsa": [
+            {"nome": "MARIA ANDRADE", "qual": "49-Socio-Administrador"},
+            {"nome": "JOAO ANDRADE", "qual": "22-Socio"},
+        ],
+    }
+
+
+def _finding(findings, campo):
+    return next((f for f in findings if f.field_name == campo), None)
+
+
+def test_receitaws_extrai_quadro_societario():
+    from garimpo_esteira.sources.cnpj import _parse_receitaws
+    fs = _parse_receitaws(_receitaws_payload(), "cnpj_ws")
+
+    assert _finding(fs, "socios_count").value == "2"
+    sig = json.loads(_finding(fs, "site_signals").value)
+    nomes = [s["nome"] for s in sig["socios"]]
+    assert nomes == ["MARIA ANDRADE", "JOAO ANDRADE"]
+    assert sig["socios"][0]["qual"] == "49-Socio-Administrador"
+
+
+def test_receitaws_extrai_regime_e_cnaes_secundarios():
+    from garimpo_esteira.sources.cnpj import _parse_receitaws
+    fs = _parse_receitaws(_receitaws_payload(), "cnpj_ws")
+    sig = json.loads(_finding(fs, "site_signals").value)
+
+    assert sig["simples"] is False
+    assert sig["cnaes_sec"] == ["Armazenamento de mercadorias", "Locacao de caminhoes"]
+
+
+def test_receitaws_sem_qsa_nao_inventa_site_signals():
+    from garimpo_esteira.sources.cnpj import _parse_receitaws
+    payload = {"status": "OK", "nome": "X", "abertura": "10/03/2014"}
+    fs = _parse_receitaws(payload, "cnpj_ws")
+    assert _finding(fs, "site_signals") is None
+    assert _finding(fs, "socios_count") is None

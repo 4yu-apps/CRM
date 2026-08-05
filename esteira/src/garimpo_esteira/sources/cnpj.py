@@ -199,6 +199,40 @@ def _parse_receitaws(data: dict, source: str) -> list[Finding]:
     if cnae:
         findings.append(Finding("category", source, cnae, 0.6))
 
+    # Quadro societario e regime: a BrasilAPI ja extraia, o ReceitaWS nao. Sao os
+    # dados que sustentam a leitura juridica (societario, sucessao, quem decide),
+    # e vinham na mesma resposta sendo descartados. Nomes de campo diferentes:
+    # aqui e qsa[].nome/qual e atividades_secundarias[].text.
+    qsa = data.get("qsa") or []
+    flags: dict[str, Any] = {}
+    if isinstance(qsa, list) and qsa:
+        findings.append(Finding("socios_count", source, str(len(qsa)), 1.0))
+        socios = [
+            {"nome": s.get("nome"), "qual": s.get("qual")}
+            for s in qsa
+            if isinstance(s, dict) and s.get("nome")
+        ]
+        if socios:
+            flags["socios"] = socios
+
+    if data.get("simples") is not None and isinstance(data.get("simples"), dict):
+        optante = data["simples"].get("optante")
+        if optante is not None:
+            flags["simples"] = bool(optante)
+
+    secundarias = data.get("atividades_secundarias") or []
+    if isinstance(secundarias, list) and secundarias:
+        descr = [
+            str(a.get("text")).strip()
+            for a in secundarias
+            if isinstance(a, dict) and a.get("text")
+        ]
+        if descr:
+            flags["cnaes_sec"] = descr
+
+    if flags:
+        findings.append(Finding("site_signals", source, json.dumps(flags), 1.0))
+
     return findings
 
 

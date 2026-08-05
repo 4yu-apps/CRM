@@ -299,10 +299,17 @@ function MarketingSignalsPanel({ lead }: { lead: Lead }) {
 //
 // A EXPOSICAO juridica aparece SO aqui, marcada como interna. E o outro lado da
 // muralha: ela prioriza a fila e nunca entra na mensagem (ver o spec da area).
+// A qualificação do sócio vem do ReceitaWS com o código da tabela na frente
+// ("49-Socio-Administrador"). O código não diz nada pra quem lê.
+function qualLegivel(qual: string): string {
+  return qual.replace(/^\d+\s*-\s*/, "").replace(/-/g, " ").trim();
+}
+
 function LegalSignalsPanel({ lead }: { lead: Lead }) {
   const facts = legalFacts(lead);
   const exposure = lead.ai_signals?.exposure?.trim();
-  if (facts.length === 0 && !exposure) return null;
+  const socios = (lead.site_signals?.socios ?? []).filter((s) => s.nome);
+  if (facts.length === 0 && !exposure && socios.length === 0) return null;
   return (
     <div className="rounded-[14px] border border-border bg-surface-2 p-4">
       <div className="mb-3 flex items-center justify-between gap-2">
@@ -320,6 +327,29 @@ function LegalSignalsPanel({ lead }: { lead: Lead }) {
           <StatTile key={f.label} fact={f} />
         ))}
       </div>
+      {/* Quem sao os sócios, com nome. "3 sócios" prioriza; o nome diz QUEM
+          decide e sustenta conversa de acordo de sócios e sucessão. Vem de
+          graça no mesmo JSON da Receita. */}
+      {socios.length > 0 && (
+        <div className="mt-3 rounded-[10px] border border-border bg-surface px-3 py-2.5">
+          <div className="mb-1.5 text-[10.5px] font-bold uppercase tracking-wider text-faint">
+            Quadro societário
+          </div>
+          <ul className="flex flex-col gap-1">
+            {socios.map((s, i) => (
+              <li key={i} className="flex flex-wrap items-baseline gap-x-2 text-[13px]">
+                <span className="font-semibold text-ink">{s.nome}</span>
+                {s.qual && <span className="text-[12px] text-faint">{qualLegivel(s.qual)}</span>}
+                {s.desde && (
+                  <span className="text-[12px] text-faint">
+                    desde {new Date(s.desde).toLocaleDateString("pt-BR", { timeZone: "UTC" })}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {exposure && (
         <div className="mt-3 rounded-[10px] border border-amber-500/25 bg-amber-500/[0.07] px-3 py-2.5">
           <div className="mb-0.5 text-[10.5px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">

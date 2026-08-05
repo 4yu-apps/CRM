@@ -80,7 +80,9 @@ export interface SiteSignals {
   has_cnpj_footer?: boolean;
   // CNAEs secundarios e QSA completo, da consulta de CNPJ (jsonb, sem coluna).
   cnaes_sec?: string[];
-  socios?: { nome?: string | null; desde?: string | null }[];
+  // Quadro societario completo. `desde` vem da BrasilAPI (data de entrada na
+  // sociedade); `qual` vem do ReceitaWS (qualificacao: administrador, socio).
+  socios?: { nome?: string | null; desde?: string | null; qual?: string | null }[];
   // performance real do PageSpeed (Google): nota 0-100 no celular + LCP
   perf_score?: number;
   perf_slow?: boolean;
