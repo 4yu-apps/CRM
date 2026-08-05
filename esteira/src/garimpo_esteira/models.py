@@ -25,7 +25,7 @@ ENRICHABLE_FIELDS = (
     "phone", "whatsapp", "email", "instagram", "facebook", "website",
     "owner_name", "cnpj", "places_detailed_at", "opened_on",
     "company_status", "category", "porte", "capital_social", "socios_count",
-    "fb_page_id", "opening_hours",
+    "natureza_juridica", "fb_page_id", "opening_hours",
 )
 
 
@@ -81,6 +81,9 @@ class Lead:
     porte: str | None = None
     capital_social: float | None = None
     socios_count: int | None = None
+    # natureza juridica (BrasilAPI): "206-2 - Sociedade Empresaria Limitada".
+    # Filtro nº 1 da area de advocacia: MEI nao contrata advogado.
+    natureza_juridica: str | None = None
     # carimbo do enriquecimento via Google Places Details (contador da cota diaria)
     places_detailed_at: str | None = None
 
