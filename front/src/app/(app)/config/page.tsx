@@ -316,7 +316,7 @@ export default function ConfigPage() {
     } finally {
       setSaving(false);
     }
-  }, [niches, city, state, radius, serviceTarget, autopilot, minScore, professions, senderName, legalAreas, oabNumber, oabUf, repo, refreshProfile, isOnboarding, router]);
+  }, [niches, city, state, radius, serviceTarget, autopilot, minScore, professions, senderName, legalAreas, oabNumber, oabUf, professionalGender, repo, refreshProfile, isOnboarding, router]);
 
   // Ja conectou com o Google? (login via Google => agenda disponivel)
   const meta = session?.user?.app_metadata as { provider?: string; providers?: string[] } | undefined;

@@ -2,6 +2,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { activeDataSource, getRepo } from "./repo";
+import type { SearchProfile } from "./types";
 import { getSupabase } from "./supabase/client";
 
 export interface AuthUser {
@@ -23,6 +24,11 @@ interface AuthContextValue {
   // de onboarding. Perfil sem profissao tambem conta como false: a profissao
   // dirige score e copy, entao o onboarding so libera o app depois de escolhida.
   hasProfile: boolean | null;
+  // O perfil inteiro, nao so "existe ou nao". A ficha precisa saber a PROFISSAO
+  // do dono pra escolher a leitura (juridica x presenca digital); antes so
+  // havia o boolean, e a ficha tinha de adivinhar pelo service_target do lead —
+  // que vira "indefinido" em todo lead descartado. null enquanto carrega.
+  profile: SearchProfile | null;
   isAdmin: boolean;
   // Reavalia o perfil (chamar depois de salvar a Configuracao pra liberar o gate)
   refreshProfile: () => Promise<void>;
@@ -46,6 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(mode === "supabase");
   // mock ja tem perfil demo; supabase comeca como "verificando" (null)
   const [hasProfile, setHasProfile] = useState<boolean | null>(mode === "mock" ? true : null);
+  const [profile, setProfile] = useState<SearchProfile | null>(null);
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
 
   useEffect(() => {
@@ -67,15 +74,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshProfile = useCallback(async () => {
     if (mode !== "supabase") {
+      // No mock tambem carrega o perfil: a ficha le a profissao dele pra
+      // escolher a leitura, e o gate ja esta liberado por outro caminho.
       setHasProfile(true);
+      try {
+        setProfile(await getRepo().getProfile());
+      } catch {
+        setProfile(null);
+      }
       return;
     }
     try {
-      const profile = await getRepo().getProfile();
+      const loaded = await getRepo().getProfile();
+      setProfile(loaded);
       // So libera o app quando ha perfil COM profissao escolhida. Aceita tanto
       // professions[] (multi-select) quanto profession (back-compat).
-      setHasProfile(!!profile && (((profile.professions?.length ?? 0) > 0) || !!profile.profession));
-      setIsAdmin(profile?.is_admin === true);
+      setHasProfile(!!loaded && (((loaded.professions?.length ?? 0) > 0) || !!loaded.profession));
+      setIsAdmin(loaded?.is_admin === true);
     } catch {
       // erro de leitura do perfil nao bloqueia o app
       setHasProfile(true);
@@ -86,13 +101,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Verifica o perfil quando o usuario entra; limpa ao sair. O setState fica
   // dentro de uma funcao async (nao sincrono no corpo do effect) pra respeitar
   // a regra de lint set-state-in-effect.
+  // Roda tambem no modo mock: la o gate ja esta liberado, mas o PERFIL importa
+  // por si (a ficha le a profissao dele pra escolher a leitura do lead).
   useEffect(() => {
-    if (mode !== "supabase") return;
     let alive = true;
     void (async () => {
       if (!user) {
         if (alive) {
           setHasProfile(null);
+          setProfile(null);
           setIsAdmin(false);
         }
         return;
@@ -171,7 +188,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, session, loading, mode, hasProfile, isAdmin, refreshProfile, refreshUser, signIn, signUp, signInWithGoogle, signOut }}
+      value={{ user, session, loading, mode, hasProfile, profile, isAdmin, refreshProfile, refreshUser, signIn, signUp, signInWithGoogle, signOut }}
     >
       {children}
     </AuthContext.Provider>

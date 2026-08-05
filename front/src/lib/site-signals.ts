@@ -4,6 +4,28 @@ import type { SiteSignals } from "./types";
 
 export type SignalChip = { label: string; variant: "neutral" | "positive" | "warn" };
 
+// Um dado com ROTULO. Chip serve pra marcar estado de relance, mas esconde o
+// valor: "Sociedade" nao diz qual natureza juridica, e "Fora do Simples" nao
+// deixa claro que aquilo e o regime tributario. Onde o valor importa, ele
+// aparece com o nome do campo do lado.
+//
+// value null vira "—" na tela (desconhecido != inexistente: o advogado precisa
+// saber que ainda nao levantamos, e nao achar que a empresa nao tem).
+export type SignalFact = {
+  label: string;
+  value: string | null;
+  href?: string;
+  /** Realca o valor quando ele e sinal forte (bom ou de atencao). */
+  tone?: SignalChip["variant"];
+};
+
+// Classe Tailwind do VALOR de um fato (nao do chip: aqui e so a cor do texto).
+export function signalFactClass(tone: SignalFact["tone"]): string {
+  if (tone === "positive") return "text-emerald-700 dark:text-emerald-400";
+  if (tone === "warn") return "text-amber-700 dark:text-amber-400";
+  return "text-ink";
+}
+
 const PLAT_LABEL: Record<string, string> = { meta: "Meta", google: "Google Ads", tiktok: "TikTok" };
 
 export function siteSignalChips(signals: SiteSignals | null | undefined): SignalChip[] {

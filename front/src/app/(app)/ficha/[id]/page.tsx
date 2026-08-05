@@ -41,9 +41,10 @@ import { TagsEditor } from "@/components/tags-editor";
 import { waSend, openWhatsApp } from "@/lib/whatsapp";
 import { Skeleton } from "@/components/skeleton";
 import { googleSearchUrl, googleMapsUrl } from "@/lib/links";
-import { siteSignalChips, signalChipClass } from "@/lib/site-signals";
+import { siteSignalChips, signalChipClass, signalFactClass, type SignalFact } from "@/lib/site-signals";
 import { marketingSignalChips } from "@/lib/marketing-signals";
-import { legalSignalChips } from "@/lib/legal-signals";
+import { legalFacts } from "@/lib/legal-signals";
+import { useAuth } from "@/lib/auth";
 import { openState } from "@/lib/business-hours";
 import { useCancelMeeting } from "@/hooks/use-cancel-meeting";
 import { SERVICE_META } from "@/lib/service";
@@ -299,24 +300,24 @@ function MarketingSignalsPanel({ lead }: { lead: Lead }) {
 // A EXPOSICAO juridica aparece SO aqui, marcada como interna. E o outro lado da
 // muralha: ela prioriza a fila e nunca entra na mensagem (ver o spec da area).
 function LegalSignalsPanel({ lead }: { lead: Lead }) {
-  const chips = legalSignalChips(lead);
+  const facts = legalFacts(lead);
   const exposure = lead.ai_signals?.exposure?.trim();
-  if (chips.length === 0 && !exposure) return null;
+  if (facts.length === 0 && !exposure) return null;
   return (
     <div className="rounded-[14px] border border-border bg-surface-2 p-4">
       <div className="mb-3 flex items-center justify-between gap-2">
-        <span className="text-[11px] font-bold uppercase tracking-wider text-faint">Perfil jurídico</span>
+        <span className="text-[11px] font-bold uppercase tracking-wider text-faint">Retrato jurídico</span>
         {lead.updated_at && (
           <span className="text-[11px] text-faint" title="Quando o robô conferiu por último">
             verificado {fmtRelative(lead.updated_at)}
           </span>
         )}
       </div>
-      <div className="flex flex-wrap gap-2">
-        {chips.map((chip, i) => (
-          <span key={i} className={cn("rounded-full px-2.5 py-1 text-[12px]", signalChipClass(chip.variant))}>
-            {chip.label}
-          </span>
+      {/* Dados rotulados, nao chips: o valor por extenso ao lado do nome do
+          campo. Ver o porque em legal-signals.ts. */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+        {facts.map((f) => (
+          <StatTile key={f.label} fact={f} />
         ))}
       </div>
       {exposure && (
@@ -330,12 +331,6 @@ function LegalSignalsPanel({ lead }: { lead: Lead }) {
     </div>
   );
 }
-
-type SignalFact = {
-  label: string;
-  value: string | null;
-  href?: string;
-};
 
 type SignalGroup = { title: string; facts: SignalFact[] };
 
@@ -357,7 +352,16 @@ function StatTile({ fact }: { fact: SignalFact }) {
           {fact.value}
         </a>
       ) : (
-        <div className={cn("mt-0.5 truncate text-[14px] font-semibold", known ? "text-ink" : "text-faint")}>
+        // line-clamp em vez de truncate: valor cortado ("Sociedade Empresari…")
+        // derrota o proposito de mostrar o dado por extenso. Duas linhas cabem
+        // natureza juridica e CNAE sem estourar o tile.
+        <div
+          className={cn(
+            "mt-0.5 line-clamp-2 text-[14px] font-semibold leading-snug",
+            known ? signalFactClass(fact.tone) : "text-faint",
+          )}
+          title={known ? (fact.value ?? undefined) : undefined}
+        >
           {known ? fact.value : "—"}
         </div>
       )}
@@ -389,7 +393,24 @@ function SignalGroupBlock({ group }: { group: SignalGroup }) {
   );
 }
 
-function RawSignalsPanel({ lead }: { lead: Lead }) {
+// Regime tributario e CNAEs secundarios vivem em site_signals (jsonb), entao
+// nao aparecem sozinhos como coluna do lead. Sao dado da Receita que estava
+// sendo baixado e mostrado so como chip.
+function regimeLabel(lead: Lead): string | null {
+  const sig = lead.site_signals;
+  if (sig?.mei === true) return "MEI";
+  if (sig?.simples === true) return "Optante pelo Simples";
+  if (sig?.simples === false) return "Fora do Simples";
+  return null;
+}
+
+function cnaesLabel(lead: Lead): string | null {
+  const cnaes = lead.site_signals?.cnaes_sec;
+  if (!cnaes?.length) return null;
+  return cnaes.length <= 2 ? cnaes.join(", ") : `${cnaes.slice(0, 2).join(", ")} +${cnaes.length - 2}`;
+}
+
+function RawSignalsPanel({ lead, juridico }: { lead: Lead; juridico: boolean }) {
   const social = lead.social_signals ?? {};
   const platforms = social.ad_platforms ?? lead.site_signals?.ad_platforms ?? [];
   const platformLabels: Record<string, string> = {
@@ -445,12 +466,19 @@ function RawSignalsPanel({ lead }: { lead: Lead }) {
     {
       title: "Empresa",
       facts: [
+        // CNPJ e natureza juridica abrem o bloco: pro advogado, sao o retrato
+        // do que a empresa E, antes de qualquer numero. Sao os campos que a
+        // Receita ja devolve e que so viravam chip.
+        { label: "CNPJ", value: lead.cnpj ?? null },
+        { label: "Natureza jurídica", value: lead.natureza_juridica ?? null },
         { label: "Data de abertura", value: lead.opened_on ? fmtDateOnly(lead.opened_on) : null },
         { label: "Situação cadastral", value: lead.company_status ?? null },
         { label: "Porte", value: lead.porte ?? null },
+        { label: "Regime tributário", value: regimeLabel(lead) },
         { label: "Capital social", value: lead.capital_social != null ? fmtBRL(lead.capital_social) : null },
         { label: "Sócios", value: lead.socios_count != null ? fmtNumber(lead.socios_count) : null },
-        { label: "Funcionamento", value: lead.opening_hours ?? null },
+        { label: "Atividades secundárias", value: cnaesLabel(lead) },
+        ...(juridico ? [] : [{ label: "Funcionamento", value: lead.opening_hours ?? null }]),
       ],
     },
     {
@@ -461,9 +489,27 @@ function RawSignalsPanel({ lead }: { lead: Lead }) {
           value: lead.lat != null && lead.lng != null ? `${lead.lat.toFixed(5)}, ${lead.lng.toFixed(5)}` : null,
           href: mapHref,
         },
+        // No modo juridico o horario nao cabe em "Empresa" (nao e leitura
+        // juridica) mas continua sendo um fato util: vem pra ca, junto do onde.
+        ...(juridico ? [{ label: "Funcionamento", value: lead.opening_hours ?? null }] : []),
       ],
     },
   ];
+
+  // Ordem por area. Pro advogado a empresa vem primeiro: presenca social e
+  // anuncios nao sao leitura juridica, e antes ele rolava por seguidores,
+  // ritmo de publicacao e plataformas de anuncio antes de chegar no que importa.
+  const byTitle = Object.fromEntries(groups.map((g) => [g.title, g]));
+  // No modo juridico o grupo "Empresa" nao entra: o painel Retrato juridico,
+  // logo acima, ja mostra os mesmos campos e mais alguns. Repetir a mesma
+  // firmografia duas vezes na mesma tela e ruido, nao reforco.
+  const ordem = juridico
+    ? ["Reputação", "Localização"]
+    : ["Reputação", "Presença social", "Anúncios", "Empresa", "Localização"];
+  const principais = ordem.map((t) => byTitle[t]).filter(Boolean);
+  const recolhidos = juridico
+    ? ["Presença social", "Anúncios"].map((t) => byTitle[t]).filter(Boolean)
+    : [];
 
   return (
     <section>
@@ -473,9 +519,21 @@ function RawSignalsPanel({ lead }: { lead: Lead }) {
         <span className="ml-auto text-[11px] text-faint">dados complementares, sem IA</span>
       </div>
       <div className="flex flex-col gap-5">
-        {groups.map((g) => (
+        {principais.map((g) => (
           <SignalGroupBlock key={g.title} group={g} />
         ))}
+        {recolhidos.length > 0 && (
+          <details className="rounded-[12px] border border-border bg-surface-2/40 px-3.5 py-2.5">
+            <summary className="cursor-pointer text-[10px] font-bold uppercase tracking-[0.14em] text-faint">
+              Presença digital (não é leitura jurídica)
+            </summary>
+            <div className="mt-3 flex flex-col gap-5">
+              {recolhidos.map((g) => (
+                <SignalGroupBlock key={g.title} group={g} />
+              ))}
+            </div>
+          </details>
+        )}
       </div>
     </section>
   );
@@ -504,6 +562,12 @@ export default function FichaPage() {
   const id = params?.id ?? "";
   const router = useRouter();
   const repo = getRepo();
+  // A leitura da ficha segue a PROFISSAO do dono, nao o service_target do lead:
+  // lead descartado vira "indefinido" (scoring.py), e o advogado recebia o
+  // painel de presenca digital em cima de todo lead que nao passou no corte.
+  const { profile } = useAuth();
+  const souAdvogado =
+    (profile?.professions ?? []).includes("advocacia") || profile?.profession === "advocacia";
 
   const [detail, setDetail] = useState<LeadDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1132,7 +1196,7 @@ export default function FichaPage() {
             factual. Largura cheia pra os fatos curtos respirarem em grade, em
             vez de espremidos numa coluna estreita virando tabela de traços. */}
         <div className="border-t border-border p-6 sm:p-7">
-          {lead.service_target === "advocacia" ? (
+          {souAdvogado || lead.service_target === "advocacia" ? (
             <>
               {/* Advocacia: o perfil jurídico lidera; o site vira coadjuvante
                   (só interessa por política de privacidade e termos). */}
@@ -1183,7 +1247,10 @@ export default function FichaPage() {
               </div>
             )
           )}
-          <RawSignalsPanel lead={lead} />
+          <RawSignalsPanel
+            lead={lead}
+            juridico={souAdvogado || lead.service_target === "advocacia"}
+          />
         </div>
 
         {/* Anotacoes (B8) */}
