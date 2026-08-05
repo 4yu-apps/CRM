@@ -477,3 +477,39 @@ def test_email_leva_a_area_de_atuacao():
     lead = _lead_adv()
     setattr(lead, "legal_areas", ["societario"])
     assert "empresarial" in build_email_prompt(lead)
+
+
+def test_muralha_travada_nenhum_campo_sensivel_vaza():
+    """Guarda estrutural: enche TODO campo sensivel com um sentinela unico e
+    exige que nenhum apareca no WhatsApp nem no e-mail. Se alguem ligar um
+    campo novo no caminho de advocacia sem pensar, este teste quebra."""
+    from garimpo_esteira.draft.mock import MockDraftProvider
+    from garimpo_esteira.draft.prompt import build_email_prompt
+
+    lead = _lead_adv()
+    setattr(lead, "sender_name", "Ana")
+    setattr(lead, "legal_areas", ["trabalhista"])
+    sentinelas = {
+        "exposure": "SENTINELAEXPOSURE",
+        "company_status": "SENTINELASTATUS",
+        "score_summary": "SENTINELASUMMARY",
+        "review_elogio": "SENTINELAELOGIO",
+    }
+    lead.ai_signals = {
+        "exposure": sentinelas["exposure"],
+        "pain": sentinelas["exposure"],
+        "context": "empresa com 12 anos de casa",
+    }
+    lead.company_status = sentinelas["company_status"]
+    lead.score_reason = {"summary": sentinelas["score_summary"]}
+    setattr(lead, "review_themes", {"elogio": sentinelas["review_elogio"]})
+
+    saidas = [
+        build_prompt(lead),
+        build_email_prompt(lead),
+        " ".join(MockDraftProvider().generate(lead)),
+        " ".join(MockDraftProvider().generate_email(lead)),
+    ]
+    for saida in saidas:
+        for nome, sentinela in sentinelas.items():
+            assert sentinela not in saida, nome
