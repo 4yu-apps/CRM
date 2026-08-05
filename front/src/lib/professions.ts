@@ -14,6 +14,7 @@ import {
   type Icon,
 } from "@phosphor-icons/react";
 
+import type { Ramo } from "./ramos";
 import type { SearchProfile, ServiceTarget } from "./types";
 
 export interface Profession {
@@ -27,8 +28,10 @@ export interface Profession {
   icon: Icon;
   /** Quem essa area costuma mirar (ajuda o usuario a se reconhecer). */
   mira: string;
-  /** Nichos que viram ponto de partida nos chips de ramo. */
-  suggestedNiches: string[];
+  /** Nichos que viram ponto de partida nos chips de ramo.
+   *  Tipado por RAMOS_DISPONIVEIS: sugerir um nicho fora do catalogo
+   *  quebra o build em vez de virar um chip que nao acha nada. */
+  suggestedNiches: Ramo[];
   /** Servico-alvo padrao pre-selecionado ao escolher a area. */
   defaultService: ServiceTarget;
 }
@@ -40,7 +43,7 @@ export const PROFESSIONS: Profession[] = [
     descricao: "Você cuida dos anúncios e leva clientes para o negócio.",
     icon: ChartLineUp,
     mira: "Negócio com movimento que ainda não anuncia.",
-    suggestedNiches: ["Restaurante", "Hamburgueria", "Estética", "Academia", "Barbearia", "Petshop"],
+    suggestedNiches: ["Restaurante", "Hamburgueria", "Estetica", "Academia", "Barbearia", "Petshop"],
     defaultService: "trafego",
   },
   {
@@ -49,7 +52,7 @@ export const PROFESSIONS: Profession[] = [
     descricao: "Você automatiza atendimento e organiza o WhatsApp.",
     icon: ChatCircleDots,
     mira: "Muito atendimento manual no WhatsApp.",
-    suggestedNiches: ["Clínica odontológica", "Clínica de estética", "Salão de beleza", "Petshop", "Pilates"],
+    suggestedNiches: ["Clinica odontologica", "Clinica de estetica", "Salao de beleza", "Petshop", "Pilates"],
     defaultService: "automacao",
   },
   {
@@ -58,7 +61,7 @@ export const PROFESSIONS: Profession[] = [
     descricao: "Você junta anúncios e automação no mesmo pacote.",
     icon: Compass,
     mira: "Negócio que precisa atrair e atender melhor.",
-    suggestedNiches: ["Estética", "Clínica", "Academia", "Restaurante"],
+    suggestedNiches: ["Estetica", "Clinica", "Academia", "Restaurante"],
     defaultService: "ambos",
   },
   {
@@ -67,7 +70,7 @@ export const PROFESSIONS: Profession[] = [
     descricao: "Você desenha produtos e experiências digitais.",
     icon: PenNib,
     mira: "Presença digital fraca, sem site bom.",
-    suggestedNiches: ["Loja de roupas", "Cafeteria", "Startup", "Restaurante", "Estúdio"],
+    suggestedNiches: ["Loja de roupas", "Cafe", "Restaurante", "Fotografo"],
     defaultService: "indefinido",
   },
   {
@@ -76,7 +79,7 @@ export const PROFESSIONS: Profession[] = [
     descricao: "Você cuida das redes e da presença da marca.",
     icon: Megaphone,
     mira: "Rede social fraca ou abandonada.",
-    suggestedNiches: ["Restaurante", "Estética", "Loja de roupas", "Academia"],
+    suggestedNiches: ["Restaurante", "Estetica", "Loja de roupas", "Academia"],
     defaultService: "marketing",
   },
   {
@@ -85,7 +88,7 @@ export const PROFESSIONS: Profession[] = [
     descricao: "Você cria identidade e dá cara para a marca.",
     icon: PaintBrush,
     mira: "Marca sem identidade clara.",
-    suggestedNiches: ["Cafeteria", "Loja de roupas", "Restaurante", "Estúdio"],
+    suggestedNiches: ["Cafe", "Loja de roupas", "Restaurante", "Fotografo"],
     defaultService: "indefinido",
   },
   {
@@ -94,7 +97,7 @@ export const PROFESSIONS: Profession[] = [
     descricao: "Você constrói sites e coloca o negócio no ar.",
     icon: Globe,
     mira: "Negócio sem site.",
-    suggestedNiches: ["Clínica", "Advocacia", "Imobiliária", "Restaurante"],
+    suggestedNiches: ["Clinica", "Advocacia", "Imobiliaria", "Restaurante"],
     defaultService: "indefinido",
   },
   {
