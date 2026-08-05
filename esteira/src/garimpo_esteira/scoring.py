@@ -626,6 +626,21 @@ def _atrito_consumidor_points(lead: Lead) -> tuple[int, str] | None:
     return None
 
 
+def _contato_juridico_points(lead: Lead) -> tuple[int, str]:
+    """A advocacia tem dois canais: WhatsApp e o e-mail formal (endereco vindo
+    da Receita). Telefone continua valendo mais — resposta e mais rapida — mas
+    so e-mail ja da pra abordar, e e o registro que cabe melhor na profissao."""
+    tem_fone = is_present("phone", lead.phone)
+    tem_email = is_present("email", lead.email)
+    if tem_fone and tem_email:
+        return 9, "tem telefone e e-mail (WhatsApp ou e-mail formal)"
+    if tem_fone:
+        return 7, "tem telefone (WhatsApp)"
+    if tem_email:
+        return 5, "tem e-mail (aborda pelo e-mail formal)"
+    return 0, "sem telefone e sem e-mail"
+
+
 def score_advocacia(
     lead: Lead, signals: dict[str, Any], today: date | None = None,
     legal_areas: list[str] | None = None,
@@ -655,7 +670,7 @@ def score_advocacia(
     add("Assessoria", _assessoria_points(lead, signals))
     add("Risco do ramo", _risco_ramo_points(lead, signals))
     add("Atrito", _atrito_consumidor_points(lead))
-    add("Contato", _contact_points(lead))
+    add("Contato", _contato_juridico_points(lead))
     return sum(c["points"] for c in crit), crit
 
 
@@ -718,6 +733,12 @@ def _summary(lens: str, target: ServiceTarget, lead: Lead, signals: dict[str, An
         return (f"Bom pra marketing/social. {nome} tem {det}. "
                 f"Da pra construir e movimentar a presenca da marca.")
     if lens == "advocacia":
+        # MEI e corte duro da lente (score 0). Sem esta saida o resumo dizia
+        # "Bom pra advocacia. (...) Perfil de empresa que sustenta assessoria
+        # juridica" logo abaixo de um lead descartado — a tela se contradizia.
+        if is_mei(lead):
+            return (f"{nome} e MEI: pessoa com CNPJ, nao empresa com quadro "
+                    f"societario. Nao sustenta assessoria juridica.")
         partes = []
         nat = (getattr(lead, "natureza_juridica", None) or "")
         if nat:
@@ -830,7 +851,13 @@ def score_lead(
     # curso. O corte so vale quando a lente vencedora NAO e a de advocacia.
     status = (lead.company_status or "").strip().upper()
     inactive = bool(status) and status != "ATIVA" and best_lens != "advocacia"
-    contactable = is_present("phone", lead.phone)
+    # Contato: as outras areas so abordam por WhatsApp, entao sem telefone o lead
+    # e inalcancavel. A advocacia tem um SEGUNDO canal desenhado — o e-mail
+    # formal, com endereco que ja vem da Receita — e o registro institucional
+    # cabe melhor na profissao que o WhatsApp frio. Ali o e-mail tambem serve.
+    contactable = is_present("phone", lead.phone) or (
+        best_lens == "advocacia" and is_present("email", lead.email)
+    )
     if inactive:
         decision: Decision = "descartado"
         target = "indefinido"
@@ -839,7 +866,11 @@ def score_lead(
     elif not contactable:
         decision = "descartado"
         target = "indefinido"
-        verdict = "sem telefone, nao da pra contatar no WhatsApp"
+        verdict = (
+            "sem telefone e sem e-mail, nao da pra contatar"
+            if best_lens == "advocacia"
+            else "sem telefone, nao da pra contatar no WhatsApp"
+        )
     elif best < THRESHOLD:
         decision = "descartado"
         target = "indefinido"

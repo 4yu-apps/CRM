@@ -433,3 +433,75 @@ def test_reason_traz_a_lente_de_advocacia():
     assert "advocacia" in r.reason
     assert r.reason["lens"] == "advocacia"
     assert "advocacia" in r.reason["summary"].lower()
+
+
+# ------------------------------------------------------------------
+# Canal de contato na advocacia: o e-mail formal e um SEGUNDO canal
+# desenhado pra area (endereco vem da Receita). Empresa boa sem
+# telefone era descartada com score alto — perda pura.
+# ------------------------------------------------------------------
+
+def _empresa_forte(**kw) -> Lead:
+    """Sociedade com socios, capital e tempo de casa: pontua alto na lente."""
+    base = dict(
+        id="e", owner_id="o", business_name="Metalurgica Kranz",
+        category="Industria metalurgica", city="Cambe", state="PR",
+        natureza_juridica="206-2 - Sociedade Empresaria Limitada",
+        socios_count=4, capital_social=1_500_000.0, porte="DEMAIS",
+        company_status="ATIVA", opened_on="2009-05-12",
+    )
+    base.update(kw)
+    return Lead(**base)
+
+
+def test_advocacia_qualifica_lead_so_com_email():
+    lead = _empresa_forte(phone=None, email="comercial@kranz.ind.br")
+    r = score_lead(lead, {"simples": False}, professions=["advocacia"])
+    assert r.decision == "qualificado", r.reason["verdict"]
+    assert r.service_target == "advocacia"
+
+
+def test_advocacia_descarta_sem_telefone_e_sem_email():
+    lead = _empresa_forte(phone=None, email=None)
+    r = score_lead(lead, {"simples": False}, professions=["advocacia"])
+    assert r.decision == "descartado"
+    assert "e-mail" in r.reason["verdict"]
+
+
+def test_regressao_outras_areas_continuam_exigindo_telefone():
+    """So a advocacia tem o segundo canal. Marketing/trafego/design abordam por
+    WhatsApp, entao lead sem telefone segue inalcancavel pra eles."""
+    for prof in ("trafego", "marketing", "design"):
+        lead = _empresa_forte(
+            id=f"e-{prof}", phone=None, email="comercial@kranz.ind.br",
+            rating=4.8, reviews_count=300, website=None, instagram=None,
+        )
+        r = score_lead(lead, {}, professions=[prof])
+        assert r.decision == "descartado", prof
+        assert r.reason["verdict"] == "sem telefone, nao da pra contatar no WhatsApp", prof
+
+
+def test_telefone_pontua_mais_que_email_na_advocacia():
+    so_email = score_lead(
+        _empresa_forte(phone=None, email="a@b.com.br"), {}, professions=["advocacia"])
+    so_fone = score_lead(
+        _empresa_forte(phone="43998887766", email=None), {}, professions=["advocacia"])
+    os_dois = score_lead(
+        _empresa_forte(phone="43998887766", email="a@b.com.br"), {}, professions=["advocacia"])
+    assert so_email.score < so_fone.score < os_dois.score
+
+
+def test_resumo_do_mei_nao_se_contradiz():
+    """MEI e corte duro (score 0); o resumo na fila nao pode dizer que o lead
+    'sustenta assessoria juridica'."""
+    mei = Lead(
+        id="m", owner_id="o", business_name="Cantina da Nona", category="Restaurante",
+        phone="4333445566", natureza_juridica="213-5 - Empresario (Individual)",
+        porte="MEI", socios_count=1, company_status="ATIVA", opened_on="2021-06-15",
+    )
+    r = score_lead(mei, {"simples": True}, professions=["advocacia"])
+    assert r.decision == "descartado"
+    resumo = r.reason["summary"]
+    assert "MEI" in resumo
+    assert "Bom pra advocacia" not in resumo
+    assert "Perfil de empresa que sustenta" not in resumo
