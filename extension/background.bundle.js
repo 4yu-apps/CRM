@@ -208,6 +208,7 @@
   }
   function reinjectBridges() {
     reinjectInto(CRM_URLS, "crm-bridge.bundle.js");
+    reinjectInto(["https://web.whatsapp.com/*"], "wa-open.bundle.js");
   }
   chrome.runtime.onInstalled.addListener(reinjectBridges);
   chrome.runtime.onStartup.addListener(reinjectBridges);
@@ -312,7 +313,12 @@
     await lembrarWaTab(tab.id);
     if (tab.windowId != null) chrome.windows.update(tab.windowId, { focused: true });
     chrome.tabs.update(tab.id, { active: true });
-    await chrome.tabs.update(tab.id, { url });
+    const semReload = await new Promise((resolve) => {
+      chrome.tabs.sendMessage(tab.id, { type: "garimpo_switch_chat", phone, text }, (resp) => {
+        resolve(!chrome.runtime.lastError && !!resp && !!resp.ok);
+      });
+    });
+    if (!semReload) await chrome.tabs.update(tab.id, { url });
   }
   chrome.tabs.onRemoved.addListener((id) => {
     if (id === waTabId) lembrarWaTab(null);

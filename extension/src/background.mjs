@@ -52,6 +52,7 @@ function reinjectInto(urls, file) {
 }
 function reinjectBridges() {
   reinjectInto(CRM_URLS, "crm-bridge.bundle.js");
+  reinjectInto(["https://web.whatsapp.com/*"], "wa-open.bundle.js");
 }
 chrome.runtime.onInstalled.addListener(reinjectBridges);
 chrome.runtime.onStartup.addListener(reinjectBridges);
@@ -204,13 +205,17 @@ async function openWhatsApp(phone, text) {
   if (tab.windowId != null) chrome.windows.update(tab.windowId, { focused: true });
   chrome.tabs.update(tab.id, { active: true });
 
-  // Navega a propria aba pra conversa. NAO tem como evitar o reload sem
-  // remendar o WhatsApp por dentro (foi o que o wa-js fazia, e foi o que
-  // bloqueou o envio do usuario). Tentei tambem dirigir a UI, digitando o
-  // numero na busca: medido na tela real, a busca do WhatsApp so encontra
-  // conversa/contato/mensagem que JA existe — pra numero novo ela responde
-  // "nenhuma conversa encontrada". E numero novo e justamente o caso aqui.
-  await chrome.tabs.update(tab.id, { url });
+  // 1a tentativa: abrir pelo fluxo "Nova conversa" da propria interface, que
+  // aceita numero nao salvo (a busca da lista de conversas NAO aceita). Sem
+  // reload e sem tocar em nada por dentro do WhatsApp.
+  const semReload = await new Promise((resolve) => {
+    chrome.tabs.sendMessage(tab.id, { type: "garimpo_switch_chat", phone, text }, (resp) => {
+      resolve(!chrome.runtime.lastError && !!resp && !!resp.ok);
+    });
+  });
+  // Fallback: navega (recarrega). E o unico caminho que abre numero novo
+  // quando a interface nao coopera.
+  if (!semReload) await chrome.tabs.update(tab.id, { url });
 }
 
 // aba fechada pelo usuario: esquece a referencia (senao tabs.get falha sempre).
