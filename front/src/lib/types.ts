@@ -252,6 +252,11 @@ export interface Lead {
   // Multiusuario (#21, fundacao): responsavel pelo lead. Null = sem atribuicao.
   // Inerte ate o modelo de time entrar (ver docs/phase8-multiuser-plan.md).
   assigned_to?: string | null;
+
+  // Cadastrado a mao pelo dono, nao veio da descoberta. A esteira enriquece e
+  // pontua igual, mas nao descarta por nota: quem digitou ja decidiu que
+  // interessa. Descarte por fato (empresa baixada, sem contato) continua valendo.
+  manual?: boolean;
 }
 
 export interface FieldProvenance {
@@ -314,6 +319,19 @@ export type LeadEditable = Partial<
     | "assigned_to"
   >
 >;
+
+// Entrada do cadastro manual.
+//
+// Alem dos campos editaveis, deixa escolher o status inicial. Isso e possivel
+// porque o gatilho que valida a maquina de estados no banco e BEFORE UPDATE, e
+// nao INSERT (20260619120005_functions_triggers.sql:70): um lead pode NASCER em
+// qualquer estado, so nao pode PULAR entre eles depois. E o que permite
+// cadastrar um cliente que a pessoa ja tem direto em 'fechado', em vez de
+// obriga-la a arrastar o mesmo card por cinco colunas do funil.
+export type LeadCreate = LeadEditable & {
+  status?: LeadStatus;
+  manual?: boolean;
+};
 
 export interface LeadDetail {
   lead: Lead;

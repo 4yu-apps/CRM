@@ -1,7 +1,7 @@
 // Implementacao supabase — banco real. Inerte ate existir env + sessao logada.
 // A UI nao muda: mesma interface do mock.
 import { getSupabase } from "../supabase/client";
-import type { ActivityEvent, ActorType, Lead, LeadDetail, LeadEditable, LeadFile, LeadStatus, MessageTemplate, MessageTemplateInput, ScanCoverage, SearchPreset, SearchPresetInput, SearchProfile, SearchProfileInput } from "../types";
+import type { ActivityEvent, ActorType, Lead, LeadCreate, LeadDetail, LeadEditable, LeadFile, LeadStatus, MessageTemplate, MessageTemplateInput, ScanCoverage, SearchPreset, SearchPresetInput, SearchProfile, SearchProfileInput } from "../types";
 
 // Bucket PRIVADO dos anexos. Path: <uid>/<leadId>/<arquivo>. RLS no banco garante
 // que cada dono so toca a propria pasta; download sai por URL assinada e curta.
@@ -60,8 +60,10 @@ async function detail(id: string): Promise<LeadDetail> {
   };
 }
 
-async function create(input: LeadEditable): Promise<Lead> {
-  // owner_id e status caem nos defaults do banco (auth.uid() / 'bruto').
+async function create(input: LeadCreate): Promise<Lead> {
+  // owner_id cai no default do banco (auth.uid()). O status tambem cai no
+  // default ('bruto') quando nao vem no input; quando vem, o INSERT aceita
+  // qualquer estado, porque o gatilho da maquina de estados so valida UPDATE.
   const { data, error } = await getSupabase().from("leads").insert(input).select().single();
   if (error) throw new Error(error.message);
   return data as Lead;
