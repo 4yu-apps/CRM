@@ -1,5 +1,12 @@
 # Plano: de máquina de prospecção para CRM de gestão
 
+> **ESTADO: fatias 1, 2 e 3 FEITAS e no ar.** Falta a 4 e a 5. O que foi
+> entregue, o que mudou de ideia no caminho e como continuar estão em
+> [`HANDOFF-CRM-GESTAO.md`](HANDOFF-CRM-GESTAO.md). Leia aquele primeiro: este
+> aqui é o plano como ele foi pensado, e em alguns pontos a execução discordou
+> dele de propósito (aniversário anual em vez de mensal, `notes` que não migrou,
+> aba que abre onde há o que fazer).
+>
 > Criado em 2026-08-06. Base: análise de produto sobre o que falta pro CRM servir
 > a quem quer **gerir carteira**, não só prospectar. Cada afirmação aqui foi
 > verificada contra o código, com arquivo e linha.
