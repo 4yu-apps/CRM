@@ -787,6 +787,9 @@ export default function FichaPage() {
   const hoursState = openState(lead.hours_struct);
 
 
+  // Carteira: quem paga (ou pagava). Muda a moldura da tela, nao o conteudo.
+  const ehCarteira = lead.status === "fechado" || lead.status === "cancelado";
+
   const statusAgeDays = daysInStatus(history);
   const statusAgeText = statusAgeLabel(statusAgeDays);
 
@@ -794,12 +797,13 @@ export default function FichaPage() {
 
   return (
     <div className="mx-auto max-w-[880px]">
-      {/* Breadcrumb */}
+      {/* Breadcrumb. Cliente nao volta "pra fila": ele nao esta sendo
+          prospectado, esta sendo atendido. */}
       <Link
-        href="/fila"
+        href={ehCarteira ? "/clientes" : "/fila"}
         className="mb-5 flex items-center gap-2 text-[14px] font-semibold text-muted-foreground hover:text-foreground"
       >
-        <ArrowLeft size={16} /> Voltar pra fila
+        <ArrowLeft size={16} /> {ehCarteira ? "Voltar pra Clientes" : "Voltar pra fila"}
       </Link>
 
       {/* Cabecalho */}
@@ -1073,7 +1077,7 @@ export default function FichaPage() {
 
             {/* Negocio (B8). Aparece com o lead fechado mesmo sem valor: o
                 convite pra registrar vale mais que esconder o bloco. */}
-            {(lead.status === "fechado" || lead.deal_value != null) && (
+            {(ehCarteira || lead.deal_value != null) && (
               <DealCard lead={lead} onSaved={load} />
             )}
 
