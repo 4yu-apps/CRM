@@ -27,6 +27,7 @@ _LEAD_COLS = (
     "suggested_value", "suggested_value_reason",
     "draft_msg1", "draft_msg2", "draft_model", "draft_generated_at",
     "backfilled_at", "reprocessed_at", "places_detailed_at",
+    "manual",
 )
 
 

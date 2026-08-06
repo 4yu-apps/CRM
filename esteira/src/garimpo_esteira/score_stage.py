@@ -46,6 +46,34 @@ def _as_float(v) -> float | None:
         return None
 
 
+def _keep_manual(lead, result) -> None:
+    """Lead cadastrado a mao nao some por nota baixa.
+
+    A pessoa digitou o nome, o telefone e a cidade com a propria mao: ela ja
+    decidiu que aquele negocio interessa. O robo passar por cima disso e devolver
+    "abaixo do corte do ICP" faz o lead sumir da fila sem ninguem pedir, e a
+    pessoa volta do almoco sem entender o que aconteceu.
+
+    O que a guarda NAO desfaz: os descartes por fato (empresa nao-ATIVA na
+    Receita, ou sem telefone e sem e-mail). Ali nao ha julgamento pra revisar, e
+    fingir que da pra prospectar so empurra o problema pra fila. Esses continuam
+    descartados, com o motivo em portugues na ficha, e voltam pelo requalify
+    assim que o dono preencher o que falta.
+
+    Muta o result no lugar (mesmo objeto que o chamador usa em seguida).
+    """
+    if not getattr(lead, "manual", False):
+        return
+    if result.decision != "descartado" or result.hard_discard:
+        return
+    result.decision = "qualificado"
+    result.service_target = result.matched_target
+    if isinstance(result.reason, dict):
+        result.reason["decision"] = "qualificado"
+        result.reason["service_target"] = result.matched_target
+        result.reason["verdict"] = "voce cadastrou esse a mao, entao ele fica na fila mesmo com nota baixa"
+
+
 def score_one(
     lead, sink: LeadSink, profession: str | None = None, min_score: int = 0,
     *, professions: list[str] | None = None, prov: list[dict] | None = None,
@@ -84,8 +112,11 @@ def score_one(
             result.reason["decision"] = "descartado"
             result.reason["service_target"] = "indefinido"
             result.reason["verdict"] = f"abaixo do seu score minimo ({min_score})"
-        lead.score_reason = result.reason
-        lead.service_target = result.service_target
+    # Reverte o corte por nota (do ICP ou do piso do dono) quando foi o dono que
+    # digitou o lead. Uma reversao so, pra ficar um motivo so na ficha.
+    _keep_manual(lead, result)
+    lead.score_reason = result.reason
+    lead.service_target = result.service_target
     fields: dict[str, object] = {
         "score": result.score,
         "score_reason": result.reason,
@@ -146,6 +177,7 @@ def rescore_no_status(
             result.reason["decision"] = "descartado"
             result.reason["service_target"] = "indefinido"
             result.reason["verdict"] = f"abaixo do seu score minimo ({min_score})"
+    _keep_manual(lead, result)
     lead.score = result.score
     lead.score_reason = result.reason
     lead.service_target = result.service_target

@@ -132,6 +132,9 @@ class Lead:
     # Parte 2: quando o reprocessamento (re-enrich + re-score sem mudar status)
     # passou por ultimo. Ondas resumiveis: NULL/mais antigo primeiro.
     reprocessed_at: str | None = None
+    # Cadastrado a mao pelo dono, nao veio da descoberta. O robo enriquece e
+    # pontua igual, mas nao descarta: quem digitou ja decidiu que interessa.
+    manual: bool = False
 
     extra: dict[str, Any] = field(default_factory=dict)
 

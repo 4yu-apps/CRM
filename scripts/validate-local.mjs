@@ -85,10 +85,13 @@ const run = async () => {
   const labels = (await one(
     `select e.enumlabel from pg_enum e join pg_type t on t.oid=e.enumtypid where t.typname='lead_status'`
   )).map(r => r.enumlabel)
-  labels.length === 15 ? ok(`enum lead_status (15 estados)`) : bad(`enum lead_status = ${labels.length}/15`)
+  // Piso, nao numero exato. As migrations aqui sao append-only: todo estado ou
+  // transicao nova quebrava a contagem fixa, e o validador ficou vermelho por
+  // meses ate ninguem mais olhar pra ele. O que importa e o seed ter rodado.
+  labels.length >= 15 ? ok(`enum lead_status (${labels.length} estados)`) : bad(`enum lead_status = ${labels.length}, esperava 15+`)
 
   const [{ n }] = await one('select count(*)::int n from public.lead_status_transitions')
-  n === 68 ? ok(`68 transicoes seedadas`) : bad(`transicoes = ${n}/68`)
+  n >= 68 ? ok(`${n} transicoes seedadas`) : bad(`transicoes = ${n}, esperava 68+`)
 
   const react = await one(
     `select 1 from public.lead_status_transitions where from_status='descartado' and to_status='rascunho_pronto'`)
@@ -102,6 +105,11 @@ const run = async () => {
     `select 1 from information_schema.columns where table_name='leads' and column_name='archived'`)
   archivedCol.length ? ok('coluna archived (acoes de lead)') : bad('coluna archived AUSENTE')
 
+  // lead cadastrado a mao: a esteira le essa coluna pra nao descartar por nota
+  const manualCol = await one(
+    `select 1 from information_schema.columns where table_name='leads' and column_name='manual'`)
+  manualCol.length ? ok('coluna manual (lead cadastrado a mao)') : bad('coluna manual AUSENTE')
+
   // colunas de rascunho (Fase 3 · migration 7)
   const draftCols = (await one(
     `select column_name from information_schema.columns
@@ -114,7 +122,7 @@ const run = async () => {
   const stLabels = (await one(
     `select e.enumlabel from pg_enum e join pg_type t on t.oid=e.enumtypid where t.typname='service_target'`
   )).map(r => r.enumlabel)
-  stLabels.length === 6 ? ok('enum service_target (6 alvos)') : bad(`enum service_target = ${stLabels.length}/6`)
+  stLabels.length >= 6 ? ok(`enum service_target (${stLabels.length} alvos)`) : bad(`enum service_target = ${stLabels.length}, esperava 6+`)
   const b1Cols = (await one(
     `select column_name from information_schema.columns
      where table_name='leads' and column_name = any($1)`, [["service_target", "ads_active"]]
