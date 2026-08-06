@@ -20,6 +20,11 @@ export const LADDER: LeadStatus[] = [
 const OFF_RAMP: LeadStatus[] = ["descartado", "sem_interesse", "perdido"];
 
 export function depth(status: LeadStatus): number {
+  // Cliente que cancelou CHEGOU em fechado: o negocio fechou, faturou, e depois
+  // acabou. Deixar ele fora da escada faria a taxa de conversao cair toda vez
+  // que alguem sai, misturando duas medidas que nao tem nada a ver: quao bem eu
+  // prospecto, e quao bem eu seguro cliente.
+  if (status === "cancelado") return LADDER.indexOf("fechado");
   return LADDER.indexOf(status); // -1 se off-ramp
 }
 
@@ -43,6 +48,7 @@ const LABELS: Record<LeadStatus, string> = {
   reuniao: "Reuniao",
   proposta: "Proposta",
   fechado: "Fechado",
+  cancelado: "Cancelado",
   descartado: "Descartado",
   sem_interesse: "Sem interesse",
   perdido: "Perdido",
@@ -79,7 +85,10 @@ const atLeast = (leads: Lead[], status: LeadStatus) => {
 export function kpis(leads: Lead[]): FunnelKpis {
   const enviados = atLeast(leads, "enviado");
   const responderam = atLeast(leads, "respondeu");
-  const fechados = leads.filter((l) => l.status === "fechado").length;
+  // "Fechados" aqui e conversao: inclui quem cancelou depois, porque o negocio
+  // fechou de verdade. A carteira de hoje (MRR, clientes ativos) sai de
+  // clients.ts, que conta so quem continua.
+  const fechados = leads.filter((l) => l.status === "fechado" || l.status === "cancelado").length;
   return {
     total: leads.length,
     qualificados: atLeast(leads, "qualificado"),
