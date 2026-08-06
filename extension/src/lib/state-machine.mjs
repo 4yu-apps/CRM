@@ -35,6 +35,7 @@ export const STATUS_LABEL = {
   reuniao: "Reuniao",
   proposta: "Proposta",
   fechado: "Fechado",
+  cancelado: "Cancelado",
   descartado: "Descartado",
   sem_interesse: "Sem interesse",
   perdido: "Perdido",

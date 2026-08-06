@@ -16,6 +16,9 @@ export type LeadStatus =
   | "reuniao"
   | "proposta"
   | "fechado"
+  // Cliente que saiu (churn). Nao e o mesmo que "perdido": aquele nunca chegou
+  // a fechar. Este fechou, faturou, e depois foi embora.
+  | "cancelado"
   | "perdido";
 
 export type LeadSource =
@@ -212,6 +215,12 @@ export interface Lead {
   // Motivo de perda (#17): por que o lead foi perdido/arquivado.
   loss_reason?: string | null;
 
+  // Churn: quando e por que o cliente saiu. Separados de updated_at/loss_reason
+  // de proposito: perder um lead e sair um cliente sao coisas diferentes, e
+  // misturar os dois campos apagaria a licao de um dos lados.
+  churn_at?: string | null;
+  churn_reason?: string | null;
+
   // Reuniao (Slice E): quando, e onde acontece. meeting_link = online
   // (Meet/Zoom/Teams); meeting_location = presencial (endereco). A Agenda e o
   // sininho de notificacoes leem o meeting_at.
@@ -336,6 +345,8 @@ export type LeadEditable = Partial<
     | "deal_term_months"
     | "deal_closed_at"
     | "loss_reason"
+    | "churn_at"
+    | "churn_reason"
     | "meeting_at"
     | "meeting_link"
     | "meeting_location"

@@ -15,6 +15,7 @@ import {
 } from "@phosphor-icons/react";
 import { useLeads } from "@/hooks/use-leads";
 import { funnel, depth, kpis as funnelKpis, pct } from "@/lib/funnel";
+import { mrr as mrrAtivo, churnedMrr, churnRate } from "@/lib/clients";
 import type { Lead, LeadStatus } from "@/lib/types";
 
 // Meta de receita do mes: editavel pelo usuario, guardada na localStorage.
@@ -41,6 +42,21 @@ function endOfMonth(date: Date): Date {
 }
 
 /** Leads criados em [from, to) */
+// Quando o negocio fechou de verdade. updated_at nao serve: ele sobe quando
+// alguem corrige um telefone, e fazia um contrato de janeiro reaparecer como
+// fechado neste mes. deal_closed_at so existe desde a Fatia 1, entao cai no
+// updated_at pra quem fechou antes disso.
+function closedAt(l: Lead): number {
+  return +new Date(l.deal_closed_at ?? l.updated_at);
+}
+
+// Fechou alguma vez: inclui quem cancelou depois. Receita fechada em janeiro
+// continua tendo sido fechada em janeiro, mesmo que o cliente tenha saido em
+// agosto. Carteira de hoje e outra pergunta, respondida por clients.ts.
+function everClosed(leads: Lead[]): Lead[] {
+  return leads.filter((l) => l.status === "fechado" || l.status === "cancelado");
+}
+
 function createdIn(leads: Lead[], from: Date, to: Date): Lead[] {
   return leads.filter((l) => {
     const t = new Date(l.created_at).getTime();
@@ -115,10 +131,12 @@ function buildKpis(leads: Lead[]): KpiData[] {
     weekStart
   ).length;
 
-  // "Fechados" = status fechado; receita = soma deal_value
-  const fechados = leads.filter((l) => l.status === "fechado");
-  const fechadosThis = updatedIn(fechados, weekStart, new Date(now.getTime() + 1)).length;
-  const fechadosPrev = updatedIn(fechados, prevWeekStart, weekStart).length;
+  // "Fechados" = negocio que fechou alguma vez; receita = soma deal_value
+  const fechados = everClosed(leads);
+  const naJanela = (from: Date, to: Date) =>
+    fechados.filter((l) => closedAt(l) >= from.getTime() && closedAt(l) < to.getTime()).length;
+  const fechadosThis = naJanela(weekStart, new Date(now.getTime() + 1));
+  const fechadosPrev = naJanela(prevWeekStart, weekStart);
   const receita = fechados.reduce((s, l) => s + (l.deal_value ?? 0), 0);
 
   const receitaFmt =
@@ -220,11 +238,8 @@ function buildMeta(leads: Lead[]): MetaDoMes {
   const now = new Date();
   const from = startOfMonth(now);
   const to = endOfMonth(now);
-  const fechadosMes = leads.filter(
-    (l) =>
-      l.status === "fechado" &&
-      new Date(l.updated_at).getTime() >= from.getTime() &&
-      new Date(l.updated_at).getTime() <= to.getTime()
+  const fechadosMes = everClosed(leads).filter(
+    (l) => closedAt(l) >= from.getTime() && closedAt(l) <= to.getTime(),
   );
   const receita = fechadosMes.reduce((s, l) => s + (l.deal_value ?? 0), 0);
   const mes = now.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
@@ -249,11 +264,12 @@ interface Recurring {
 }
 
 function buildRecurring(leads: Lead[]): Recurring {
-  const closed = leads.filter((l) => l.status === "fechado" && (l.deal_value ?? 0) > 0);
+  // Ticket medio e historico (inclui quem saiu); MRR e carteira de hoje e vem do
+  // mrr() de clients.ts, pra nao existirem duas definicoes de MRR no app. A
+  // antiga divergia num ponto: contava cliente arquivado.
+  const closed = everClosed(leads).filter((l) => (l.deal_value ?? 0) > 0);
   const soma = closed.reduce((s, l) => s + (l.deal_value ?? 0), 0);
-  const mrr = closed
-    .filter((l) => l.deal_billing === "mensal_fixo")
-    .reduce((s, l) => s + (l.deal_value ?? 0), 0);
+  const mrr = mrrAtivo(leads);
   const porPrazoTotal = closed
     .filter((l) => l.deal_billing === "por_prazo")
     .reduce((s, l) => s + (l.deal_value ?? 0) * (l.deal_term_months ?? 1), 0);
@@ -383,7 +399,7 @@ function previousRange(p: Period, now: Date): Range | null {
   }
 }
 
-const closedCount = (ls: Lead[]) => ls.filter((l) => l.status === "fechado").length;
+const closedCount = (ls: Lead[]) => everClosed(ls).length;
 
 // ---------- icone de delta ----------
 
@@ -401,6 +417,18 @@ export default function ResultadosPage() {
   const kpis = useMemo(() => buildKpis(leads), [leads]);
   const meta = useMemo(() => buildMeta(leads), [leads]);
   const recurring = useMemo(() => buildRecurring(leads), [leads]); // #14 — sobre toda a base
+  // Churn: quanto de receita recorrente saiu, e a taxa nos ultimos 90 dias.
+  // renderedAt fixa o "agora" uma vez, como o Inicio ja faz: relogio dentro de
+  // useMemo torna o calculo impuro e o resultado muda entre renders.
+  const [renderedAt] = useState(() => Date.now());
+  const churn = useMemo(() => {
+    const desde = renderedAt - 90 * 86_400_000;
+    return {
+      saiu: leads.filter((l) => l.status === "cancelado").length,
+      mrrPerdido: churnedMrr(leads),
+      taxa: churnRate(leads, desde),
+    };
+  }, [leads, renderedAt]);
 
   // seletor de periodo (#13) — escopa funil e recortes (coorte por created_at)
   const [period, setPeriod] = useState<Period>("all");
@@ -735,6 +763,19 @@ export default function ResultadosPage() {
               <div className="mt-1 font-heading text-[26px] font-bold leading-none">{brl(recurring.porPrazoTotal)}</div>
               <div className="mt-1.5 text-[12px] text-faint">valor total contratado (valor × meses)</div>
             </div>
+            {/* Churn so aparece quando existe. Card zerado fixo na tela ensina a
+                pessoa a ignorar aquele canto. */}
+            {churn.saiu > 0 && (
+              <div className="rounded-[14px] bg-[var(--inset)] p-4">
+                <div className="text-[12px] text-muted-foreground">Saiu da carteira</div>
+                <div className="mt-1 font-heading text-[26px] font-bold leading-none text-danger">
+                  {brl(churn.mrrPerdido)}
+                </div>
+                <div className="mt-1.5 text-[12px] text-faint">
+                  {churn.saiu} {churn.saiu === 1 ? "cliente saiu" : "clientes sairam"} · {pct(churn.taxa)} de churn em 90d
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

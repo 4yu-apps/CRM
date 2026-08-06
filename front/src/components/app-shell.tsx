@@ -105,20 +105,25 @@ const TITLES: Record<string, [string, string]> = {
   "/fila": ["Fila de leads", "Revise, ajuste e aprove"],
   "/funil": ["Funil", "Onde cada lead está agora"],
   "/contatos": ["Contatos", "Sua base inteira, num lugar só"],
-  "/clientes": ["Clientes", "Quem você fechou e quem dá pra reaquecer"],
+  "/clientes": ["Clientes", "Sua carteira: quem paga e quem precisa de você"],
   "/agenda": ["Agenda", "Suas próximas reuniões"],
   "/resultados": ["Resultados", "Tá valendo a pena?"],
   "/templates": ["Templates", "Modelos de mensagem reutilizáveis"],
   "/buscar": ["Garimpar leads", "Sob comando, quando você quiser"],
   "/celular": ["No celular", "Acompanhe e envie pelo WhatsApp"],
   "/config": ["Configuração", "Ajuste uma vez, eu cuido do resto"],
-  "/ficha": ["Ficha do lead", "Tudo que eu juntei sobre o negócio"],
+  // Neutro de proposito: a mesma ficha serve lead e cliente, e chamar um
+  // cliente de "lead" no cabecalho e o sistema contando a historia errada.
+  "/ficha": ["Ficha", "Tudo que eu juntei sobre o negócio"],
   "/admin": ["Admin", "Gerencie todos os perfis do sistema"],
 };
 
 function isActive(pathname: string, href: string): boolean {
   if (href === "/") return pathname === "/";
-  if (href === "/fila") return pathname.startsWith("/fila") || pathname.startsWith("/ficha");
+  // A ficha NAO acende "Fila de leads": da pra chegar nela por Clientes, Funil,
+  // Contatos e pela busca. Acender a fila fazia o menu jurar que um cliente
+  // pagante estava na fila de prospeccao.
+  if (href === "/fila") return pathname.startsWith("/fila");
   return pathname.startsWith(href);
 }
 

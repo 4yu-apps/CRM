@@ -21,7 +21,10 @@ TRANSITIONS: dict[LeadStatus, tuple[LeadStatus, ...]] = {
     "proposta": ("fechado", "perdido"),
     "descartado": ("enriquecido",),  # reativavel pelo dono (volta pro funil)
     "sem_interesse": (),
-    "fechado": (),
+    # churn: a esteira nao registra saida de cliente (isso e humano), mas o
+    # estado precisa existir aqui pro grafo nao mentir sobre o que o banco aceita.
+    "fechado": ("cancelado",),
+    "cancelado": ("fechado",),
     "perdido": (),
 }
 
