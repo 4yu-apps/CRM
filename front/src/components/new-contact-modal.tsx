@@ -194,14 +194,17 @@ export function NewContactModal({
   return (
     <div
       onClick={() => { if (!saving) onClose(); }}
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[rgba(20,12,40,.45)] p-6 backdrop-blur-[2px]"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(20,12,40,.45)] p-4 backdrop-blur-[2px] sm:p-6"
     >
+      {/* Teto de altura + miolo rolante, com cabecalho e rodape fixos. Sem isso,
+          num notebook de 768px o formulario com contrato por prazo empurra o
+          botao Salvar pra fora da tela, e nada na tela conta que da pra rolar. */}
       <div
         onClick={(e) => e.stopPropagation()}
-        className="my-auto w-[460px] max-w-full overflow-hidden rounded-[22px] bg-card shadow-[var(--shadow-lg)]"
+        className="flex max-h-[calc(100dvh-2rem)] w-[460px] max-w-full flex-col overflow-hidden rounded-[22px] bg-card shadow-[var(--shadow-lg)]"
         style={{ animation: "fadeUp .25s both" }}
       >
-        <div className="flex items-center justify-between border-b border-border px-6 py-5">
+        <div className="flex flex-none items-center justify-between border-b border-border px-6 py-5">
           <div className="flex items-center gap-3">
             <div className="flex size-10 flex-none items-center justify-center rounded-[12px] bg-brand-50 text-brand">
               <UserPlus size={20} weight="fill" />
@@ -216,7 +219,7 @@ export function NewContactModal({
           </button>
         </div>
 
-        <div className="flex flex-col gap-4 px-6 py-5">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-5">
           {/* A pergunta que muda tudo. Fica no topo porque decide o destino do
               registro, e nao no fim como um detalhe. */}
           <div>
@@ -227,7 +230,7 @@ export function NewContactModal({
               {(
                 [
                   { id: "lead", Icon: MagnifyingGlass, titulo: "Lead pra prospectar", sub: "o robô completa e escreve a abordagem" },
-                  { id: "cliente", Icon: Handshake, titulo: "Cliente que eu já tenho", sub: "entra direto na sua base de clientes" },
+                  { id: "cliente", Icon: Handshake, titulo: "Cliente que já tenho", sub: "entra direto na sua base de clientes" },
                 ] as const
               ).map((opt) => (
                 <button
@@ -280,7 +283,7 @@ export function NewContactModal({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 inputMode="email"
-                placeholder="contato@negocio.com.br"
+                placeholder="contato@empresa.com"
                 className={inputCls}
               />
             </Campo>
@@ -394,7 +397,7 @@ export function NewContactModal({
           )}
         </div>
 
-        <div className="flex gap-3 px-6 pb-6">
+        <div className="flex flex-none gap-3 border-t border-border px-6 py-5">
           <button
             onClick={onClose}
             disabled={saving}

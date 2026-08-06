@@ -638,6 +638,7 @@ export default function ContatosPage() {
               onClick={() => setNewContact(true)}
               className="flex flex-none items-center gap-1.5 rounded-xl px-4 py-3 text-[13px] font-bold text-white"
               style={{ background: "var(--grad)" }}
+              aria-label="Novo contato"
               title="Cadastrar um contato a mão"
             >
               <Plus size={15} weight="bold" />
