@@ -34,17 +34,29 @@ async function ateQue(fn, ms, passo = 100) {
 // O WhatsApp ofusca as classes, mas mantem alguns atributos estruturais. Varias
 // tentativas em ordem: se uma sair do ar, as outras seguram.
 function achaBusca() {
+  // Medido no WhatsApp real: o UNICO contenteditable da pagina e o composer.
+  // Logo a busca virou <input> (ou outro campo), e as tentativas antigas por
+  // contenteditable davam 0. Ordem: campo de texto na coluna da esquerda, depois
+  // por rotulo, e so no fim os contenteditable (caso o WhatsApp volte atras).
   const cands = [
-    '#side div[contenteditable="true"]',
+    '#side input[type="text"]',
+    '#side input:not([type="file"]):not([type="checkbox"])',
+    'input[aria-label*="Pesquis"]',
+    'input[aria-label*="Search"]',
+    '#side [role="textbox"]',
+    '#side [contenteditable="true"]',
     'div[data-tab="3"][contenteditable="true"]',
-    '[aria-label*="Pesquis"] [contenteditable="true"]',
-    '[aria-label*="Search"] [contenteditable="true"]',
   ];
   for (const s of cands) {
     const el = document.querySelector(s);
     if (el) return el;
   }
   return null;
+}
+
+// input e contenteditable se escrevem de jeitos diferentes.
+function ehInput(el) {
+  return el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement;
 }
 
 function achaComposer() {
@@ -64,13 +76,25 @@ function achaComposer() {
 function listaResultados() {
   const pane = document.querySelector("#pane-side") || document.querySelector("#side");
   if (!pane) return [];
-  return Array.from(pane.querySelectorAll('[role="listitem"], [role="row"]'));
+  // Medido no WhatsApp real: [role=row] existe (72 linhas), [role=listitem] nao.
+  return Array.from(pane.querySelectorAll('[role="row"], [role="listitem"]'));
 }
 
 // Digita como gente: foca, limpa e usa insertText (o editor do WhatsApp e
 // controlado por JS; setar .textContent nao dispara os eventos dele).
 function digita(el, texto) {
   el.focus();
+  if (ehInput(el)) {
+    // React controla o valor: mexer no .value direto nao avisa o estado dele.
+    // O setter nativo do prototipo + evento input e o caminho que ele escuta.
+    const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement : HTMLInputElement;
+    const setter = Object.getOwnPropertyDescriptor(proto.prototype, "value")?.set;
+    if (setter) setter.call(el, texto);
+    else el.value = texto;
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+    return;
+  }
   const sel = window.getSelection();
   const range = document.createRange();
   range.selectNodeContents(el);
@@ -82,10 +106,15 @@ function digita(el, texto) {
 }
 
 function numeroAtivo() {
-  // O cabecalho da conversa aberta guarda o numero/jid em algum atributo.
+  // O composer da conversa aberta traz o numero no proprio rotulo:
+  // aria-label="Digite uma mensagem para +55 44 9188-4854". Medido no real;
+  // e bem mais confiavel que garimpar o cabecalho.
+  const c = achaComposer();
+  const rotulo = c?.getAttribute("aria-label") || "";
+  const digitos = rotulo.replace(/\D/g, "");
+  if (digitos) return digitos;
   const h = document.querySelector("header [data-id], header [title]");
-  const bruto = h?.getAttribute("data-id") || h?.getAttribute("title") || "";
-  return String(bruto).replace(/\D/g, "");
+  return String(h?.getAttribute("data-id") || h?.getAttribute("title") || "").replace(/\D/g, "");
 }
 
 function soDigitos(p) {

@@ -16,16 +16,22 @@
   }
   function achaBusca() {
     const cands = [
-      '#side div[contenteditable="true"]',
-      'div[data-tab="3"][contenteditable="true"]',
-      '[aria-label*="Pesquis"] [contenteditable="true"]',
-      '[aria-label*="Search"] [contenteditable="true"]'
+      '#side input[type="text"]',
+      '#side input:not([type="file"]):not([type="checkbox"])',
+      'input[aria-label*="Pesquis"]',
+      'input[aria-label*="Search"]',
+      '#side [role="textbox"]',
+      '#side [contenteditable="true"]',
+      'div[data-tab="3"][contenteditable="true"]'
     ];
     for (const s of cands) {
       const el = document.querySelector(s);
       if (el) return el;
     }
     return null;
+  }
+  function ehInput(el) {
+    return el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement;
   }
   function achaComposer() {
     const cands = [
@@ -43,10 +49,19 @@
   function listaResultados() {
     const pane = document.querySelector("#pane-side") || document.querySelector("#side");
     if (!pane) return [];
-    return Array.from(pane.querySelectorAll('[role="listitem"], [role="row"]'));
+    return Array.from(pane.querySelectorAll('[role="row"], [role="listitem"]'));
   }
   function digita(el, texto) {
     el.focus();
+    if (ehInput(el)) {
+      const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement : HTMLInputElement;
+      const setter = Object.getOwnPropertyDescriptor(proto.prototype, "value")?.set;
+      if (setter) setter.call(el, texto);
+      else el.value = texto;
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+      return;
+    }
     const sel = window.getSelection();
     const range = document.createRange();
     range.selectNodeContents(el);
@@ -57,9 +72,12 @@
     el.dispatchEvent(new InputEvent("input", { bubbles: true, data: texto, inputType: "insertText" }));
   }
   function numeroAtivo() {
+    const c = achaComposer();
+    const rotulo = c?.getAttribute("aria-label") || "";
+    const digitos = rotulo.replace(/\D/g, "");
+    if (digitos) return digitos;
     const h = document.querySelector("header [data-id], header [title]");
-    const bruto = h?.getAttribute("data-id") || h?.getAttribute("title") || "";
-    return String(bruto).replace(/\D/g, "");
+    return String(h?.getAttribute("data-id") || h?.getAttribute("title") || "").replace(/\D/g, "");
   }
   function soDigitos(p) {
     const d = String(p || "").replace(/\D/g, "");
