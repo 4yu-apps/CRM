@@ -2,7 +2,7 @@
 //  - mock: em memoria (default, roda sem banco)
 //  - supabase: banco real (quando NEXT_PUBLIC_DATA_SOURCE=supabase + envs)
 // Trocar de uma pra outra nao toca a UI.
-import type { ActivityEvent, ActorType, Lead, LeadActivity, LeadActivityInput, LeadCreate, LeadDetail, LeadEditable, LeadFile, LeadStatus, MessageTemplate, MessageTemplateInput, ScanCoverage, SearchPreset, SearchPresetInput, SearchProfile, SearchProfileInput } from "../types";
+import type { ActivityEvent, ActorType, Lead, LeadActivity, LeadActivityInput, LeadCreate, LeadDetail, LeadEditable, LeadFile, LeadPayment, LeadPaymentInput, LeadStatus, MessageTemplate, MessageTemplateInput, ScanCoverage, SearchPreset, SearchPresetInput, SearchProfile, SearchProfileInput } from "../types";
 import { mockRepo } from "./mock";
 import { supabaseRepo } from "./supabase";
 
@@ -25,6 +25,14 @@ export interface LeadsRepo {
   addActivity(leadId: string, input: LeadActivityInput): Promise<LeadActivity>;
   /** Apaga um toque (digitou errado, duplicou). */
   deleteActivity(id: string): Promise<void>;
+  /** Recebimentos. Sem `leadId`, traz os do dono inteiro (Resultados soma por
+   *  periodo). Mais recentes primeiro. */
+  listPayments(leadId?: string): Promise<LeadPayment[]>;
+  /** Registra que entrou dinheiro. Sem `paid_on`, assume hoje. */
+  addPayment(leadId: string, input: LeadPaymentInput): Promise<LeadPayment>;
+  /** Apaga um recebimento (digitou errado, duplicou). O `paid_until` do lead
+   *  recalcula sozinho: o banco faz por trigger, o mock espelha. */
+  deletePayment(id: string): Promise<void>;
   /** Retorna o perfil de busca do dono logado, ou null se ainda nao existe. */
   getProfile(): Promise<SearchProfile | null>;
   /** Upsert do perfil de busca: cria se nao existe, atualiza se ja existe. */

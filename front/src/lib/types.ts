@@ -267,6 +267,15 @@ export interface Lead {
   // este so sobe quando houve toque de verdade.
   last_activity_at?: string | null;
 
+  // Ate quando o cliente esta pago (YYYY-MM-DD). Mantida por trigger a partir
+  // de lead_payments, nunca a mao.
+  //
+  // NULL nao quer dizer caloteiro: quer dizer que ninguem esta acompanhando
+  // recebimento deste cliente. A diferenca importa, porque tratar as duas
+  // coisas igual faria a base inteira aparecer em atraso no dia em que esta
+  // coluna nasceu, e alerta que grita pra todo mundo ninguem le.
+  paid_until?: string | null;
+
   // Cadastrado a mao pelo dono, nao veio da descoberta. A esteira enriquece e
   // pontua igual, mas nao descarta por nota: quem digitou ja decidiu que
   // interessa. Descarte por fato (empresa baixada, sem contato) continua valendo.
@@ -294,6 +303,30 @@ export interface LeadActivityInput {
   kind: ActivityKind;
   body: string;
   happened_at?: string;
+}
+
+// Um recebimento: quanto entrou, quando, e ate quando cobre o contrato.
+//
+// `amount` vive aqui e nao e derivado de deal_value de proposito. Reconstruir o
+// recebido multiplicando o valor de hoje pelos meses pagos mente na hora em que
+// o preco muda, e preco de agencia muda.
+export interface LeadPayment {
+  id: string;
+  lead_id: string;
+  amount: number;
+  /** Quando o dinheiro entrou (YYYY-MM-DD). Pode ser no passado. */
+  paid_on: string;
+  /** Ate quando cobre (YYYY-MM-DD). Null = avulso, nao mexe no paid_until. */
+  covers_until: string | null;
+  note: string | null;
+  created_at: string;
+}
+
+export interface LeadPaymentInput {
+  amount: number;
+  paid_on?: string;
+  covers_until?: string | null;
+  note?: string | null;
 }
 
 export interface FieldProvenance {
