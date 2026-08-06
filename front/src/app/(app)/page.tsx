@@ -19,6 +19,7 @@ import {
   CaretUp,
 } from "@phosphor-icons/react";
 import { useLeads } from "@/hooks/use-leads";
+import { lastTouchAt } from "@/lib/activities";
 import { useAuth } from "@/lib/auth";
 import { getRepo } from "@/lib/repo";
 import { fmtRelative } from "@/lib/format";
@@ -185,13 +186,17 @@ export default function InicioPage() {
 
   // #3 — Esfriando: enviados/sem resposta, SEM follow-up agendado (senao caem em
   // Follow-ups) e sem nenhum toque ha COOLING_DAYS+ dias. O ralo silencioso.
+  //
+  // Usa lastTouchAt, que cai em updated_at pra quem ainda nao tem toque
+  // registrado. Sem esse fallback, no dia em que a linha do tempo entrou a base
+  // inteira apareceria aqui de uma vez, e o alerta viraria ruido.
   const esfriando = useMemo(() => {
     const limite = renderedAt - COOLING_DAYS * 24 * 60 * 60 * 1000;
     return leads
       .filter((l) => l.status === "enviado" || l.status === "sem_resposta")
       .filter((l) => !l.followup_at)
-      .filter((l) => +new Date(l.updated_at) < limite)
-      .sort((a, b) => +new Date(a.updated_at) - +new Date(b.updated_at)); // mais frio primeiro
+      .filter((l) => +new Date(lastTouchAt(l)) < limite)
+      .sort((a, b) => +new Date(lastTouchAt(a)) - +new Date(lastTouchAt(b))); // mais frio primeiro
   }, [leads, renderedAt]);
 
   const temAcao =
