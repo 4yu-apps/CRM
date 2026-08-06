@@ -36,6 +36,7 @@ import {
 import { getRepo } from "@/lib/repo";
 import { FollowupCard } from "@/components/followup-card";
 import { DealCard } from "@/components/deal-card";
+import { LeadTimeline } from "@/components/lead-timeline";
 import { LeadFiles } from "@/components/lead-files";
 import { TagsEditor } from "@/components/tags-editor";
 import { waSend, openWhatsApp } from "@/lib/whatsapp";
@@ -1325,55 +1326,13 @@ export default function FichaPage() {
         {/* Anexos do lead (contrato, etc.) */}
         <LeadFiles leadId={lead.id} />
 
-        {/* Historico do funil */}
-        {history.length > 0 && (
-          <div className="border-t border-border p-6 sm:p-7">
-            <div className="mb-4 text-[12px] font-bold uppercase tracking-wider text-faint">Histórico do funil</div>
-            <div className="flex flex-col gap-0">
-              {history.map((h, i) => {
-                const toMeta = STATUS_META[h.to_status];
-                const tc = TONE_CLASSES[toMeta.tone];
-                return (
-                  <div key={h.id} className="flex gap-3.5 pb-4 last:pb-0">
-                    {/* linha da timeline */}
-                    <div className="relative flex flex-col items-center">
-                      <div className={cn("mt-0.5 flex size-7 flex-none items-center justify-center rounded-full border text-[11px] font-bold", tc)}>
-                        {i + 1}
-                      </div>
-                      {i < history.length - 1 && (
-                        <div className="mt-1 flex-1 w-px bg-border" />
-                      )}
-                    </div>
-                    <div className="min-w-0 pb-1 pt-0.5">
-                      <div className="flex flex-wrap items-center gap-2">
-                        {h.from_status && (
-                          <>
-                            <span className="text-[12.5px] font-semibold text-muted-foreground">
-                              {STATUS_META[h.from_status]?.label ?? h.from_status}
-                            </span>
-                            <ArrowRight size={13} className="text-faint" />
-                          </>
-                        )}
-                        <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider border", tc)}>
-                          {toMeta.label}
-                        </span>
-                        <span className="text-[11.5px] text-faint">
-                          por {h.actor === "system" ? "sistema" : h.actor === "extension" ? "extensão" : "você"}
-                        </span>
-                      </div>
-                      {h.note && (
-                        <div className="mt-0.5 text-[13px] text-muted-foreground">{h.note}</div>
-                      )}
-                      <div className="mt-0.5 text-[11.5px] text-faint" title={h.changed_at}>
-                        {fmtRelative(h.changed_at)} ({fmtDateTime(h.changed_at)})
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        {/* Linha do tempo: status + toques registrados, numa lista so. */}
+        <LeadTimeline
+          leadId={lead.id}
+          history={history}
+          activities={detail.activities}
+          onChanged={load}
+        />
 
         {/* Acoes + LGPD */}
         <div className="border-t border-border p-6 sm:p-7">
