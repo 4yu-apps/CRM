@@ -146,10 +146,24 @@ python -m pytest
 
 # front (modo mock)
 cd front && npm install && npm run dev   # localhost:3000 ; npm run lint ; npm run build
+npm test                                 # vitest: logica pura de lib/
+npm run e2e                              # playwright: fluxo real, desktop + mobile
 
 # extensao (logica pura)
 cd extension && node --test
 ```
+
+O `npm test` do front nao e so teste de funcao. Ele sobe as migrations num
+Postgres embutido (o mesmo do `db:validate`) e confere que os **quatro
+espelhos** da maquina de estados concordam: banco, front, esteira e extensao.
+Quando divergem o sintoma nao e erro de build, e um botao que aparece na tela, o
+usuario clica e o banco responde "Transicao de status invalida" em producao. Foi
+assim que achamos `aprovado -> descartado` faltando no banco.
+
+O `npm run e2e` roda sempre com `NEXT_PUBLIC_DATA_SOURCE=mock`, entao **nunca
+toca a base de producao** e nao precisa de login. Ele builda e sobe na porta
+3100, em pt-BR e fuso de Sao Paulo, porque data e dinheiro na tela dependem
+disso. Falha guarda print e trace em `test-results/` (gitignored).
 
 Para ligar no Supabase real, veja o `.env.example` de cada pasta. Segredos so em
 `.env` / `.env.local` (gitignored). **O repositorio e PUBLICO: nunca commite

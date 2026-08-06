@@ -2,53 +2,14 @@
 // Aplica as 6 migrations num banco em memoria com stub do schema `auth` do
 // Supabase, depois roda testes de catalogo + comportamento (maquina de
 // estados, dedup, guarda LGPD, historico, RPC). Uso: node scripts/validate-local.mjs
-import { PGlite } from '@electric-sql/pglite'
-import { readFileSync, readdirSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
-import { dirname, join } from 'node:path'
-
-const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-const migDir = join(root, 'supabase', 'migrations')
+import { applyMigrations } from './schema-offline.mjs'
 
 let fail = 0
 const ok  = (m) => console.log(`  \x1b[32m✓\x1b[0m ${m}`)
 const bad = (m) => { console.log(`  \x1b[31m✗ ${m}\x1b[0m`); fail++ }
 const section = (m) => console.log(`\n\x1b[1m${m}\x1b[0m`)
 
-// Stub do ambiente Supabase que o pglite nao tem (auth schema, roles).
-// auth.uid() le um GUC de teso para podermos exercitar RLS.
-const PREAMBLE = `
-  create schema if not exists auth;
-  create schema if not exists storage;
-  create table if not exists auth.users (
-    id uuid primary key default gen_random_uuid(),
-    email text
-  );
-  create or replace function auth.uid() returns uuid language sql stable as
-    $$ select nullif(current_setting('garimpo.test_uid', true), '')::uuid $$;
-  create or replace function auth.role() returns text language sql stable as
-    $$ select coalesce(nullif(current_setting('garimpo.test_role', true), ''), 'authenticated') $$;
-  create table if not exists storage.buckets (
-    id text primary key,
-    name text not null,
-    public boolean not null default false,
-    file_size_limit bigint
-  );
-  create table if not exists storage.objects (
-    id uuid primary key default gen_random_uuid(),
-    bucket_id text references storage.buckets(id),
-    name text not null
-  );
-  alter table storage.objects enable row level security;
-  create or replace function storage.foldername(name text) returns text[]
-    language sql immutable as
-    $$ select string_to_array(trim(both '/' from name), '/') $$;
-  do $$ begin create role authenticated; exception when duplicate_object then null; end $$;
-  do $$ begin create role anon;          exception when duplicate_object then null; end $$;
-  do $$ begin create role service_role;  exception when duplicate_object then null; end $$;
-`
-
-const db = new PGlite()
+let db
 
 // helper: espera erro ao rodar fn; passa se o erro casar com /re/
 const expectError = async (label, sql, re) => {
@@ -57,21 +18,13 @@ const expectError = async (label, sql, re) => {
 }
 
 const run = async () => {
-  await db.exec(PREAMBLE)
-
-  // ---- aplicar migrations em ordem ----
+  // ---- aplicar migrations em ordem (schema-offline.mjs) ----
   section('Aplicando migrations')
-  const files = readdirSync(migDir).filter(f => f.endsWith('.sql')).sort()
-  for (const f of files) {
-    // pg_trgm nao e empacotado pelo PGlite. Esta migration e validada no
-    // Supabase real pelo db push; o restante do schema segue coberto offline.
-    if (f === '20260625120500_receita_estabelecimento.sql') {
-      ok(`${f} (pulada no PGlite: pg_trgm indisponivel)`)
-      continue
-    }
-    try { await db.exec(readFileSync(join(migDir, f), 'utf8')); ok(f) }
-    catch (e) { bad(`${f} -> ${e.message}`); throw e }
-  }
+  db = await applyMigrations((f, err, pulada) => {
+    if (pulada) ok(`${f} (pulada no PGlite: extensao indisponivel)`)
+    else if (err) bad(`${f} -> ${err.message}`)
+    else ok(f)
+  })
 
   // ---- catalogo ----
   section('Catalogo')

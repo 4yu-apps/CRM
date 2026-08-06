@@ -40,3 +40,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# playwright: relatorio, traces e prints de falha sao efemeros
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
