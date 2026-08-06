@@ -32,7 +32,9 @@ function norm(s: string): string {
   return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 }
 
-type Rect = { top: number; left: number; width: number };
+// `top` e `bottom` sao exclusivos: o menu ancora por um dos dois, dependendo de
+// pra que lado ele coube. `maxH` e o espaco real disponivel naquele lado.
+type Rect = { top?: number; bottom?: number; left: number; width: number; maxH: number };
 
 // Dropdown visual proprio (substitui o <select> nativo). Gatilho com padding
 // folgado dos dois lados — o caret nunca encosta na borda. O menu vai num
@@ -70,11 +72,35 @@ export function Dropdown({
   }, [options, query, withSearch]);
 
   // Mede o gatilho pra posicionar o menu (coordenadas de viewport, p/ fixed).
+  //
+  // Antes isso ancorava sempre em r.bottom + 6, com altura fixa de 320px. Perto
+  // do rodape da janela (dentro de um modal, por exemplo) o menu descia por cima
+  // de tudo e saia da tela: a lista de ramos vazava pra fora do modal de novo
+  // contato e ficava metade invisivel.
+  //
+  // Agora o menu abre pro lado onde ha espaco e nunca pede mais altura do que
+  // cabe. Se sobra pouco embaixo e mais em cima, ele vira pra cima.
   const measure = useCallback(() => {
     const el = triggerRef.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
-    setRect({ top: r.bottom + 6, left: align === "end" ? r.right : r.left, width: r.width });
+    const GAP = 6;
+    const MARGEM = 12;               // respiro pra borda da janela
+    const TETO = 320;                // altura maxima desejada
+    const MINIMO = 160;              // abaixo disso a lista fica inutil
+
+    const abaixo = window.innerHeight - r.bottom - GAP - MARGEM;
+    const acima = r.top - GAP - MARGEM;
+    const paraCima = abaixo < MINIMO && acima > abaixo;
+
+    setRect({
+      ...(paraCima
+        ? { bottom: window.innerHeight - r.top + GAP }
+        : { top: r.bottom + GAP }),
+      left: align === "end" ? r.right : r.left,
+      width: r.width,
+      maxH: Math.max(MINIMO, Math.min(TETO, paraCima ? acima : abaixo)),
+    });
   }, [align]);
 
   // Abre/fecha: mede o gatilho (inofensivo ao fechar) e zera a busca.
@@ -225,11 +251,13 @@ export function Dropdown({
               style={{
                 position: "fixed",
                 top: rect.top,
+                bottom: rect.bottom,
                 left: align === "end" ? undefined : rect.left,
                 right: align === "end" ? Math.max(0, window.innerWidth - rect.left) : undefined,
                 minWidth: rect.width,
+                maxHeight: rect.maxH,
               }}
-              className="z-[200] flex max-h-[320px] min-w-[180px] flex-col overflow-hidden rounded-[14px] border border-border bg-card shadow-xl"
+              className="z-[200] flex min-w-[180px] flex-col overflow-hidden rounded-[14px] border border-border bg-card shadow-xl"
             >
               {withSearch && (
                 <div className="relative flex-none border-b border-border p-2">
