@@ -6,6 +6,7 @@
 // que ninguem confia.
 import type { Lead } from "./types";
 import { lastTouchAt, daysSinceTouch } from "./activities";
+import { addMonths, parseDateOnly } from "./format";
 
 const DAY = 86_400_000;
 
@@ -45,18 +46,19 @@ export function renewalDate(l: Lead): Date | null {
   const base = new Date(l.deal_closed_at);
   if (Number.isNaN(base.getTime())) return null;
 
+  // addMonths em vez de setMonth cru: um contrato fechado em 31 de janeiro com
+  // prazo de um mes "renovava" em 3 de marco, porque o JS aceita 31 de fevereiro
+  // e desliza pro mes seguinte. Tres dias de silencio num aviso que existe
+  // justamente pra nao deixar passar a data.
   if (l.deal_billing === "por_prazo") {
     if (!l.deal_term_months) return null;
-    const d = new Date(base);
-    d.setMonth(d.getMonth() + l.deal_term_months);
-    return d;
+    return addMonths(base, l.deal_term_months);
   }
 
   if (l.deal_billing === "mensal_fixo") {
     // Proximo aniversario anual a partir de hoje.
-    const d = new Date(base);
-    d.setFullYear(d.getFullYear() + 1);
-    while (d.getTime() < Date.now()) d.setFullYear(d.getFullYear() + 1);
+    let d = addMonths(base, 12);
+    while (d.getTime() < Date.now()) d = addMonths(d, 12);
     return d;
   }
 
@@ -79,9 +81,62 @@ export function contractYears(l: Lead): number | null {
 }
 
 // ---------------------------------------------------------------------------
+// Pagamento em atraso
+// ---------------------------------------------------------------------------
+// Mora aqui, e nao em payments.ts, porque "essa conta merece minha atencao
+// hoje?" e pergunta de carteira. payments.ts cuida do dinheiro que entrou.
+
+/** Dias de tolerancia antes de um atraso virar alerta. */
+// Pix cai no dia, boleto compensa em um ou dois. Gritar no dia seguinte ao
+// vencimento faz o alerta acordar todo comeco de mes sem nada ter acontecido.
+export const TOLERANCIA_DIAS = 3;
+
+/**
+ * Alguem esta acompanhando recebimento desse cliente?
+ *
+ * `paid_until` vazio NAO quer dizer caloteiro: quer dizer que nunca se
+ * registrou recebimento nenhum. Tratar as duas coisas igual poria a carteira
+ * inteira em atraso no dia em que a coluna nasceu, que e o mesmo erro que a
+ * Fatia 2 evitou com o `last_activity_at`. Silencio ate o primeiro registro.
+ */
+export function tracksPayments(l: Lead): boolean {
+  return !!l.paid_until;
+}
+
+/**
+ * Dias de atraso. Negativo = ainda faltam dias pra vencer.
+ * Null quando a pergunta nao se aplica: nao e cliente, ou ninguem acompanha.
+ */
+export function daysOverdue(l: Lead, now = Date.now()): number | null {
+  if (!isClient(l)) return null;
+  const ate = parseDateOnly(l.paid_until);
+  if (!ate) return null;
+  return Math.floor((now - ate.getTime()) / DAY);
+}
+
+/** Esta devendo, ja passada a tolerancia. */
+export function isOverdue(l: Lead, now = Date.now()): boolean {
+  const d = daysOverdue(l, now);
+  return d !== null && d > TOLERANCIA_DIAS;
+}
+
+/** Soma do que esta em atraso agora: um mes de cada cliente que passou do prazo.
+ *  Um mes, e nao o acumulado: o CRM nao sabe quantos meses ficaram pra tras, so
+ *  ate quando o ultimo recebimento cobriu. Inventar o resto seria chute. */
+export function overdueAmount(leads: Lead[], now = Date.now()): number {
+  return leads.filter((l) => isOverdue(l, now)).reduce((s, l) => s + (l.deal_value ?? 0), 0);
+}
+
+// ---------------------------------------------------------------------------
 // Atencao: o que faz a tela de Clientes valer a visita
 // ---------------------------------------------------------------------------
-export type AttentionKind = "vencido" | "renovacao" | "aniversario" | "silencio" | "sem_valor";
+export type AttentionKind =
+  | "atraso"
+  | "vencido"
+  | "renovacao"
+  | "aniversario"
+  | "silencio"
+  | "sem_valor";
 
 export interface Attention {
   kind: AttentionKind;
@@ -97,6 +152,14 @@ export interface Attention {
  */
 export function attentionOf(l: Lead, now = Date.now()): Attention | null {
   if (!isClient(l)) return null;
+
+  // Dinheiro que nao entrou vem antes de tudo. Contrato que vence e problema do
+  // mes que vem; cliente que parou de pagar ja e problema deste mes, e adiar a
+  // conversa so aumenta o valor da conversa.
+  const atraso = daysOverdue(l, now);
+  if (atraso !== null && atraso > TOLERANCIA_DIAS) {
+    return { kind: "atraso", label: `${atraso}d sem pagar`, rank: -2000 - atraso };
+  }
 
   const dias = daysUntilRenewal(l);
   const recorrente = l.deal_billing === "mensal_fixo";

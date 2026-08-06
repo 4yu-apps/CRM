@@ -3,6 +3,7 @@ import {
   isClient, isChurned, renewalDate, daysUntilRenewal, contractYears,
   attentionOf, needsAttention, mrr, churnedMrr, churnRate,
   isColdReactivatable, daysCold, SILENCIO_DIAS,
+  tracksPayments, daysOverdue, isOverdue, overdueAmount, TOLERANCIA_DIAS,
 } from "./clients";
 import type { Lead } from "./types";
 
@@ -86,6 +87,19 @@ describe("renovacao", () => {
     expect(renewalDate(l)!.getFullYear()).toBe(2027);
   });
 
+  it("contrato fechado em dia 31 nao transborda pro mes seguinte", () => {
+    // Era um bug real: `setMonth(+1)` num 31 de janeiro devolve 3 de marco,
+    // porque o JS aceita "31 de fevereiro" e desliza. O aviso de renovacao
+    // chegava tres dias depois do dia que ele existe pra nao deixar passar.
+    const l = lead({
+      deal_billing: "por_prazo", deal_term_months: 1,
+      deal_closed_at: "2026-01-31T12:00:00-03:00",
+    });
+    const r = renewalDate(l)!;
+    expect(r.getMonth()).toBe(1); // fevereiro, nao marco
+    expect(r.getDate()).toBe(28);
+  });
+
   it("sem data, sem prazo ou fora da carteira nao ha renovacao", () => {
     expect(renewalDate(lead({ deal_closed_at: null }))).toBeNull();
     expect(renewalDate(lead({ deal_billing: "por_prazo", deal_term_months: null }))).toBeNull();
@@ -100,7 +114,80 @@ describe("renovacao", () => {
   });
 });
 
+describe("pagamento em atraso", () => {
+  it("sem recebimento nenhum registrado, o cliente NAO esta em atraso", () => {
+    // A distincao que impede um alarme falso em massa: paid_until vazio quer
+    // dizer "ninguem acompanha", nao "nao pagou". No dia em que a coluna
+    // nasceu, a carteira inteira estava assim.
+    const l = lead({ paid_until: null });
+    expect(tracksPayments(l)).toBe(false);
+    expect(daysOverdue(l)).toBeNull();
+    expect(isOverdue(l)).toBe(false);
+  });
+
+  it("cobertura no futuro e cliente em dia, com dias negativos", () => {
+    const l = lead({ paid_until: "2026-09-06" });
+    expect(daysOverdue(l)!).toBeLessThan(0);
+    expect(isOverdue(l)).toBe(false);
+  });
+
+  it("a tolerancia segura o alarme nos primeiros dias", () => {
+    // Boleto compensa em um ou dois dias. Gritar no dia seguinte ao vencimento
+    // faria o alerta acordar todo comeco de mes sem nada ter acontecido.
+    const dentro = lead({ paid_until: "2026-08-03" }); // 3 dias
+    const fora = lead({ paid_until: "2026-08-02" }); // 4 dias
+    expect(daysOverdue(dentro)).toBe(TOLERANCIA_DIAS);
+    expect(isOverdue(dentro)).toBe(false);
+    expect(isOverdue(fora)).toBe(true);
+  });
+
+  it("quem nao e cliente ativo nao entra na conta de atraso", () => {
+    // Cliente que saiu da carteira e cobranca, nao gestao. Se ele contasse
+    // aqui, todo churn viraria um alerta permanente que ninguem pode resolver.
+    expect(daysOverdue(lead({ status: "cancelado", paid_until: "2026-01-01" }))).toBeNull();
+    expect(daysOverdue(lead({ archived: true, paid_until: "2026-01-01" }))).toBeNull();
+  });
+
+  it("o total em atraso soma um mes de cada devedor, nao o acumulado", () => {
+    // O CRM sabe ate quando o ultimo recebimento cobriu, nao quantos meses
+    // ficaram pra tras. Multiplicar por meses estimados seria chute com cara
+    // de numero.
+    const base = [
+      lead({ id: "a", deal_value: 1000, paid_until: "2026-05-01" }), // meses atras
+      lead({ id: "b", deal_value: 500, paid_until: "2026-07-01" }),
+      lead({ id: "c", deal_value: 800, paid_until: "2026-09-01" }), // em dia
+      lead({ id: "d", deal_value: 700, paid_until: null }), // nao acompanhado
+    ];
+    expect(overdueAmount(base)).toBe(1500);
+  });
+});
+
 describe("atencao", () => {
+  it("atraso vem antes de tudo, ate de contrato vencido", () => {
+    // Contrato que vence e problema do mes que vem. Cliente que parou de pagar
+    // ja e problema deste mes, e adiar so aumenta o valor da conversa.
+    const l = lead({
+      paid_until: "2026-06-01",
+      deal_billing: "por_prazo", deal_term_months: 1,
+      deal_closed_at: "2026-01-06T12:00:00-03:00", // tambem vencido
+      last_activity_at: diasAtras(200), // tambem em silencio
+    });
+    const a = attentionOf(l)!;
+    expect(a.kind).toBe("atraso");
+    expect(a.label).toContain("sem pagar");
+  });
+
+  it("quanto mais atrasado, mais no topo da lista", () => {
+    const pouco = attentionOf(lead({ paid_until: "2026-07-25" }))!;
+    const muito = attentionOf(lead({ paid_until: "2026-03-01" }))!;
+    expect(muito.rank).toBeLessThan(pouco.rank);
+  });
+
+  it("cliente em dia com o pagamento cai nas outras regras, nao no atraso", () => {
+    const l = lead({ paid_until: "2026-09-06", last_activity_at: diasAtras(45) });
+    expect(attentionOf(l)!.kind).toBe("silencio");
+  });
+
   it("vencido vem antes de tudo", () => {
     const l = lead({
       deal_billing: "por_prazo", deal_term_months: 1,
