@@ -99,19 +99,34 @@
     if (!botao) return false;
     const antes = new Set(camposDeTexto());
     clica(botao);
-    const busca = await ateQue(() => camposDeTexto().find((el) => !antes.has(el)), 1200);
+    const busca = await ateQue(() => {
+      const foco = document.activeElement;
+      if (foco && foco !== document.body && camposDeTexto().includes(foco)) return foco;
+      return camposDeTexto().find((el) => !antes.has(el));
+    }, 1500);
     if (!busca) {
       fecharPainel();
       return false;
     }
     digita(busca, num);
     const alvo = await ateQue(() => {
-      const linhas = Array.from(document.querySelectorAll('[role="row"], [role="listitem"], [role="button"]'));
-      return linhas.find((l) => {
+      const casa = (l) => {
         const txt = (l.textContent || "").replace(/\D/g, "");
         return txt && mesmoNumero(txt, num);
-      });
-    }, 1800);
+      };
+      const secao = Array.from(document.querySelectorAll("div, span, h2, h3")).find(
+        (e) => /n[aã]o est[aã]o na sua lista|not in your contacts|n[aã]o salvos?/i.test(e.textContent || "")
+      );
+      if (secao) {
+        const perto = Array.from(
+          (secao.closest('[role="listitem"], [role="row"], div')?.parentElement || document).querySelectorAll('[role="row"], [role="listitem"], [role="button"]')
+        ).find(casa);
+        if (perto) return perto;
+      }
+      return Array.from(
+        document.querySelectorAll('[role="row"], [role="listitem"], [role="button"]')
+      ).find(casa);
+    }, 2200);
     if (!alvo) {
       fecharPainel();
       return false;

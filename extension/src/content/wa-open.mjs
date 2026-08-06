@@ -143,8 +143,14 @@ async function abrirConversa(phone, text) {
   const antes = new Set(camposDeTexto());
   clica(botao);
 
-  // A busca do painel e o campo NOVO que apareceu depois do clique.
-  const busca = await ateQue(() => camposDeTexto().find((el) => !antes.has(el)), 1200);
+  // O painel FOCA a busca ao abrir. O activeElement e a pista mais confiavel;
+  // a diferenca de campos fica de reserva (caso o WhatsApp reuse o mesmo campo
+  // e o foco nao venha).
+  const busca = await ateQue(() => {
+    const foco = document.activeElement;
+    if (foco && foco !== document.body && camposDeTexto().includes(foco)) return foco;
+    return camposDeTexto().find((el) => !antes.has(el));
+  }, 1500);
   if (!busca) {
     fecharPainel();
     return false;
@@ -155,12 +161,26 @@ async function abrirConversa(phone, text) {
   // Espera uma linha de resultado que contenha os digitos do numero. Sem isso,
   // clicar no primeiro item abriria a conversa ERRADA.
   const alvo = await ateQue(() => {
-    const linhas = Array.from(document.querySelectorAll('[role="row"], [role="listitem"], [role="button"]'));
-    return linhas.find((l) => {
+    const casa = (l) => {
       const txt = (l.textContent || "").replace(/\D/g, "");
       return txt && mesmoNumero(txt, num);
-    });
-  }, 1800);
+    };
+    // O numero nao salvo aparece sob um cabecalho proprio ("Nao estao na sua
+    // lista de contatos"). Se ele existir, prioriza o que vem depois dele.
+    const secao = Array.from(document.querySelectorAll("div, span, h2, h3")).find((e) =>
+      /n[aã]o est[aã]o na sua lista|not in your contacts|n[aã]o salvos?/i.test(e.textContent || ""),
+    );
+    if (secao) {
+      const perto = Array.from(
+        (secao.closest('[role="listitem"], [role="row"], div')?.parentElement || document)
+          .querySelectorAll('[role="row"], [role="listitem"], [role="button"]'),
+      ).find(casa);
+      if (perto) return perto;
+    }
+    return Array.from(
+      document.querySelectorAll('[role="row"], [role="listitem"], [role="button"]'),
+    ).find(casa);
+  }, 2200);
 
   if (!alvo) {
     fecharPainel();
