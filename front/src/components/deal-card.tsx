@@ -10,11 +10,12 @@
 // repo e avisa o pai (onSaved).
 import { useState } from "react";
 import { toast } from "sonner";
-import { CheckCircle, CurrencyCircleDollar, PencilSimple } from "@phosphor-icons/react";
+import { CheckCircle, CurrencyCircleDollar, PencilSimple, ArrowBendUpLeft } from "@phosphor-icons/react";
 import { getRepo } from "@/lib/repo";
 import { parseBRL, toDateInput, fromDateInput, todayInput } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { DealBilling, Lead } from "@/lib/types";
+import { ChurnModal } from "./churn-modal";
 
 function fmtBRL(value: number): string {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
@@ -34,6 +35,7 @@ export function DealCard({ lead, onSaved }: { lead: Lead; onSaved: () => void | 
   const repo = getRepo();
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saindo, setSaindo] = useState(false);
 
   const [value, setValue] = useState(lead.deal_value != null ? String(lead.deal_value) : "");
   const [billing, setBilling] = useState<DealBilling>(lead.deal_billing ?? "mensal_fixo");
@@ -41,10 +43,11 @@ export function DealCard({ lead, onSaved }: { lead: Lead; onSaved: () => void | 
   const [closedAt, setClosedAt] = useState(toDateInput(lead.deal_closed_at));
 
   const temValor = lead.deal_value != null;
+  const cancelado = lead.status === "cancelado";
   // Negocio ja registrado num lead que voltou pro funil (fechado -> reuniao, por
   // exemplo). O valor continua valendo como historico, mas chamar de "fechado"
-  // seria mentira.
-  const reaberto = temValor && lead.status !== "fechado";
+  // seria mentira. Cancelado tem cara propria: nao e reabertura, e saida.
+  const reaberto = temValor && !cancelado && lead.status !== "fechado";
   const lido = parseBRL(value);
 
   const abrirEdicao = () => {
@@ -122,20 +125,26 @@ export function DealCard({ lead, onSaved }: { lead: Lead; onSaved: () => void | 
   // ----- Leitura -----
   if (!editing) {
     return (
+      <>
       <div
         className={cn(
           "rounded-[14px] border p-4",
-          reaberto ? "border-border bg-surface-2" : "border-success/30 bg-success-bg",
+          cancelado
+            ? "border-danger/30 bg-danger-bg"
+            : reaberto
+              ? "border-border bg-surface-2"
+              : "border-success/30 bg-success-bg",
         )}
       >
         <div className="mb-1.5 flex items-center justify-between gap-2">
           <div
             className={cn(
               "flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider",
-              reaberto ? "text-faint" : "text-success",
+              cancelado ? "text-danger" : reaberto ? "text-faint" : "text-success",
             )}
           >
-            <CheckCircle size={14} weight="fill" /> {reaberto ? "Negócio reaberto" : "Negócio fechado"}
+            {cancelado ? <ArrowBendUpLeft size={14} weight="bold" /> : <CheckCircle size={14} weight="fill" />}
+            {cancelado ? "Cliente saiu" : reaberto ? "Negócio reaberto" : "Negócio fechado"}
           </div>
           <button
             type="button"
@@ -155,7 +164,27 @@ export function DealCard({ lead, onSaved }: { lead: Lead; onSaved: () => void | 
             Esse lead voltou pro funil. O valor fica aqui como histórico do que já foi fechado uma vez.
           </p>
         )}
+        {cancelado && (
+          <p className="mt-2 text-[12px] text-ink-2">
+            {lead.churn_reason ?? "Motivo não registrado"}
+            {lead.churn_at && <span className="ml-1.5 text-faint">· saiu em {fmtDia(lead.churn_at)}</span>}
+          </p>
+        )}
       </div>
+
+      {/* Saida na propria ficha: da pra chegar aqui por Clientes, Funil, busca
+          ou link direto, e quem esta lendo a conta e quem decide que acabou. */}
+      {lead.status === "fechado" && (
+        <button
+          type="button"
+          onClick={() => setSaindo(true)}
+          className="mt-2 text-[12px] font-semibold text-faint hover:text-danger"
+        >
+          Registrar saída do cliente
+        </button>
+      )}
+      {saindo && <ChurnModal lead={lead} onClose={() => setSaindo(false)} onDone={onSaved} />}
+      </>
     );
   }
 
