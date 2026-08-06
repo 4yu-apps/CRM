@@ -8,7 +8,7 @@ LeadStatus = Literal[
     "bruto", "enriquecido", "qualificado", "descartado",
     "rascunho_pronto", "aprovado", "enviado", "sem_resposta",
     "respondeu", "sem_interesse", "interessado", "reuniao",
-    "proposta", "fechado", "perdido",
+    "proposta", "fechado", "perdido", "cancelado",
 ]
 
 LeadSource = Literal[

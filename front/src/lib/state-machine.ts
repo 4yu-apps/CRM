@@ -20,8 +20,13 @@ export const TRANSITIONS: Record<LeadStatus, LeadStatus[]> = {
   interessado: ["aprovado", "enviado", "respondeu", "reuniao", "fechado", "proposta", "perdido"],
   reuniao: ["aprovado", "enviado", "respondeu", "interessado", "fechado", "proposta", "perdido"],
   proposta: ["aprovado", "enviado", "respondeu", "interessado", "reuniao", "fechado", "perdido"],
-  // fechado deixa de ser terminal: pode reabrir se foi fechado por engano.
-  fechado: ["aprovado", "enviado", "respondeu", "interessado", "reuniao"],
+  // fechado deixa de ser terminal: pode reabrir se foi fechado por engano, e
+  // pode virar cancelado quando o cliente sai (churn).
+  fechado: ["aprovado", "enviado", "respondeu", "interessado", "reuniao", "cancelado"],
+  // Cliente que saiu volta: reativar nao inventa lead novo, mantem historico e
+  // valor. Cancelado NAO volta pro funil de prospeccao: quem ja foi cliente e
+  // reconquista de carteira, nao lead frio.
+  cancelado: ["fechado"],
   // arquivados (descartado/sem_interesse/perdido) reativam pra Novo (visivel).
   descartado: ["enriquecido", "rascunho_pronto"],
   sem_interesse: ["rascunho_pronto"],
@@ -34,7 +39,7 @@ export const CONTACT_STATUSES: LeadStatus[] = ["rascunho_pronto", "aprovado", "e
 // Status fora do funil ativo (descarte, sem interesse, perda, fechado-ganho).
 // Usado nas metricas de "ativos". Independe do grafo: descartado pode ser
 // reativado, mas continua fora do funil ativo ate voltar.
-export const EXIT_STATUSES: LeadStatus[] = ["descartado", "sem_interesse", "perdido", "fechado"];
+export const EXIT_STATUSES: LeadStatus[] = ["descartado", "sem_interesse", "perdido", "fechado", "cancelado"];
 
 export function nextStatuses(status: LeadStatus): LeadStatus[] {
   return TRANSITIONS[status] ?? [];
@@ -72,6 +77,7 @@ export const STATUS_META: Record<LeadStatus, StatusMeta> = {
   reuniao: { label: "Reuniao", stage: "conversa", tone: "good" },
   proposta: { label: "Proposta", stage: "conversa", tone: "good" },
   fechado: { label: "Fechado", stage: "ganho", tone: "good" },
+  cancelado: { label: "Cancelado", stage: "saida", tone: "bad" },
   descartado: { label: "Descartado", stage: "saida", tone: "bad" },
   sem_interesse: { label: "Sem interesse", stage: "saida", tone: "bad" },
   perdido: { label: "Perdido", stage: "saida", tone: "bad" },
@@ -89,6 +95,8 @@ const TRANSITION_LABELS: Record<string, string> = {
   "descartado->enriquecido": "Reativar",
   "descartado->rascunho_pronto": "Reativar",
   "sem_interesse->rascunho_pronto": "Reativar",
+  "fechado->cancelado": "Registrar saida",
+  "cancelado->fechado": "Cliente voltou",
   "perdido->rascunho_pronto": "Reativar",
 };
 
@@ -110,6 +118,7 @@ export const STATUS_ORDER: LeadStatus[] = [
   "reuniao",
   "proposta",
   "fechado",
+  "cancelado",
   "perdido",
   "sem_interesse",
   "descartado",
