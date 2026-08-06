@@ -89,14 +89,26 @@ export function NewContactModal({
 
   const valorLido = parseBRL(valor);
 
-  // Repetido: mesmo telefone (so digitos) em qualquer contato ja cadastrado.
-  // Numero curto ainda esta sendo digitado, entao so acusa a partir de 10 digitos
-  // (DDD + numero), pra nao piscar aviso a cada tecla.
-  const duplicado = useMemo(() => {
+  // Repetido por telefone (so digitos). Numero curto ainda esta sendo digitado,
+  // entao so acusa a partir de 10 digitos (DDD + numero), pra nao piscar aviso a
+  // cada tecla.
+  const duplicadoFone = useMemo(() => {
     const d = digits(whatsapp);
     if (d.length < 10) return null;
     return existing.find((l) => digits(l.phone) === d || digits(l.whatsapp) === d) ?? null;
   }, [whatsapp, existing]);
+
+  // Repetido por NOME. O banco tem indice unico em (dono, nome + endereco
+  // normalizados) e este formulario nao pede endereco, entao dois contatos de
+  // mesmo nome colidem: duas unidades da mesma franquia, por exemplo. Sem este
+  // aviso o dono levava um "duplicate key violates unique constraint" cru.
+  const duplicadoNome = useMemo(() => {
+    const n = nome.trim().toLowerCase();
+    if (n.length < 3) return null;
+    return existing.find((l) => (l.business_name ?? "").trim().toLowerCase() === n) ?? null;
+  }, [nome, existing]);
+
+  const duplicado = duplicadoFone ?? duplicadoNome;
 
   const salvar = async () => {
     const nomeLimpo = nome.trim();
@@ -116,8 +128,12 @@ export function NewContactModal({
       toast.warning("Pra prospectar preciso de um canal: WhatsApp ou e-mail.");
       return;
     }
-    if (duplicado) {
-      toast.warning(`Esse WhatsApp já é de ${duplicado.business_name ?? "um contato seu"}.`);
+    if (duplicadoFone) {
+      toast.warning(`Esse WhatsApp já é de ${duplicadoFone.business_name ?? "um contato seu"}.`);
+      return;
+    }
+    if (duplicadoNome) {
+      toast.warning(`Você já tem um contato chamado "${nomeLimpo}".`);
       return;
     }
 
@@ -182,9 +198,11 @@ export function NewContactModal({
       // estar velha (outra aba, a esteira rodando). Se o indice unico do banco
       // pegar, o erro vem em ingles falando de constraint; traduz.
       toast.error(
-        /duplicate key|unique constraint|leads_owner_(cnpj|phone)_uniq/i.test(msg)
-          ? "Você já tem um contato com esse telefone. Procure por ele na lista."
-          : msg,
+        /leads_owner_name_addr_uniq/i.test(msg)
+          ? "Você já tem um contato com esse nome. Procure por ele na lista."
+          : /duplicate key|unique constraint|leads_owner_(cnpj|phone)_uniq/i.test(msg)
+            ? "Você já tem um contato com esse telefone. Procure por ele na lista."
+            : msg,
       );
     } finally {
       setSaving(false);
@@ -297,7 +315,8 @@ export function NewContactModal({
             <div className="-mt-2 flex items-start gap-2 rounded-[12px] border border-amber-300 bg-amber-50 px-3 py-2.5 text-[12.5px] text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
               <Warning size={15} weight="fill" className="mt-0.5 flex-none" />
               <span>
-                Esse WhatsApp já é de <strong>{duplicado.business_name ?? "um contato seu"}</strong>.{" "}
+                {duplicadoFone ? "Esse WhatsApp já é de " : "Você já tem um contato chamado "}
+                <strong>{duplicado.business_name ?? "um contato seu"}</strong>.{" "}
                 <Link href={`/ficha/${duplicado.id}`} onClick={onClose} className="font-semibold underline">
                   Abrir a ficha
                 </Link>

@@ -103,4 +103,26 @@ describe("frios reativaveis", () => {
   it("daysCold conta o tempo desde o ultimo toque", () => {
     expect(daysCold(frio(45, "perdido"))).toBe(45);
   });
+
+  it("o robo re-enriquecer NAO esquenta um lead abandonado", () => {
+    // updated_at de ontem porque a esteira reprocessou, mas o ultimo toque de
+    // verdade foi ha 60 dias. Antes da linha do tempo isso sumia da reativacao
+    // sozinho, e a receita parada no banco continuava parada.
+    const l = lead({
+      status: "perdido",
+      updated_at: new Date(HOJE.getTime() - 1 * 86_400_000).toISOString(),
+      last_activity_at: new Date(HOJE.getTime() - 60 * 86_400_000).toISOString(),
+    });
+    expect(daysCold(l)).toBe(60);
+    expect(isColdReactivatable(l)).toBe(true);
+  });
+
+  it("toque recente tira o lead da reativacao, mesmo com updated_at antigo", () => {
+    const l = lead({
+      status: "sem_resposta",
+      updated_at: new Date(HOJE.getTime() - 90 * 86_400_000).toISOString(),
+      last_activity_at: new Date(HOJE.getTime() - 2 * 86_400_000).toISOString(),
+    });
+    expect(isColdReactivatable(l)).toBe(false);
+  });
 });

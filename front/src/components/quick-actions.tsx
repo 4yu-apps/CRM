@@ -1,8 +1,14 @@
 "use client";
-// #5 + #6 — Acao rapida no card: muda status e/ou anexa uma nota de 1 linha
+// #5 + #6 — Acao rapida no card: muda status e/ou registra um toque de 1 linha
 // sem abrir a ficha. Os botoes sao contextuais (saem da maquina de estados),
 // so transicoes que NAO exigem dado extra (reuniao precisa de data -> fica no
-// funil). A nota digitada e prefixada ao notes do lead, com data.
+// funil).
+//
+// A nota digitada aqui vira ATIVIDADE na linha do tempo. Antes ela era
+// prefixada com "[dd/mm/aaaa]" no campo notes do lead, o que fazia dois
+// escritores brigarem pelo mesmo texto: o textarea da ficha sobrescrevia tudo e
+// apagava o log em silencio. Agora cada um tem seu lugar: evento na timeline,
+// anotacao livre sobre a conta no notes.
 import { useState } from "react";
 import { toast } from "sonner";
 import { nextStatuses, canTransition, STATUS_META } from "@/lib/state-machine";
@@ -31,11 +37,6 @@ function chipTone(s: LeadStatus): string {
   return "border-rose-300 text-rose-700 hover:bg-rose-50 dark:border-rose-800 dark:text-rose-400";
 }
 
-function stamp(note: string): string {
-  const dia = new Date().toLocaleDateString("pt-BR");
-  return `[${dia}] ${note.trim()}`;
-}
-
 export function QuickActions({
   lead,
   repo,
@@ -54,8 +55,7 @@ export function QuickActions({
 
   const attachNote = async () => {
     if (!note.trim()) return;
-    const prev = lead.notes?.trim();
-    await repo.update(lead.id, { notes: prev ? `${stamp(note)}\n${prev}` : stamp(note) });
+    await repo.addActivity(lead.id, { kind: "nota", body: note.trim() });
   };
 
   const move = async (to: LeadStatus) => {
@@ -78,7 +78,7 @@ export function QuickActions({
     setBusy(true);
     try {
       await attachNote();
-      toast.success("Nota salva.");
+      toast.success("Registrado na linha do tempo.");
       setNote("");
       await onDone();
     } catch (e) {
@@ -94,7 +94,7 @@ export function QuickActions({
         type="text"
         value={note}
         onChange={(e) => setNote(e.target.value)}
-        placeholder="Nota rápida (opcional)"
+        placeholder="O que aconteceu? (opcional)"
         disabled={busy}
         className="w-full rounded-[8px] border border-border-2 bg-card px-2.5 py-1.5 text-[12.5px] outline-none focus:border-brand disabled:opacity-50"
       />
@@ -117,7 +117,7 @@ export function QuickActions({
             disabled={busy}
             className="ml-auto rounded-full border border-border-2 px-2.5 py-1 text-[11.5px] font-semibold text-ink-2 hover:text-brand disabled:opacity-50"
           >
-            Só salvar nota
+            Só registrar
           </button>
         )}
       </div>

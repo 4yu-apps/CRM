@@ -332,8 +332,16 @@ export default function ContatosPage() {
         case "score":
           base = (a.score ?? -1) - (b.score ?? -1);
           break;
-        default: // recent
-          base = +new Date(a.updated_at) - +new Date(b.updated_at);
+        default: {
+          // Ultimo TOQUE, nao updated_at: aquele sobe quando o robo enriquece ou
+          // alguem corrige a cidade, entao nao diz nada sobre abandono. Quem
+          // nunca foi tocado vai pro fim da ordem crescente (0), e nao pro
+          // comeco como uma data antiga faria.
+          const ta = a.last_activity_at ? +new Date(a.last_activity_at) : 0;
+          const tb = b.last_activity_at ? +new Date(b.last_activity_at) : 0;
+          base = ta - tb;
+          break;
+        }
       }
       // Desempate estavel por nome pra a lista nao "tremer" entre renders.
       if (base === 0) base = (a.business_name ?? "").localeCompare(b.business_name ?? "");
@@ -795,7 +803,7 @@ export default function ContatosPage() {
           <span>Contato</span>
           <SortTh col="signal" label={signalCol.header} sortCol={sortCol} sortDir={sortDir} onSort={onSort} />
           <SortTh col="score" label="Score" sortCol={sortCol} sortDir={sortDir} onSort={onSort} />
-          <SortTh col="recent" label="Atualizado" sortCol={sortCol} sortDir={sortDir} onSort={onSort} />
+          <SortTh col="recent" label="Último toque" sortCol={sortCol} sortDir={sortDir} onSort={onSort} />
           <span className="text-right">Ações</span>
         </div>
 
@@ -912,7 +920,9 @@ export default function ContatosPage() {
                 </div>
 
                 {/* Atualizado */}
-                <div className="text-[12.5px] text-faint">{fmtRelative(lead.updated_at)}</div>
+                <div className="text-[12.5px] text-faint">
+                  {lead.last_activity_at ? fmtRelative(lead.last_activity_at) : "sem toque"}
+                </div>
 
                 {/* Acoes */}
                 <div className="flex items-center justify-end gap-1">

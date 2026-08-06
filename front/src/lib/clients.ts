@@ -2,6 +2,7 @@
 // Cliente = lead fechado. Renovacao = deal_closed_at + deal_term_months (so
 // faz sentido p/ contrato "por_prazo"; "mensal_fixo" e recorrente, sem fim).
 import type { Lead } from "./types";
+import { lastTouchAt } from "./activities";
 
 const DAY = 86_400_000;
 
@@ -33,9 +34,12 @@ const COLD_STATUSES = ["sem_resposta", "sem_interesse", "perdido"];
 export function isColdReactivatable(l: Lead, minDays = 30): boolean {
   if (l.archived) return false;
   if (!COLD_STATUSES.includes(l.status)) return false;
-  return Date.now() - +new Date(l.updated_at) >= minDays * DAY;
+  return Date.now() - +new Date(lastTouchAt(l)) >= minDays * DAY;
 }
 
+// Ha quanto tempo esse lead esta sem toque. Usa lastTouchAt (que cai em
+// updated_at quando nao ha atividade registrada), senao o robo re-enriquecendo
+// um lead perdido "esquentaria" ele sem ninguem ter falado com ninguem.
 export function daysCold(l: Lead): number {
-  return Math.floor((Date.now() - +new Date(l.updated_at)) / DAY);
+  return Math.floor((Date.now() - +new Date(lastTouchAt(l))) / DAY);
 }

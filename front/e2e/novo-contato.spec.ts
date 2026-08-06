@@ -25,6 +25,29 @@ test("o botao Salvar fica visivel com o formulario todo aberto", async ({ page }
   expect(caixa!.y + caixa!.height, `Salvar passou da dobra em ${info.project.name}`).toBeLessThanOrEqual(altura);
 });
 
+test("o dropdown de ramo cabe na janela em vez de vazar pra fora", async ({ page }) => {
+  // Reportado pelo dono com print: a lista de ramos saia do modal e descia pra
+  // fora da tela. O menu vai num portal fixed, entao nao e o modal que corta:
+  // o proprio dropdown ancorava sempre pra baixo com altura fixa de 320px, sem
+  // olhar se cabia.
+  await page.getByRole("button", { name: "Ramo do contato" }).click();
+  const menu = page.getByRole("listbox");
+  await expect(menu).toBeVisible();
+
+  const caixa = await menu.boundingBox();
+  const janela = page.viewportSize()!;
+  expect(caixa!.y, "menu comecou acima do topo da janela").toBeGreaterThanOrEqual(0);
+  expect(caixa!.y + caixa!.height, "menu passou do rodape da janela").toBeLessThanOrEqual(janela.height);
+  expect(caixa!.x + caixa!.width, "menu passou da lateral").toBeLessThanOrEqual(janela.width);
+
+  // E continua utilizavel: da pra escolher uma opcao.
+  await page.getByRole("option", { name: "Barbearia" }).click();
+  // O nome acessivel do gatilho e o aria-label ("Ramo do contato"), entao o que
+  // muda ao escolher e o TEXTO dele, nao o nome.
+  await expect(page.getByRole("button", { name: "Ramo do contato" })).toContainText("Barbearia");
+  await expect(menu).toBeHidden();
+});
+
 test("valor digitado no jeito brasileiro nao vira um milesimo do que era", async ({ page }) => {
   await page.getByRole("button", { name: /Cliente que já tenho/ }).click();
   await page.getByPlaceholder("Ex: 1500").fill("2.500,00");

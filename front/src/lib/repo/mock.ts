@@ -1,7 +1,7 @@
 // Implementacao mock — em memoria, espelha o comportamento do banco:
 // valida transicoes, aplica guarda LGPD e grava historico (como os triggers).
 import { canTransition, nextStatuses, STATUS_META } from "../state-machine";
-import type { ActivityEvent, ActorType, FieldProvenance, Lead, LeadCreate, LeadDetail, LeadEditable, LeadFile, LeadStatus, MessageTemplate, MessageTemplateInput, ScanCoverage, SearchPreset, SearchPresetInput, SearchProfile, SearchProfileInput, StatusHistory } from "../types";
+import type { ActivityEvent, ActorType, FieldProvenance, Lead, LeadActivity, LeadActivityInput, LeadCreate, LeadDetail, LeadEditable, LeadFile, LeadStatus, MessageTemplate, MessageTemplateInput, ScanCoverage, SearchPreset, SearchPresetInput, SearchProfile, SearchProfileInput, StatusHistory } from "../types";
 import { buildSeed, DEMO_ACTIVITY, DEMO_COVERAGE, DEMO_OWNER, DEMO_PROFILE } from "./mock-data";
 import type { LeadsRepo } from "./index";
 
@@ -14,6 +14,8 @@ const store = {
   profile: { ...DEMO_PROFILE } as SearchProfile,
   coverage: DEMO_COVERAGE.map((c) => ({ ...c })),
   activity: DEMO_ACTIVITY.map((a) => ({ ...a })),
+  // Linha do tempo por lead. Some ao recarregar, esperado no mock.
+  activities: [] as LeadActivity[],
 };
 
 let _hid = 1_000;
@@ -38,7 +40,10 @@ async function detail(id: string): Promise<LeadDetail> {
   const history: StatusHistory[] = store.history
     .filter((h) => h.lead_id === id)
     .sort((a, b) => +new Date(b.changed_at) - +new Date(a.changed_at));
-  return clone({ lead, provenance, history });
+  const activities = store.activities
+    .filter((a) => a.lead_id === id)
+    .sort((a, b) => +new Date(b.happened_at) - +new Date(a.happened_at));
+  return clone({ lead, provenance, history, activities });
 }
 
 async function create(input: LeadCreate): Promise<Lead> {
@@ -159,6 +164,56 @@ async function remove(id: string): Promise<void> {
   store.leads.splice(i, 1);
   store.provenance = store.provenance.filter((p) => p.lead_id !== id);
   store.history = store.history.filter((h) => h.lead_id !== id);
+  // Espelha o ON DELETE CASCADE do banco: lead apagado nao deixa toque orfao.
+  store.activities = store.activities.filter((a) => a.lead_id !== id);
+}
+
+let _aid = 0;
+const activityId = () => `act-live-${(++_aid).toString(36)}`;
+
+// Espelha o trigger tg_sync_last_activity do banco: recalcula em vez de so
+// comparar, senao apagar o toque mais recente deixaria data fantasma no lead.
+function syncLastActivity(leadId: string): void {
+  const lead = find(leadId);
+  if (!lead) return;
+  const datas = store.activities
+    .filter((a) => a.lead_id === leadId)
+    .map((a) => +new Date(a.happened_at));
+  lead.last_activity_at = datas.length ? new Date(Math.max(...datas)).toISOString() : null;
+}
+
+async function listActivities(leadId: string): Promise<LeadActivity[]> {
+  return clone(
+    store.activities
+      .filter((a) => a.lead_id === leadId)
+      .sort((a, b) => +new Date(b.happened_at) - +new Date(a.happened_at)),
+  );
+}
+
+async function addActivity(leadId: string, input: LeadActivityInput): Promise<LeadActivity> {
+  if (!find(leadId)) throw new Error("Lead nao encontrado");
+  const body = input.body.trim();
+  // Mesma regra do check no banco: toque sem texto e linha muda na timeline.
+  if (!body) throw new Error("Escreva o que aconteceu.");
+  const now = new Date().toISOString();
+  const act: LeadActivity = {
+    id: activityId(),
+    lead_id: leadId,
+    kind: input.kind,
+    body,
+    happened_at: input.happened_at ?? now,
+    created_at: now,
+  };
+  store.activities.push(act);
+  syncLastActivity(leadId);
+  return clone(act);
+}
+
+async function deleteActivity(id: string): Promise<void> {
+  const i = store.activities.findIndex((a) => a.id === id);
+  if (i === -1) throw new Error("Atividade nao encontrada");
+  const [removida] = store.activities.splice(i, 1);
+  syncLastActivity(removida.lead_id);
 }
 
 async function getProfile(): Promise<SearchProfile | null> {
@@ -294,6 +349,9 @@ async function fileSignedUrl(path: string): Promise<string> {
 
 export const mockRepo: LeadsRepo = {
   list,
+  listActivities,
+  addActivity,
+  deleteActivity,
   detail,
   create,
   update,
