@@ -723,6 +723,16 @@ class ScoreResult:
     decision: Decision
     service_target: ServiceTarget
     reason: dict[str, Any]
+    # Descarte por FATO, nao por nota: empresa nao-ATIVA na Receita, ou sem
+    # nenhum canal de contato. Nao adianta insistir num negocio morto nem
+    # escrever copy pra quem nao tem telefone e nem e-mail. Quem quer poupar um
+    # lead do corte (o cadastrado a mao, por exemplo) so pode poupar do corte
+    # por NOTA, que e julgamento; esses dois sao fato.
+    hard_discard: bool = False
+    # O alvo que o lead casou ANTES do descarte zerar pra "indefinido". Serve pra
+    # quem reverte um descarte por nota nao ficar com um lead "qualificado" sem
+    # servico nenhum, incoerente na ficha e mudo no rascunho.
+    matched_target: ServiceTarget = "indefinido"
 
 
 def _summary(lens: str, target: ServiceTarget, lead: Lead, signals: dict[str, Any]) -> str:
@@ -898,14 +908,20 @@ def score_lead(
     contactable = is_present("phone", lead.phone) or (
         best_lens == "advocacia" and is_present("email", lead.email)
     )
+    # O alvo casado antes de qualquer corte. Guardado porque o descarte zera o
+    # target, e quem reverte um descarte por nota precisa dele de volta.
+    matched_target: ServiceTarget = target
+    hard_discard = False
     if inactive:
         decision: Decision = "descartado"
         target = "indefinido"
+        hard_discard = True
         verdict = f"empresa {status.lower()} na Receita, nao vale prospectar"
         winning_crit = [*winning_crit, {"label": "Situacao", "points": 0, "note": verdict}]
     elif not contactable:
         decision = "descartado"
         target = "indefinido"
+        hard_discard = True
         verdict = (
             "sem telefone e sem e-mail, nao da pra contatar"
             if best_lens == "advocacia"
@@ -937,4 +953,7 @@ def score_lead(
         "marketing": {"score": m_score, "criteria": m_crit},
         "advocacia": {"score": adv_score, "criteria": adv_crit},
     }
-    return ScoreResult(score=best, decision=decision, service_target=target, reason=reason)
+    return ScoreResult(
+        score=best, decision=decision, service_target=target, reason=reason,
+        hard_discard=hard_discard, matched_target=matched_target,
+    )

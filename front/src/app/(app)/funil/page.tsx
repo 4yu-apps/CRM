@@ -7,6 +7,7 @@ import { useLeads } from "@/hooks/use-leads";
 import { SERVICE_META } from "@/lib/service";
 import { createCalendarEvent } from "@/lib/calendar";
 import { canTransition } from "@/lib/state-machine";
+import { parseBRL } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Lead, LeadStatus, DealBilling } from "@/lib/types";
 
@@ -310,16 +311,16 @@ function FunnelDealModal({ lead, onConfirm, onClose }: DealModalProps) {
   const [months, setMonths] = useState("");
 
   // Delta vs sugestao da IA: leitura de poder de preco (fechou acima/abaixo do sugerido).
-  const numAtual = parseFloat(value.replace(",", "."));
+  const numAtual = parseBRL(value);
   const sugIA = lead.suggested_value ?? null;
   const deltaPct =
-    sugIA != null && sugIA > 0 && !isNaN(numAtual) && numAtual > 0
+    sugIA != null && sugIA > 0 && numAtual != null && numAtual > 0
       ? Math.round(((numAtual - sugIA) / sugIA) * 100)
       : null;
 
   const handle = () => {
-    const num = parseFloat(value.replace(",", "."));
-    if (!value || isNaN(num) || num <= 0) {
+    const num = parseBRL(value);
+    if (num == null || num <= 0) {
       toast.warning("Informe um valor valido.");
       return;
     }
@@ -377,6 +378,13 @@ function FunnelDealModal({ lead, onConfirm, onClose }: DealModalProps) {
               onChange={(e) => setValue(e.target.value)}
               className="w-full rounded-xl border border-border-2 bg-surface-2 px-3.5 py-3 text-sm outline-none focus:border-brand"
             />
+            {/* Eco do valor lido. "2.500,00" e "2500" chegam iguais aqui, e o
+                dono ve isso antes de salvar em vez de descobrir depois. */}
+            {numAtual != null && numAtual > 0 && (
+              <p className="mt-1.5 text-[12px] text-muted-foreground">
+                Vou salvar <strong className="text-foreground">{fmtBRL(numAtual)}</strong>
+              </p>
+            )}
             {deltaPct != null && deltaPct !== 0 && (
               <p className={cn("mt-1.5 text-[12px] font-semibold", deltaPct > 0 ? "text-success" : "text-danger")}>
                 {deltaPct > 0

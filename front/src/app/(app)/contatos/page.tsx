@@ -17,6 +17,7 @@ import {
   UploadSimple,
   CaretUp,
   CaretDown,
+  Plus,
   ArrowsDownUp,
 } from "@phosphor-icons/react";
 import { useLeads } from "@/hooks/use-leads";
@@ -31,6 +32,7 @@ import { matchesSignal, signalFilterOptions, type SignalFilter } from "@/lib/qua
 import { cn } from "@/lib/utils";
 import { openWhatsApp } from "@/lib/whatsapp";
 import { ListSkeleton } from "@/components/skeleton";
+import { NewContactModal } from "@/components/new-contact-modal";
 
 // Ordenacao: coluna + direcao. Os headers (desktop) clicam pra ordenar; o
 // dropdown (mobile/atalho) reflete e seta o mesmo estado.
@@ -285,6 +287,7 @@ export default function ContatosPage() {
   const [sinalFilter, setSinalFilter] = useState<SignalFilter>(""); // #9
   const [tagFilter, setTagFilter] = useState<string>(""); // #20
   const [importing, setImporting] = useState(false);
+  const [newContact, setNewContact] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [sortCol, setSortCol] = useState<SortCol>("recent");
@@ -618,14 +621,29 @@ export default function ContatosPage() {
       {/* Barra de ferramentas */}
       <div className="mb-4 flex flex-col gap-3">
         <div className="flex flex-col gap-3">
-          <div className="relative w-full">
-            <MagnifyingGlass size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-faint" />
-            <input
-              value={q}
-              onChange={(e) => { setQ(e.target.value); setPage(1); }}
-              placeholder="Buscar por nome, cidade, telefone..."
-              className="w-full rounded-xl border border-border-2 bg-surface-2 py-3 pl-11 pr-4 text-[14px] text-ink outline-none focus:border-brand"
-            />
+          <div className="flex w-full items-center gap-2.5">
+            <div className="relative flex-1">
+              <MagnifyingGlass size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-faint" />
+              <input
+                value={q}
+                onChange={(e) => { setQ(e.target.value); setPage(1); }}
+                placeholder="Buscar por nome, cidade, telefone..."
+                className="w-full rounded-xl border border-border-2 bg-surface-2 py-3 pl-11 pr-4 text-[14px] text-ink outline-none focus:border-brand"
+              />
+            </div>
+            {/* Acao principal da tela. Fica na linha da busca, e nao junto dos
+                filtros: cadastrar nao e filtrar. */}
+            <button
+              type="button"
+              onClick={() => setNewContact(true)}
+              className="flex flex-none items-center gap-1.5 rounded-xl px-4 py-3 text-[13px] font-bold text-white"
+              style={{ background: "var(--grad)" }}
+              aria-label="Novo contato"
+              title="Cadastrar um contato a mão"
+            >
+              <Plus size={15} weight="bold" />
+              <span className="hidden sm:inline">Novo contato</span>
+            </button>
           </div>
           <div className="flex flex-wrap items-center gap-2.5">
             <Dropdown
@@ -1046,6 +1064,10 @@ export default function ContatosPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {newContact && (
+        <NewContactModal onClose={() => setNewContact(false)} onCreated={refresh} existing={leads} />
       )}
     </div>
   );

@@ -1,7 +1,7 @@
 // Implementacao mock — em memoria, espelha o comportamento do banco:
 // valida transicoes, aplica guarda LGPD e grava historico (como os triggers).
 import { canTransition, nextStatuses, STATUS_META } from "../state-machine";
-import type { ActivityEvent, ActorType, FieldProvenance, Lead, LeadDetail, LeadEditable, LeadFile, LeadStatus, MessageTemplate, MessageTemplateInput, ScanCoverage, SearchPreset, SearchPresetInput, SearchProfile, SearchProfileInput, StatusHistory } from "../types";
+import type { ActivityEvent, ActorType, FieldProvenance, Lead, LeadCreate, LeadDetail, LeadEditable, LeadFile, LeadStatus, MessageTemplate, MessageTemplateInput, ScanCoverage, SearchPreset, SearchPresetInput, SearchProfile, SearchProfileInput, StatusHistory } from "../types";
 import { buildSeed, DEMO_ACTIVITY, DEMO_COVERAGE, DEMO_OWNER, DEMO_PROFILE } from "./mock-data";
 import type { LeadsRepo } from "./index";
 
@@ -41,7 +41,7 @@ async function detail(id: string): Promise<LeadDetail> {
   return clone({ lead, provenance, history });
 }
 
-async function create(input: LeadEditable): Promise<Lead> {
+async function create(input: LeadCreate): Promise<Lead> {
   const now = new Date().toISOString();
   const id = leadId();
   const lead: Lead = {
@@ -75,6 +75,7 @@ async function create(input: LeadEditable): Promise<Lead> {
     updated_at: now,
     draft_msg1: null,
     draft_msg2: null,
+    manual: false,
     ...input,
   };
   store.leads.push(lead);
@@ -82,7 +83,9 @@ async function create(input: LeadEditable): Promise<Lead> {
     id: histId(),
     lead_id: id,
     from_status: null,
-    to_status: "bruto",
+    // O estado em que ele NASCEU, nao "bruto" fixo: cliente cadastrado a mao
+    // nasce em 'fechado', e o historico tem que contar isso.
+    to_status: lead.status,
     actor: "human",
     changed_by: DEMO_OWNER,
     note: "criado manualmente",

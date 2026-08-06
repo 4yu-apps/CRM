@@ -2,15 +2,15 @@
 //  - mock: em memoria (default, roda sem banco)
 //  - supabase: banco real (quando NEXT_PUBLIC_DATA_SOURCE=supabase + envs)
 // Trocar de uma pra outra nao toca a UI.
-import type { ActivityEvent, ActorType, Lead, LeadDetail, LeadEditable, LeadFile, LeadStatus, MessageTemplate, MessageTemplateInput, ScanCoverage, SearchPreset, SearchPresetInput, SearchProfile, SearchProfileInput } from "../types";
+import type { ActivityEvent, ActorType, Lead, LeadCreate, LeadDetail, LeadEditable, LeadFile, LeadStatus, MessageTemplate, MessageTemplateInput, ScanCoverage, SearchPreset, SearchPresetInput, SearchProfile, SearchProfileInput } from "../types";
 import { mockRepo } from "./mock";
 import { supabaseRepo } from "./supabase";
 
 export interface LeadsRepo {
   list(): Promise<Lead[]>;
   detail(id: string): Promise<LeadDetail>;
-  /** Cria lead manual (status inicial 'bruto'). */
-  create(input: LeadEditable): Promise<Lead>;
+  /** Cria lead a mao. Sem `status`, nasce em 'bruto' e a esteira pega. */
+  create(input: LeadCreate): Promise<Lead>;
   update(id: string, patch: LeadEditable): Promise<Lead>;
   /** Muda status validando a maquina de estados + guarda LGPD. Lanca erro se invalido. */
   transition(id: string, to: LeadStatus, actor: ActorType, note?: string): Promise<Lead>;

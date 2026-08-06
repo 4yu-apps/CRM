@@ -11,7 +11,6 @@ import {
   Buildings,
   CalendarX,
   Check,
-  CheckCircle,
   Coffee,
   Copy,
   CurrencyCircleDollar,
@@ -36,6 +35,7 @@ import {
 } from "@phosphor-icons/react";
 import { getRepo } from "@/lib/repo";
 import { FollowupCard } from "@/components/followup-card";
+import { DealCard } from "@/components/deal-card";
 import { LeadFiles } from "@/components/lead-files";
 import { TagsEditor } from "@/components/tags-editor";
 import { waSend, openWhatsApp } from "@/lib/whatsapp";
@@ -58,7 +58,6 @@ import {
 } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type {
-  DealBilling,
   FieldProvenance,
   Lead,
   LeadDetail,
@@ -98,12 +97,6 @@ function fmtDateOnly(value?: string | null): string {
 
 function fmtNumber(value?: number | null): string {
   return value == null ? "-" : new Intl.NumberFormat("pt-BR").format(value);
-}
-
-function dealBillingLabel(billing: DealBilling | null | undefined, months: number | null | undefined): string {
-  if (billing === "por_prazo") return `Por prazo${months ? ` (${months} meses)` : ""}`;
-  if (billing === "mensal_fixo") return "Mensal fixo";
-  return "-";
 }
 
 // ---------------------------------------------------------------------------
@@ -1077,20 +1070,10 @@ export default function FichaPage() {
               </div>
             )}
 
-            {/* Negocio fechado (B8) */}
-            {lead.deal_value != null && (
-              <div className="rounded-[14px] border border-success/30 bg-success-bg p-4">
-                <div className="mb-1.5 flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-success">
-                  <CheckCircle size={14} weight="fill" /> Negócio fechado
-                </div>
-                <div className="text-xl font-bold text-ink">{fmtBRL(lead.deal_value)}</div>
-                <div className="mt-1 text-[13px] text-muted-foreground">
-                  {dealBillingLabel(lead.deal_billing, lead.deal_term_months)}
-                  {lead.deal_closed_at && (
-                    <span className="ml-2 text-faint">em {fmtDateTime(lead.deal_closed_at)}</span>
-                  )}
-                </div>
-              </div>
+            {/* Negocio (B8). Aparece com o lead fechado mesmo sem valor: o
+                convite pra registrar vale mais que esconder o bloco. */}
+            {(lead.status === "fechado" || lead.deal_value != null) && (
+              <DealCard lead={lead} onSaved={load} />
             )}
 
             {/* Motivo de perda (#17) */}
