@@ -15,7 +15,11 @@
 // responde {ok:false} dentro do orcamento, desfaz o que abriu (Esc) e o service
 // worker navega como antes. Degradar limpo e parte do projeto.
 
-const ORCAMENTO_MS = 4000;
+// Teto de seguranca. Tem que ser MAIOR que a soma das esperas internas
+// (1200+3500+1200+600 = 6500), senao ele dispara no meio de um fluxo que esta
+// dando certo: a conversa abre e o service worker recarrega por cima. Foi
+// exatamente o que aconteceu com 4000.
+const ORCAMENTO_MS = 8000;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -150,7 +154,7 @@ async function abrirConversa(phone, text) {
     const foco = document.activeElement;
     if (foco && foco !== document.body && camposDeTexto().includes(foco)) return foco;
     return camposDeTexto().find((el) => !antes.has(el));
-  }, 1500);
+  }, 1200);
   if (!busca) {
     fecharPainel();
     return false;
@@ -180,7 +184,7 @@ async function abrirConversa(phone, text) {
     return Array.from(
       document.querySelectorAll('[role="row"], [role="listitem"], [role="button"]'),
     ).find(casa);
-  }, 2200);
+  }, 3500);
 
   if (!alvo) {
     fecharPainel();
@@ -190,7 +194,7 @@ async function abrirConversa(phone, text) {
   clica(alvo);
 
   // So e sucesso se o composer da conversa CERTA aparecer.
-  const ok = await ateQue(() => mesmoNumero(numeroAtivo(), num), 1500);
+  const ok = await ateQue(() => mesmoNumero(numeroAtivo(), num), 1200);
   if (!ok) {
     fecharPainel();
     return false;
@@ -203,7 +207,7 @@ async function abrirConversa(phone, text) {
 // de outra conversa.
 async function preencheSeForOChat(num, text) {
   if (!text) return true;
-  const comp = await ateQue(achaComposer, 800);
+  const comp = await ateQue(achaComposer, 600);
   if (!comp) return false;
   if (!mesmoNumero(numeroAtivo(), num)) return false;
   digita(comp, text);
@@ -218,14 +222,21 @@ if (!window.__garimpoWaOpen) {
     const responde = (ok) => {
       if (respondido) return;
       respondido = true;
-      if (!ok) fecharPainel(); // nunca deixa painel/busca abertos na tela
+      // So limpa a tela quando de fato falhou; com a conversa aberta, um Esc
+      // aqui atrapalharia o usuario.
+      if (!ok) fecharPainel();
       try {
         sendResponse({ ok });
       } catch {
         /* canal fechado: o service worker ja navegou */
       }
     };
-    const guarda = setTimeout(() => responde(false), ORCAMENTO_MS);
+    // Antes de desistir, olha a tela: se a conversa certa ja esta aberta, foi
+    // sucesso. Responder false aqui faria o service worker recarregar por cima
+    // de um chat que abriu — o "reinicia do nada" que o usuario viu.
+    const guarda = setTimeout(() => {
+      responde(mesmoNumero(numeroAtivo(), soDigitos(msg.phone)));
+    }, ORCAMENTO_MS);
     abrirConversa(msg.phone, msg.text)
       .then((ok) => {
         clearTimeout(guarda);

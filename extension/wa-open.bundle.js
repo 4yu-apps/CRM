@@ -1,6 +1,6 @@
 (() => {
   // src/content/wa-open.mjs
-  var ORCAMENTO_MS = 4e3;
+  var ORCAMENTO_MS = 8e3;
   var sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   async function ateQue(fn, ms, passo = 100) {
     const fim = Date.now() + ms;
@@ -103,7 +103,7 @@
       const foco = document.activeElement;
       if (foco && foco !== document.body && camposDeTexto().includes(foco)) return foco;
       return camposDeTexto().find((el) => !antes.has(el));
-    }, 1500);
+    }, 1200);
     if (!busca) {
       fecharPainel();
       return false;
@@ -126,13 +126,13 @@
       return Array.from(
         document.querySelectorAll('[role="row"], [role="listitem"], [role="button"]')
       ).find(casa);
-    }, 2200);
+    }, 3500);
     if (!alvo) {
       fecharPainel();
       return false;
     }
     clica(alvo);
-    const ok = await ateQue(() => mesmoNumero(numeroAtivo(), num), 1500);
+    const ok = await ateQue(() => mesmoNumero(numeroAtivo(), num), 1200);
     if (!ok) {
       fecharPainel();
       return false;
@@ -141,7 +141,7 @@
   }
   async function preencheSeForOChat(num, text) {
     if (!text) return true;
-    const comp = await ateQue(achaComposer, 800);
+    const comp = await ateQue(achaComposer, 600);
     if (!comp) return false;
     if (!mesmoNumero(numeroAtivo(), num)) return false;
     digita(comp, text);
@@ -161,7 +161,9 @@
         } catch {
         }
       };
-      const guarda = setTimeout(() => responde(false), ORCAMENTO_MS);
+      const guarda = setTimeout(() => {
+        responde(mesmoNumero(numeroAtivo(), soDigitos(msg.phone)));
+      }, ORCAMENTO_MS);
       abrirConversa(msg.phone, msg.text).then((ok) => {
         clearTimeout(guarda);
         responde(ok);
