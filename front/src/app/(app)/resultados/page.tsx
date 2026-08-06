@@ -16,7 +16,9 @@ import {
 import { useLeads } from "@/hooks/use-leads";
 import { funnel, depth, kpis as funnelKpis, pct } from "@/lib/funnel";
 import { mrr as mrrAtivo, churnedMrr, churnRate } from "@/lib/clients";
-import type { Lead, LeadStatus } from "@/lib/types";
+import { received } from "@/lib/payments";
+import { getRepo } from "@/lib/repo";
+import type { Lead, LeadPayment, LeadStatus } from "@/lib/types";
 
 // Meta de receita do mes: editavel pelo usuario, guardada na localStorage.
 const GOAL_KEY = "garimpo:goal";
@@ -430,6 +432,34 @@ export default function ResultadosPage() {
     };
   }, [leads, renderedAt]);
 
+  // Recebimentos: o que entrou de verdade, do lado do que foi contratado.
+  // Carrega separado dos leads porque a pergunta e sobre dinheiro por DATA, e
+  // nao sobre o estado atual do lead: um cliente que ja saiu continua tendo
+  // pago o que pagou.
+  const [payments, setPayments] = useState<LeadPayment[]>([]);
+  useEffect(() => {
+    let vivo = true;
+    getRepo()
+      .listPayments()
+      .then((p) => {
+        if (vivo) setPayments(p);
+      })
+      // Recebimento que nao carrega vira zero, e zero aqui e indistinguivel de
+      // "ninguem registrou nada": ambos escondem o bloco em vez de mentir.
+      .catch(() => {});
+    return () => {
+      vivo = false;
+    };
+  }, []);
+
+  const recebido = useMemo(() => {
+    const agora = new Date(renderedAt);
+    return {
+      mes: received(payments, startOfMonth(agora), new Date(renderedAt + 1)),
+      total: received(payments),
+    };
+  }, [payments, renderedAt]);
+
   // seletor de periodo (#13) — escopa funil e recortes (coorte por created_at)
   const [period, setPeriod] = useState<Period>("all");
   const now = useMemo(() => new Date(), []);
@@ -734,7 +764,9 @@ export default function ResultadosPage() {
       <div className="fu rounded-[18px] border border-border bg-card p-6 shadow-[var(--shadow)]">
         <div className="mb-4 flex items-baseline justify-between gap-2">
           <span className="text-[16px] font-bold">Receita recorrente</span>
-          <span className="text-[11.5px] text-faint">todos os negócios fechados</span>
+          {/* "Contratado" e promessa, "recebido" e fato. Os dois moram aqui e a
+              legenda avisa que eles nao batem, porque eles nunca vao bater. */}
+          <span className="text-[11.5px] text-faint">contratado x recebido</span>
         </div>
         {loading ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -757,6 +789,20 @@ export default function ResultadosPage() {
               <div className="text-[12px] text-muted-foreground">MRR contratado</div>
               <div className="mt-1 font-heading text-[26px] font-bold leading-none text-success">{brl(recurring.mrr)}</div>
               <div className="mt-1.5 text-[12px] text-faint">recorrente por mês (mensal fixo)</div>
+            </div>
+            {/* Recebido fica COLADO no contratado de proposito. Separados por
+                telas diferentes, um vira o numero que a pessoa lembra e o outro
+                o que ela esquece, e o que ela lembra e sempre o maior. */}
+            <div className="rounded-[14px] bg-[var(--inset)] p-4">
+              <div className="text-[12px] text-muted-foreground">Recebido este mês</div>
+              <div className="mt-1 font-heading text-[26px] font-bold leading-none">
+                {brl(recebido.mes)}
+              </div>
+              <div className="mt-1.5 text-[12px] text-faint">
+                {recebido.total > 0
+                  ? `${brl(recebido.total)} desde o começo`
+                  : "registre em Clientes o que entrar"}
+              </div>
             </div>
             <div className="rounded-[14px] bg-[var(--inset)] p-4">
               <div className="text-[12px] text-muted-foreground">Contratos por prazo</div>

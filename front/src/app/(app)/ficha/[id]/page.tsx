@@ -36,6 +36,7 @@ import {
 import { getRepo } from "@/lib/repo";
 import { FollowupCard } from "@/components/followup-card";
 import { DealCard } from "@/components/deal-card";
+import { PaymentsCard } from "@/components/payments-card";
 import { LeadTimeline } from "@/components/lead-timeline";
 import { LeadFiles } from "@/components/lead-files";
 import { TagsEditor } from "@/components/tags-editor";
@@ -1080,6 +1081,12 @@ export default function FichaPage() {
             {(ehCarteira || lead.deal_value != null) && (
               <DealCard lead={lead} onSaved={load} />
             )}
+
+            {/* Recebimentos: logo abaixo do negocio, porque a pergunta so faz
+                sentido depois de "quanto foi combinado". So pra cliente ativo:
+                cobrar quem ja saiu da carteira e cobranca, nao gestao, e a
+                ficha de um cancelado nao deve pedir mais um recebimento. */}
+            {lead.status === "fechado" && <PaymentsCard lead={lead} onSaved={load} />}
 
             {/* Motivo de perda (#17) */}
             {lead.loss_reason && (

@@ -14,12 +14,12 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Handshake, SmileySad, Warning, ArrowBendUpLeft, Clock, CurrencyCircleDollar,
-  Cake, CalendarX, ArrowCounterClockwise,
+  Cake, CalendarX, ArrowCounterClockwise, WarningCircle,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { useLeads } from "@/hooks/use-leads";
 import {
-  isClient, isChurned, attentionOf, renewalDate, mrr, churnedMrr,
+  isClient, isChurned, attentionOf, renewalDate, mrr, churnedMrr, overdueAmount,
   type Attention, type AttentionKind,
 } from "@/lib/clients";
 import { ChurnModal } from "@/components/churn-modal";
@@ -40,6 +40,7 @@ function billingLabel(l: Lead): string {
 }
 
 const ATTENTION_META: Record<AttentionKind, { Icon: typeof Warning; cls: string }> = {
+  atraso: { Icon: WarningCircle, cls: "bg-danger-bg text-danger" },
   vencido: { Icon: CalendarX, cls: "bg-danger-bg text-danger" },
   renovacao: { Icon: Warning, cls: "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400" },
   aniversario: { Icon: Cake, cls: "bg-brand-50 text-brand" },
@@ -98,6 +99,9 @@ export default function ClientesPage() {
 
   const receitaMensal = useMemo(() => mrr(leads), [leads]);
   const perdido = useMemo(() => churnedMrr(leads), [leads]);
+  // Quanto esta em atraso agora. So aparece quando existe: um card zerado fixo
+  // no cabecalho ensina a pessoa a ignorar aquele canto da tela.
+  const atrasado = useMemo(() => overdueAmount(leads), [leads]);
 
   const reativar = async (l: Lead) => {
     setVoltando(l.id);
@@ -143,6 +147,12 @@ export default function ClientesPage() {
             <div className="font-heading text-[22px] font-bold leading-none text-success">{brl(receitaMensal)}</div>
             <div className="mt-1 text-[11.5px] text-faint">MRR ativo</div>
           </div>
+          {atrasado > 0 && (
+            <div className="rounded-[14px] border border-danger/30 bg-danger-bg px-4 py-2.5 text-center shadow-[var(--shadow)]">
+              <div className="font-heading text-[22px] font-bold leading-none text-danger">{brl(atrasado)}</div>
+              <div className="mt-1 text-[11.5px] text-danger/80">em atraso</div>
+            </div>
+          )}
           {perdido > 0 && (
             <div className="rounded-[14px] border border-border bg-card px-4 py-2.5 text-center shadow-[var(--shadow)]">
               <div className="font-heading text-[22px] font-bold leading-none text-danger">{brl(perdido)}</div>
