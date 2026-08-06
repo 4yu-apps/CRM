@@ -60,6 +60,23 @@ function achaComposer() {
   return null;
 }
 
+// Campo de busca do painel "Nova conversa". O rotulo foi lido na tela real:
+// placeholder "Pesquisar nome ou numero". Isso e MUITO mais firme que deduzir
+// pelo foco — e serve tambem pra saber se o painel JA esta aberto.
+function achaBuscaDoPainel() {
+  const cands = [
+    'input[placeholder*="Pesquisar nome"]',
+    'input[aria-label*="Pesquisar nome"]',
+    'input[placeholder*="Search name"]',
+    '[contenteditable="true"][aria-label*="Pesquisar nome"]',
+  ];
+  for (const c of cands) {
+    const el = document.querySelector(c);
+    if (el) return el;
+  }
+  return null;
+}
+
 function botaoNovaConversa() {
   const cands = [
     '[aria-label*="Nova conversa"]',
@@ -128,10 +145,34 @@ function mesmoNumero(a, b) {
   return !!x && x === y;
 }
 
-function fecharPainel() {
-  document.body.dispatchEvent(
-    new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }),
-  );
+async function fecharPainel() {
+  // Esc no elemento com foco (mandar no body nem sempre pega) e, se o painel
+  // insistir, clica na seta de voltar. Painel aberto por cima da conversa foi
+  // uma das confusoes relatadas.
+  const alvo = document.activeElement || document.body;
+  for (const el of [alvo, document.body]) {
+    el.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }));
+  }
+  await sleep(150);
+  if (!achaBuscaDoPainel()) return;
+  const voltar = document.querySelector('[aria-label*="Voltar"], [aria-label*="Back"], [data-icon="back"]');
+  if (voltar) clica(voltar.closest("button, [role=button], div") || voltar);
+}
+
+// Rascunho no composer faz o WhatsApp perguntar "Quer sair do site?" quando a
+// aba navega. Como o fallback do service worker NAVEGA, limpar antes evita o
+// dialogo que travava tudo.
+function limpaComposer() {
+  const c = achaComposer();
+  if (!c) return;
+  if (!(c.textContent || "").trim()) return;
+  c.focus();
+  const sel = window.getSelection();
+  const range = document.createRange();
+  range.selectNodeContents(c);
+  sel.removeAllRanges();
+  sel.addRange(range);
+  document.execCommand("insertText", false, "");
 }
 
 async function abrirConversa(phone, text) {
@@ -141,23 +182,28 @@ async function abrirConversa(phone, text) {
   // Ja esta na conversa certa: nao precisa abrir nada.
   if (mesmoNumero(numeroAtivo(), num)) return preencheSeForOChat(num, text);
 
-  const botao = botaoNovaConversa();
-  if (!botao) return false;
-
-  const antes = new Set(camposDeTexto());
-  clica(botao);
-
-  // O painel FOCA a busca ao abrir. O activeElement e a pista mais confiavel;
-  // a diferenca de campos fica de reserva (caso o WhatsApp reuse o mesmo campo
-  // e o foco nao venha).
-  const busca = await ateQue(() => {
-    const foco = document.activeElement;
-    if (foco && foco !== document.body && camposDeTexto().includes(foco)) return foco;
-    return camposDeTexto().find((el) => !antes.has(el));
-  }, 1200);
+  // O painel pode ter ficado aberto da tentativa anterior. Clicar no + de novo
+  // fecharia ou embaralharia o estado — foi o que quebrou no segundo lead.
+  let busca = achaBuscaDoPainel();
   if (!busca) {
-    fecharPainel();
-    return false;
+    const botao = botaoNovaConversa();
+    if (!botao) return false;
+    const antes = new Set(camposDeTexto());
+    clica(botao);
+    busca = await ateQue(() => achaBuscaDoPainel(), 1200);
+    if (!busca) {
+
+      // reserva: o painel foca a busca ao abrir; ou o campo que apareceu agora.
+      busca = await ateQue(() => {
+        const foco = document.activeElement;
+        if (foco && foco !== document.body && camposDeTexto().includes(foco)) return foco;
+        return camposDeTexto().find((el) => !antes.has(el));
+      }, 800);
+    }
+    if (!busca) {
+      await fecharPainel();
+      return false;
+    }
   }
 
   digita(busca, num);
@@ -224,7 +270,10 @@ if (!window.__garimpoWaOpen) {
       respondido = true;
       // So limpa a tela quando de fato falhou; com a conversa aberta, um Esc
       // aqui atrapalharia o usuario.
-      if (!ok) fecharPainel();
+      if (!ok) {
+        limpaComposer(); // sem rascunho, a navegacao nao pergunta "quer sair?"
+        void fecharPainel();
+      }
       try {
         sendResponse({ ok });
       } catch {

@@ -32,6 +32,19 @@
     }
     return null;
   }
+  function achaBuscaDoPainel() {
+    const cands = [
+      'input[placeholder*="Pesquisar nome"]',
+      'input[aria-label*="Pesquisar nome"]',
+      'input[placeholder*="Search name"]',
+      '[contenteditable="true"][aria-label*="Pesquisar nome"]'
+    ];
+    for (const c of cands) {
+      const el = document.querySelector(c);
+      if (el) return el;
+    }
+    return null;
+  }
   function botaoNovaConversa() {
     const cands = [
       '[aria-label*="Nova conversa"]',
@@ -86,27 +99,50 @@
     const y = String(b).slice(-8);
     return !!x && x === y;
   }
-  function fecharPainel() {
-    document.body.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true })
-    );
+  async function fecharPainel() {
+    const alvo = document.activeElement || document.body;
+    for (const el of [alvo, document.body]) {
+      el.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }));
+    }
+    await sleep(150);
+    if (!achaBuscaDoPainel()) return;
+    const voltar = document.querySelector('[aria-label*="Voltar"], [aria-label*="Back"], [data-icon="back"]');
+    if (voltar) clica(voltar.closest("button, [role=button], div") || voltar);
+  }
+  function limpaComposer() {
+    const c = achaComposer();
+    if (!c) return;
+    if (!(c.textContent || "").trim()) return;
+    c.focus();
+    const sel = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(c);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    document.execCommand("insertText", false, "");
   }
   async function abrirConversa(phone, text) {
     const num = soDigitos(phone);
     if (!num) return false;
     if (mesmoNumero(numeroAtivo(), num)) return preencheSeForOChat(num, text);
-    const botao = botaoNovaConversa();
-    if (!botao) return false;
-    const antes = new Set(camposDeTexto());
-    clica(botao);
-    const busca = await ateQue(() => {
-      const foco = document.activeElement;
-      if (foco && foco !== document.body && camposDeTexto().includes(foco)) return foco;
-      return camposDeTexto().find((el) => !antes.has(el));
-    }, 1200);
+    let busca = achaBuscaDoPainel();
     if (!busca) {
-      fecharPainel();
-      return false;
+      const botao = botaoNovaConversa();
+      if (!botao) return false;
+      const antes = new Set(camposDeTexto());
+      clica(botao);
+      busca = await ateQue(() => achaBuscaDoPainel(), 1200);
+      if (!busca) {
+        busca = await ateQue(() => {
+          const foco = document.activeElement;
+          if (foco && foco !== document.body && camposDeTexto().includes(foco)) return foco;
+          return camposDeTexto().find((el) => !antes.has(el));
+        }, 800);
+      }
+      if (!busca) {
+        await fecharPainel();
+        return false;
+      }
     }
     digita(busca, num);
     const alvo = await ateQue(() => {
@@ -155,7 +191,10 @@
       const responde = (ok) => {
         if (respondido) return;
         respondido = true;
-        if (!ok) fecharPainel();
+        if (!ok) {
+          limpaComposer();
+          void fecharPainel();
+        }
         try {
           sendResponse({ ok });
         } catch {
