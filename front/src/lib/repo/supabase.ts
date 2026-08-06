@@ -1,7 +1,7 @@
 // Implementacao supabase — banco real. Inerte ate existir env + sessao logada.
 // A UI nao muda: mesma interface do mock.
 import { getSupabase } from "../supabase/client";
-import type { ActivityEvent, ActorType, Lead, LeadActivity, LeadActivityInput, LeadCreate, LeadDetail, LeadEditable, LeadFile, LeadStatus, MessageTemplate, MessageTemplateInput, ScanCoverage, SearchPreset, SearchPresetInput, SearchProfile, SearchProfileInput } from "../types";
+import type { ActivityEvent, ActorType, Lead, LeadActivity, LeadActivityInput, LeadCreate, LeadDetail, LeadEditable, LeadFile, LeadPayment, LeadPaymentInput, LeadStatus, MessageTemplate, MessageTemplateInput, ScanCoverage, SearchPreset, SearchPresetInput, SearchProfile, SearchProfileInput } from "../types";
 
 // Bucket PRIVADO dos anexos. Path: <uid>/<leadId>/<arquivo>. RLS no banco garante
 // que cada dono so toca a propria pasta; download sai por URL assinada e curta.
@@ -152,6 +152,37 @@ async function addActivity(leadId: string, input: LeadActivityInput): Promise<Le
 
 async function deleteActivity(id: string): Promise<void> {
   const { error } = await getSupabase().from("lead_activities").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+async function listPayments(leadId?: string): Promise<LeadPayment[]> {
+  // Sem leadId traz os do dono inteiro: a RLS ja recorta por dono, entao nao ha
+  // filtro a mais a fazer aqui.
+  let q = getSupabase().from("lead_payments").select("*");
+  if (leadId) q = q.eq("lead_id", leadId);
+  const { data, error } = await q.order("paid_on", { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as LeadPayment[];
+}
+
+async function addPayment(leadId: string, input: LeadPaymentInput): Promise<LeadPayment> {
+  // paid_on fica de fora quando nao vem: o default (current_date) evita gravar o
+  // relogio do navegador, que pode estar torto.
+  const row: Record<string, unknown> = { lead_id: leadId, amount: input.amount };
+  if (input.paid_on) row.paid_on = input.paid_on;
+  if (input.covers_until !== undefined) row.covers_until = input.covers_until;
+  if (input.note !== undefined) row.note = input.note;
+  const { data, error } = await getSupabase()
+    .from("lead_payments")
+    .insert(row)
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return data as LeadPayment;
+}
+
+async function deletePayment(id: string): Promise<void> {
+  const { error } = await getSupabase().from("lead_payments").delete().eq("id", id);
   if (error) throw new Error(error.message);
 }
 
@@ -315,6 +346,9 @@ export const supabaseRepo: LeadsRepo = {
   listActivities,
   addActivity,
   deleteActivity,
+  listPayments,
+  addPayment,
+  deletePayment,
   detail,
   create,
   update,

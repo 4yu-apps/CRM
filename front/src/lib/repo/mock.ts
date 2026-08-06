@@ -1,7 +1,7 @@
 // Implementacao mock — em memoria, espelha o comportamento do banco:
 // valida transicoes, aplica guarda LGPD e grava historico (como os triggers).
 import { canTransition, nextStatuses, STATUS_META } from "../state-machine";
-import type { ActivityEvent, ActorType, FieldProvenance, Lead, LeadActivity, LeadActivityInput, LeadCreate, LeadDetail, LeadEditable, LeadFile, LeadStatus, MessageTemplate, MessageTemplateInput, ScanCoverage, SearchPreset, SearchPresetInput, SearchProfile, SearchProfileInput, StatusHistory } from "../types";
+import type { ActivityEvent, ActorType, FieldProvenance, Lead, LeadActivity, LeadActivityInput, LeadCreate, LeadDetail, LeadEditable, LeadFile, LeadPayment, LeadPaymentInput, LeadStatus, MessageTemplate, MessageTemplateInput, ScanCoverage, SearchPreset, SearchPresetInput, SearchProfile, SearchProfileInput, StatusHistory } from "../types";
 import { buildSeed, DEMO_ACTIVITY, DEMO_COVERAGE, DEMO_OWNER, DEMO_PROFILE } from "./mock-data";
 import type { LeadsRepo } from "./index";
 
@@ -16,6 +16,8 @@ const store = {
   activity: DEMO_ACTIVITY.map((a) => ({ ...a })),
   // Linha do tempo por lead. Some ao recarregar, esperado no mock.
   activities: [] as LeadActivity[],
+  // Recebimentos por lead. Mesma vida curta das atividades.
+  payments: [] as LeadPayment[],
 };
 
 let _hid = 1_000;
@@ -166,6 +168,7 @@ async function remove(id: string): Promise<void> {
   store.history = store.history.filter((h) => h.lead_id !== id);
   // Espelha o ON DELETE CASCADE do banco: lead apagado nao deixa toque orfao.
   store.activities = store.activities.filter((a) => a.lead_id !== id);
+  store.payments = store.payments.filter((p) => p.lead_id !== id);
 }
 
 let _aid = 0;
@@ -214,6 +217,61 @@ async function deleteActivity(id: string): Promise<void> {
   if (i === -1) throw new Error("Atividade nao encontrada");
   const [removida] = store.activities.splice(i, 1);
   syncLastActivity(removida.lead_id);
+}
+
+let _pid = 0;
+const paymentId = () => `pay-live-${(++_pid).toString(36)}`;
+
+// Espelha o trigger tg_sync_paid_until: recalcula o max, nao compara com o que
+// acabou de chegar. Apagar um recebimento com data errada tem que devolver a
+// cobertura anterior, senao o cliente fica "em dia" por causa de linha que nao
+// existe mais.
+function syncPaidUntil(leadId: string): void {
+  const lead = find(leadId);
+  if (!lead) return;
+  const datas = store.payments
+    .filter((p) => p.lead_id === leadId && p.covers_until)
+    .map((p) => p.covers_until as string);
+  lead.paid_until = datas.length ? datas.reduce((a, b) => (a > b ? a : b)) : null;
+}
+
+async function listPayments(leadId?: string): Promise<LeadPayment[]> {
+  return clone(
+    store.payments
+      .filter((p) => !leadId || p.lead_id === leadId)
+      .sort((a, b) => (a.paid_on < b.paid_on ? 1 : a.paid_on > b.paid_on ? -1 : 0)),
+  );
+}
+
+async function addPayment(leadId: string, input: LeadPaymentInput): Promise<LeadPayment> {
+  if (!find(leadId)) throw new Error("Lead nao encontrado");
+  // Mesma regra do check no banco: zero nao e recebimento, negativo seria
+  // estorno, que e outra coisa e ainda nao existe aqui.
+  if (!Number.isFinite(input.amount) || input.amount <= 0) {
+    throw new Error("Informe quanto entrou.");
+  }
+  const hoje = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const pay: LeadPayment = {
+    id: paymentId(),
+    lead_id: leadId,
+    amount: input.amount,
+    paid_on:
+      input.paid_on ?? `${hoje.getFullYear()}-${pad(hoje.getMonth() + 1)}-${pad(hoje.getDate())}`,
+    covers_until: input.covers_until ?? null,
+    note: input.note ?? null,
+    created_at: hoje.toISOString(),
+  };
+  store.payments.push(pay);
+  syncPaidUntil(leadId);
+  return clone(pay);
+}
+
+async function deletePayment(id: string): Promise<void> {
+  const i = store.payments.findIndex((p) => p.id === id);
+  if (i === -1) throw new Error("Recebimento nao encontrado");
+  const [removido] = store.payments.splice(i, 1);
+  syncPaidUntil(removido.lead_id);
 }
 
 async function getProfile(): Promise<SearchProfile | null> {
@@ -352,6 +410,9 @@ export const mockRepo: LeadsRepo = {
   listActivities,
   addActivity,
   deleteActivity,
+  listPayments,
+  addPayment,
+  deletePayment,
   detail,
   create,
   update,

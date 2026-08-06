@@ -83,6 +83,41 @@ export function todayInput(): string {
   return toDateInput(new Date().toISOString());
 }
 
+// Soma meses SEM transbordar pro mes seguinte.
+//
+// `d.setMonth(d.getMonth() + 1)` num dia 31 de janeiro devolve 3 de marco, nao
+// 28 de fevereiro: o JS aceita "31 de fevereiro" e desliza. Num CRM isso vira
+// contrato que renova tres dias depois do que devia, e recebimento que cobre
+// ate um dia que nao existe. Aqui o dia gruda no ultimo do mes de destino.
+export function addMonths(base: Date, months: number): Date {
+  const dia = base.getDate();
+  const d = new Date(base);
+  d.setDate(1);
+  d.setMonth(d.getMonth() + months);
+  // Ultimo dia do mes de destino: dia 0 do mes seguinte.
+  const ultimo = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(dia, ultimo));
+  return d;
+}
+
+// "YYYY-MM-DD" -> Date local ao meio-dia. Colunas `date` do Postgres chegam
+// como string crua; ler com `new Date(s)` daria meia-noite UTC, que no Brasil e
+// a vespera. Mesmo motivo do fromDateInput.
+export function parseDateOnly(value?: string | null): Date | null {
+  if (!value) return null;
+  const [y, m, d] = value.slice(0, 10).split("-").map(Number);
+  if (!y || !m || !d) return null;
+  const dt = new Date(y, m - 1, d, 12, 0, 0, 0);
+  return Number.isNaN(dt.getTime()) ? null : dt;
+}
+
+// Date -> "YYYY-MM-DD" local. E o formato que a coluna `date` guarda.
+export function toDateOnly(d: Date): string {
+  const mes = String(d.getMonth() + 1).padStart(2, "0");
+  const dia = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mes}-${dia}`;
+}
+
 const rtf = new Intl.RelativeTimeFormat("pt-BR", { numeric: "auto" });
 const DIV: [number, Intl.RelativeTimeFormatUnit][] = [
   [60, "seconds"],
