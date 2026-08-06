@@ -5,7 +5,7 @@
 > arquivo diz **o que foi feito**, **o que mudou de ideia no caminho**, **o que
 > falta** e **como não repetir as armadilhas que já custaram tempo**.
 >
-> Atualizado em 2026-08-06, ao fim da Fatia 3.
+> Atualizado em 2026-08-06, ao fim da Fatia 5.
 
 ---
 
@@ -62,10 +62,10 @@ append-only. Offline-first (interface + mock + supabase).
 
 ```bash
 npm run db:validate            # schema num Postgres embutido (pglite, sem docker)
-cd esteira && python -m pytest # 557 testes
+cd esteira && .venv/bin/python -m pytest   # 557 testes (o `python` do sistema nao tem pytest)
 cd extension && node --test    # 43 testes
-cd front && npm test           # 78 testes (vitest)
-cd front && npm run e2e        # 40 testes (playwright, desktop + mobile)
+cd front && npm test           # 119 testes (vitest)
+cd front && npm run e2e        # 52 testes (playwright, desktop + mobile)
 cd front && npm run lint && npx tsc --noEmit && npm run build
 ```
 
@@ -85,8 +85,11 @@ o sintoma **não é erro de build**: é um botão que aparece na tela, o usuári
 clica, e o banco responde "Transicao de status invalida" em produção. Foi assim
 que se achou `aprovado -> descartado` faltando no banco.
 
-`front/src/lib/activities.db.test.ts` faz o mesmo estilo pro trigger de
-`last_activity_at`.
+`front/src/lib/activities.db.test.ts` e `front/src/lib/payments.db.test.ts` fazem
+o mesmo estilo pros triggers de `last_activity_at` e `paid_until`. Os dois
+triggers recalculam o `max` em vez de comparar com o que acabou de chegar, e é
+isso que os testes cobram: apagar o registro mais recente tem que devolver o
+anterior, não deixar data fantasma.
 
 ---
 
@@ -102,14 +105,18 @@ que se achou `aprovado -> descartado` faltando no banco.
 | **Rótulo repetido** | `strict mode violation` | Geralmente é problema de UX de verdade, não de teste: dois botões com o mesmo nome confundem gente também |
 | **`updated_at` como proxy de "quando"** | Números de receita e abandono mentem | Ele sobe quando o robô enriquece ou alguém corrige a cidade. Use `deal_closed_at`, `last_activity_at` ou `churn_at` |
 | **Enum novo + uso na mesma migration** | `unsafe use of new value` | Postgres recusa. Precisa de **dois arquivos**: um só com o `alter type add value`, outro com o resto |
+| **`setMonth(+1)` transborda** | Aviso de renovação chega dias depois do dia certo | `new Date(2026,0,31).setMonth(+1)` dá **3 de março**: o JS aceita "31 de fevereiro" e desliza. Use `addMonths` do `format.ts`, que gruda no último dia do mês |
+| **Menu do celular esconde metade das telas** | `waitForURL` estoura só no projeto `mobile` | Só cinco itens cabem no rodapé; Clientes e Resultados moram atrás do botão **Mais**. Teste de celular precisa abrir o sheet antes de clicar no link |
+| **Rodar suíte em cima de suíte** | 3 arquivos de pglite falham juntos, sem erro de asserção; a WSL pode cair | O gargalo é a máquina, não o código. Rode **um comando por vez**; a suíte passou 4x seguidas depois disso |
+| **`python` não existe** | `command not found` no `pytest` | A esteira tem venv própria: `esteira/.venv/bin/python` |
 
 ---
 
 ## O que já foi feito
 
-Três merges na `main`: `01ab224` (Fatia 1), `aa31657` (Fatia 2), `871883f`
-(Fatia 3). Todas no ar em `crm.4yumkt.com.br`, com migrations aplicadas em
-produção.
+Merges na `main`: `01ab224` (Fatia 1), `aa31657` (Fatia 2), `871883f`
+(Fatia 3), Fatia 5 logo abaixo. Todas no ar em `crm.4yumkt.com.br`, com
+migrations aplicadas em produção e conferidas por query direta.
 
 ### Fatia 1 · Cadastrar e corrigir
 
@@ -160,6 +167,39 @@ botão aparecia; o modal cortava o botão Salvar em notebook de 768px.
 - **Resultados**: MRR com uma definição só, "fechou neste mês" pelo
   `deal_closed_at`, e card de churn.
 
+### Fatia 5 · Financeiro leve
+
+O `deal_value` respondia uma pergunta e o app usava ele como se respondesse
+três: **contratado** (o que foi combinado), **faturado** e **recebido**. Um
+cliente de R$1.500 fechado em janeiro somava R$1.500 de MRR em agosto mesmo sem
+ter pagado desde março. O número não estava errado por bug: estava respondendo
+outra pergunta.
+
+- **`lead_payments`**: quanto entrou, quando (`paid_on`), e até quando cobre
+  (`covers_until`). Não é parcelamento, boleto, nota nem banco: é caderninho.
+- **`leads.paid_until`** desnormalizado por trigger, mesmo padrão e mesma
+  justificativa do `last_activity_at`. O trigger **recalcula o max**, então
+  apagar um recebimento digitado errado devolve a cobertura anterior.
+- **`amount` guardado por recebimento**, e não reconstruído de `deal_value ×
+  meses`. Reconstrução mente no dia em que o preço muda, e preço de agência
+  muda.
+- **Alerta de atraso** na aba Atenção, na frente de tudo: contrato que vence é
+  problema do mês que vem, cliente que parou de pagar já é deste mês. Com
+  tolerância de 3 dias, porque boleto compensa em um ou dois.
+- **Resultados mostra recebido colado em contratado.** Separados por telas
+  diferentes, o que a pessoa lembra é sempre o maior.
+
+**A decisão que mais importa aqui:** `paid_until` vazio quer dizer *ninguém
+acompanha*, não *caloteiro*. No dia do deploy a carteira inteira está assim, e
+tratar as duas coisas igual poria todo mundo em alerta de uma vez. É a mesma
+lição do `last_activity_at` na Fatia 2, e há teste cobrando os dois lados: uma
+mutação que trocou esse `null` por "vencido desde sempre" derrubou **9 testes
+que já existiam**, não só os novos.
+
+Um bug de produção corrigido de passagem: `renewalDate` usava `setMonth(+1)`
+cru, então contrato fechado em 31 de janeiro com prazo de um mês avisava em
+**3 de março** em vez de 28 de fevereiro.
+
 ---
 
 ## O que falta
@@ -183,15 +223,9 @@ telefone = 1 negócio. Carteira real tem sócio, gerente de marketing e financei
 pela esteira, pela extensão, pelo front inteiro e por 9 scripts em `scripts/`.
 
 **Antes de abrir**, confirme com o dono que a carteira já cresceu o bastante pra
-sentir a falta. Modelar sem uso real é chutar.
-
-### Fatia 5 · Financeiro leve (~2 dias)
-
-`paid_until` + botão "Recebi". Resultados mostra **recebido** ao lado de
-**contratado**. Hoje `deal_value` é contratado, não faturado nem recebido.
-
-Não fazer: parcelas, boleto, NF, integração bancária. Fere o teto de R$30/mês e
-vira produto diferente.
+sentir a falta. Modelar sem uso real é chutar. Perguntado em 2026-08-06, a
+resposta foi **"vai ter em breve"**: ainda não dói, mas é questão de semanas.
+Por isso a Fatia 5 veio antes.
 
 ### Dívidas menores, já mapeadas
 
@@ -208,6 +242,14 @@ vira produto diferente.
   de conversa no WhatsApp). Ela só conhece o rótulo do estado.
 - **Sem verificação visual automatizada de regressão** (nada de screenshot
   diffing). A verificação visual é manual, via Playwright, a cada fatia.
+- **O total "em atraso" soma um mês por devedor, não o acumulado.** O CRM sabe
+  até quando o último recebimento cobriu, não quantos meses ficaram pra trás.
+  Multiplicar por meses estimados seria chute com cara de número. Se a carteira
+  passar a ter inadimplência de vários meses, essa conta precisa mudar.
+- **Recebimento não tem edição, só criação e exclusão.** Digitou errado, apaga e
+  registra de novo. Duas telas pra mesma coisa não se pagavam agora.
+- **A ficha de cliente cancelado não mostra recebimentos.** Cobrar quem já saiu
+  é cobrança, não gestão. Se virar necessidade, o histórico já está no banco.
 
 ---
 
@@ -217,11 +259,13 @@ vira produto diferente.
 |---|---|
 | `front/src/lib/clients.ts` | Regras de carteira: quem é cliente, MRR, atenção, churn. **Um lugar só**, porque a mesma pergunta é feita em 3 telas |
 | `front/src/lib/activities.ts` | `lastTouchAt` e o fallback documentado |
-| `front/src/lib/format.ts` | `parseBRL` e as datas fixadas ao meio-dia local |
+| `front/src/lib/payments.ts` | Dinheiro que **entrou**: soma por período, próxima cobertura. Quem está **devendo** mora em `clients.ts`, que é pergunta de carteira |
+| `front/src/lib/format.ts` | `parseBRL`, as datas fixadas ao meio-dia local, e `addMonths` (que não transborda) |
 | `front/src/components/lead-timeline.tsx` | Timeline unificada |
 | `front/src/components/new-contact-modal.tsx` | Cadastro manual |
 | `front/src/components/churn-modal.tsx` | Saída de cliente |
-| `front/src/components/deal-card.tsx` | Negócio na ficha |
+| `front/src/components/deal-card.tsx` | Negócio na ficha (o que foi combinado) |
+| `front/src/components/payments-card.tsx` | Recebimentos na ficha (o que entrou) |
 | `scripts/schema-offline.mjs` | Aplica as migrations num pglite. Usado pelo `db:validate` **e** pelos testes |
 
-Migrations das três fatias: `20260806120000` até `20260806150100`.
+Migrations das quatro fatias: `20260806120000` até `20260806160000`.
