@@ -1,7 +1,7 @@
 // Implementacao supabase — banco real. Inerte ate existir env + sessao logada.
 // A UI nao muda: mesma interface do mock.
 import { getSupabase } from "../supabase/client";
-import type { ActivityEvent, ActorType, Lead, LeadCreate, LeadDetail, LeadEditable, LeadFile, LeadStatus, MessageTemplate, MessageTemplateInput, ScanCoverage, SearchPreset, SearchPresetInput, SearchProfile, SearchProfileInput } from "../types";
+import type { ActivityEvent, ActorType, Lead, LeadActivity, LeadActivityInput, LeadCreate, LeadDetail, LeadEditable, LeadFile, LeadStatus, MessageTemplate, MessageTemplateInput, ScanCoverage, SearchPreset, SearchPresetInput, SearchProfile, SearchProfileInput } from "../types";
 
 // Bucket PRIVADO dos anexos. Path: <uid>/<leadId>/<arquivo>. RLS no banco garante
 // que cada dono so toca a propria pasta; download sai por URL assinada e curta.
@@ -47,16 +47,18 @@ async function list(): Promise<Lead[]> {
 
 async function detail(id: string): Promise<LeadDetail> {
   const sb = getSupabase();
-  const [lead, prov, hist] = await Promise.all([
+  const [lead, prov, hist, acts] = await Promise.all([
     sb.from("leads").select("*").eq("id", id).single(),
     sb.from("lead_field_provenance").select("*").eq("lead_id", id).order("found_at", { ascending: false }),
     sb.from("lead_status_history").select("*").eq("lead_id", id).order("changed_at", { ascending: false }),
+    sb.from("lead_activities").select("*").eq("lead_id", id).order("happened_at", { ascending: false }),
   ]);
   if (lead.error) throw new Error(lead.error.message);
   return {
     lead: lead.data as Lead,
     provenance: (prov.data ?? []) as LeadDetail["provenance"],
     history: (hist.data ?? []) as LeadDetail["history"],
+    activities: (acts.data ?? []) as LeadActivity[],
   };
 }
 
@@ -121,6 +123,35 @@ async function setArchived(id: string, value: boolean): Promise<Lead> {
 
 async function remove(id: string): Promise<void> {
   const { error } = await getSupabase().from("leads").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+async function listActivities(leadId: string): Promise<LeadActivity[]> {
+  const { data, error } = await getSupabase()
+    .from("lead_activities")
+    .select("*")
+    .eq("lead_id", leadId)
+    .order("happened_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as LeadActivity[];
+}
+
+async function addActivity(leadId: string, input: LeadActivityInput): Promise<LeadActivity> {
+  // happened_at fica de fora quando nao vem: o default do banco (now()) evita
+  // gravar o relogio do navegador, que pode estar torto.
+  const row: Record<string, unknown> = { lead_id: leadId, kind: input.kind, body: input.body };
+  if (input.happened_at) row.happened_at = input.happened_at;
+  const { data, error } = await getSupabase()
+    .from("lead_activities")
+    .insert(row)
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return data as LeadActivity;
+}
+
+async function deleteActivity(id: string): Promise<void> {
+  const { error } = await getSupabase().from("lead_activities").delete().eq("id", id);
   if (error) throw new Error(error.message);
 }
 
@@ -281,6 +312,9 @@ async function deleteTemplate(id: string): Promise<void> {
 
 export const supabaseRepo: LeadsRepo = {
   list,
+  listActivities,
+  addActivity,
+  deleteActivity,
   detail,
   create,
   update,

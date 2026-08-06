@@ -2,7 +2,7 @@
 //  - mock: em memoria (default, roda sem banco)
 //  - supabase: banco real (quando NEXT_PUBLIC_DATA_SOURCE=supabase + envs)
 // Trocar de uma pra outra nao toca a UI.
-import type { ActivityEvent, ActorType, Lead, LeadCreate, LeadDetail, LeadEditable, LeadFile, LeadStatus, MessageTemplate, MessageTemplateInput, ScanCoverage, SearchPreset, SearchPresetInput, SearchProfile, SearchProfileInput } from "../types";
+import type { ActivityEvent, ActorType, Lead, LeadActivity, LeadActivityInput, LeadCreate, LeadDetail, LeadEditable, LeadFile, LeadStatus, MessageTemplate, MessageTemplateInput, ScanCoverage, SearchPreset, SearchPresetInput, SearchProfile, SearchProfileInput } from "../types";
 import { mockRepo } from "./mock";
 import { supabaseRepo } from "./supabase";
 
@@ -19,6 +19,12 @@ export interface LeadsRepo {
   setArchived(id: string, value: boolean): Promise<Lead>;
   /** Exclui de vez (hard delete; apaga proveniencia e historico em cascata). */
   remove(id: string): Promise<void>;
+  /** Linha do tempo do lead: toques registrados, mais recente primeiro. */
+  listActivities(leadId: string): Promise<LeadActivity[]>;
+  /** Registra um toque. Sem `happened_at`, assume agora. */
+  addActivity(leadId: string, input: LeadActivityInput): Promise<LeadActivity>;
+  /** Apaga um toque (digitou errado, duplicou). */
+  deleteActivity(id: string): Promise<void>;
   /** Retorna o perfil de busca do dono logado, ou null se ainda nao existe. */
   getProfile(): Promise<SearchProfile | null>;
   /** Upsert do perfil de busca: cria se nao existe, atualiza se ja existe. */

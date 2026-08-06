@@ -253,10 +253,38 @@ export interface Lead {
   // Inerte ate o modelo de time entrar (ver docs/phase8-multiuser-plan.md).
   assigned_to?: string | null;
 
+  // Data do toque mais recente em lead_activities. Mantida por trigger no banco,
+  // nunca a mao. NAO e updated_at: aquele sobe quando alguem corrige a cidade;
+  // este so sobe quando houve toque de verdade.
+  last_activity_at?: string | null;
+
   // Cadastrado a mao pelo dono, nao veio da descoberta. A esteira enriquece e
   // pontua igual, mas nao descarta por nota: quem digitou ja decidiu que
   // interessa. Descarte por fato (empresa baixada, sem contato) continua valendo.
   manual?: boolean;
+}
+
+// Tipo de toque na linha do tempo. TEXT com check no banco, nao enum: tipo de
+// atividade muda com o uso, e valor novo em enum custa alterar coluna em prod.
+export type ActivityKind = "ligacao" | "reuniao" | "mensagem" | "nota" | "proposta" | "outro";
+
+// Um toque no lead: o que foi feito e falado, com data. Complementa o
+// lead_status_history, que so conta como o funil andou.
+export interface LeadActivity {
+  id: string;
+  lead_id: string;
+  kind: ActivityKind;
+  body: string;
+  // Quando ACONTECEU, nao quando foi digitado: da pra registrar hoje uma
+  // ligacao de ontem. A timeline ordena por aqui.
+  happened_at: string;
+  created_at: string;
+}
+
+export interface LeadActivityInput {
+  kind: ActivityKind;
+  body: string;
+  happened_at?: string;
 }
 
 export interface FieldProvenance {
@@ -335,6 +363,7 @@ export type LeadCreate = LeadEditable & {
 
 export interface LeadDetail {
   lead: Lead;
+  activities: LeadActivity[];
   provenance: FieldProvenance[];
   history: StatusHistory[];
 }
